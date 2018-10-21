@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>groupId</groupId>
-    <artifactId>nildumu</artifactId>
+    <artifactId>nildumu-project</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <dependencies>
@@ -96,6 +96,11 @@
             <groupId>org.jgrapht</groupId>
             <artifactId>jgrapht-io</artifactId>
             <version>1.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.beust</groupId>
+            <artifactId>jcommander</artifactId>
+            <version>1.72</version>
         </dependency>
     </dependencies>
 
@@ -222,7 +227,42 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <mainClass>
+                                nildumu.Main
+                            </mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <archive>
+                                <manifest>
+                                    <mainClass>
+                                        nildumu.Main
+                                    </mainClass>
+                                </manifest>
+                            </archive>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.19.1</version>

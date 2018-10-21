@@ -674,32 +674,7 @@ public interface Operator {
 
         @Override
         Context.ModsCreator computeModsCreator(int i, Bit r, Value x, Value y, List<B> bitValues, DependencySet dataDeps) {
-            if (i > 1){
-                return (c, b, a) -> Mods.empty();
-            }
-            return new StructuredModsCreator() {
-                @Override
-                public Mods assumeOne(Context c, Bit r, Bit a) { // x < y
-                    if (y.isNonNegative()){ // x < y && 0 <= y => x is upper bounded by y
-                        return indexesWithBitValue(y, ZERO).mapToObj(x::get).map(xi -> c.repl(xi, bl.create(ZERO))).collect(Mods.collector());
-                    }
-                    if (y.isNegative()){ // x < y < 0 => x is negative too
-                        return c.repl(x.signBit(), bl.create(ONE));
-                    }
-                    return Mods.empty();
-                }
-
-                @Override
-                public Mods assumeZero(Context c, Bit r, Bit a) { // x >= y
-                    if (x.isNonNegative()){ // y <= x && 0 <= x => y is upper bounded by x
-                        return indexesWithBitValue(x, ZERO).mapToObj(y::get).map(yi -> c.repl(yi, bl.create(ZERO))).collect(Mods.collector());
-                    }
-                    if (x.isNegative()){ // y <= x < 0 => y is negative too
-                        return c.repl(y.signBit(), bl.create(ONE));
-                    }
-                    return Mods.empty();
-                }
-            };
+            return (c, b, a) -> Mods.empty();
         }
     };
 

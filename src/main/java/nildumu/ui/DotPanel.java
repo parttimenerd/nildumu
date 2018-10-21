@@ -18,7 +18,7 @@ import java.util.function.Consumer;
 import javax.swing.*;
 import javax.swing.event.ListDataListener;
 
-import nildumu.*;
+import nildumu.DotRegistry;
 import swp.util.Pair;
 
 public class DotPanel extends JPanel {

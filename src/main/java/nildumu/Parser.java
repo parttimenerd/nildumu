@@ -1591,8 +1591,9 @@ public class Parser implements Serializable {
 
         @Override
         public String toPrettyString(String indent, String incr) {
-            return String.format("%swhile [%s] (%s) {\n%s\n%s}", indent, preCondVarDefs.stream()
-                    .map(MJNode::toString).collect(Collectors.joining(";")),
+            String pres = preCondVarDefs.stream()
+                    .map(MJNode::toString).collect(Collectors.joining(";"));
+            return String.format("%swhile %s (%s) {\n%s\n%s}", indent, pres.isEmpty() ? "" : "[" + pres + "]",
                     conditionalExpression, body.toPrettyString(indent + incr, incr), indent);
         }
 

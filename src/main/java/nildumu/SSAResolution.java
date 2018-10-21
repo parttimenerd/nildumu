@@ -1,6 +1,7 @@
 package nildumu;
 
 import java.util.*;
+import java.util.stream.*;
 
 import swp.parser.lr.BaseAST;
 
@@ -205,7 +206,10 @@ public class SSAResolution implements NodeVisitor<SSAResolution.VisRet> {
             whileStatement.body.statementNodes.add(0, new VariableDeclarationNode(whileStatement.location, newWhilePhiVar, phi));
             stmtsToAdd.add(new VariableDeclarationNode(statementNode.location, newWhilePhiVar, phi));
         }
-        return new VisRet(ret.removeCurrentStatement, stmtsToAdd, prepend);
+        return new VisRet(ret.removeCurrentStatement,
+                Stream.concat(stmtsToAdd.stream(), stmtsToAdd.stream())
+                        .collect(Collectors.toList()),
+                prepend);
     }
 
     /**

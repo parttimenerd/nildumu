@@ -1,7 +1,6 @@
 package nildumu;
 
 import java.time.temporal.ValueRange;
-import java.util.stream.*;
 
 import swp.util.Pair;
 

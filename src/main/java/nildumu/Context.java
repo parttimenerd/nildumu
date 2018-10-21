@@ -3,14 +3,14 @@ package nildumu;
 import java.util.*;
 import java.util.function.*;
 import java.util.logging.*;
-import java.util.stream.*;
+import java.util.stream.Collectors;
 
 import nildumu.util.*;
 import swp.util.Pair;
 
-import static nildumu.util.DefaultMap.ForbiddenAction.*;
 import static nildumu.Lattices.*;
 import static nildumu.Parser.*;
+import static nildumu.util.DefaultMap.ForbiddenAction.*;
 
 /**
  * The context contains the global state and the global functions from the thesis.

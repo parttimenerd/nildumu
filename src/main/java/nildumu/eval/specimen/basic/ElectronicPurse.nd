@@ -1,0 +1,10 @@
+/* Toy program from paper of Backes et. al: "Automatic */
+/* discovery and quantification of information leaks" */
+/* https://github.com/qif/jpf-qif/blob/master/src/examples/plas/ElectronicPurse.java*/
+h input int H = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+int O = 0;
+while (H >= 5 & H < 20){
+    H = H - 5;
+    O = O + 1;
+}
+l output int o = O;

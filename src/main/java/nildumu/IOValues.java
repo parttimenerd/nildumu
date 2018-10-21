@@ -6,8 +6,8 @@ import java.util.stream.Collectors;
 import nildumu.util.DefaultMap;
 import swp.util.Pair;
 
-import static nildumu.util.DefaultMap.ForbiddenAction.*;
 import static nildumu.Lattices.*;
+import static nildumu.util.DefaultMap.ForbiddenAction.*;
 
 /**
  * Contains the bits that are marked as input or output, that have an unknown value

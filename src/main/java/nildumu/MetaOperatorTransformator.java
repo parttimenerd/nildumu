@@ -81,9 +81,9 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
                             ExpressionNode tmp = left;
                             left = right;
                             right = tmp;
-                            op = GREATER;
+                            op = LOWER;
                         }
-                        return new BinaryOperatorNode(new BinaryOperatorNode(left, right, op), new BinaryOperatorNode(left, right, op), BOR);
+                        return repl(new BinaryOperatorNode(new BinaryOperatorNode(left, right, op), new BinaryOperatorNode(left, right, EQUALS), BOR));
                     case MINUS:
                         return repl(new BinaryOperatorNode(new BinaryOperatorNode(binOp.left, new UnaryOperatorNode(binOp.right, TILDE), PLUS), new IntegerLiteralNode(binOp.location, Lattices.ValueLattice.get().parse(1)), PLUS));
                     case PLUS:
