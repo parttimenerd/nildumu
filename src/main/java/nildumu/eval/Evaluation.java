@@ -2,11 +2,12 @@ package nildumu.eval;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import nildumu.*;
-import nildumu.eval.tools.AbstractTool;
+import nildumu.eval.tools.*;
 
 public class Evaluation {
 
@@ -58,6 +59,9 @@ public class Evaluation {
                                                      Path baseFolder){
         PacketList packets = new PacketList();
         tools.forEach(t -> {
+            if (program.hasMethods() && !t.isInterprocedural()){
+                packets.add(AnalysisPacket.empty(t, program));
+            }
             Path folder = baseFolder.resolve(t.name);
             try {
                 Files.createDirectories(folder);
@@ -80,9 +84,9 @@ public class Evaluation {
 
     public static void main(String[] args) {
         try {
-            Evaluation eval = new Evaluation(IntegerType.BYTE, "basic");
+            Evaluation eval = new Evaluation(IntegerType.INT, "");
             PacketList packets = eval.getAllPackets(Paths.get("eval"));
-            packets.writeTemciConfigOrDie("eval/temci.yaml");
+            packets.writeTemciConfigOrDie("eval/temci.yaml", Duration.ofMinutes(5));
             AggregatedAnalysisResults results =
                     new PacketExecutor().analysePackets(packets).aggregate();
             System.out.println(results.toStringPerProgram(AggregatedAnalysisResults.LEAKAGE));

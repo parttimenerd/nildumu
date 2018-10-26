@@ -28,7 +28,7 @@ public class AggregatedAnalysisResults {
                         Collectors.toMap(e -> e.getKey().program, Map.Entry::getValue)));
         perProgram = results.results.entrySet().stream()
                 .collect(Collectors.groupingBy(e -> e.getKey().program,
-                        Collectors.toMap(e -> e.getKey().tool, e -> e.getValue())));
+                        Collectors.toMap(e -> e.getKey().tool, Map.Entry::getValue)));
     }
 
     public String toStringPerTool(AnalysisResultFormatter formatter){
@@ -46,7 +46,6 @@ public class AggregatedAnalysisResults {
      * @param formatter call formatter
      * @param <A> row type
      * @param <B> column type
-     * @param <C> cell type
      * @return csv representation
      */
     public static <A extends Comparable<A>,

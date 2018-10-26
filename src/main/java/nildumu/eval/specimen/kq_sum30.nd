@@ -1,0 +1,4 @@
+h input int x = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+h input int y = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+h input int z = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+l output int o = x + y + z;

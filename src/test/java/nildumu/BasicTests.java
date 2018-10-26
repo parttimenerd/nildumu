@@ -136,6 +136,19 @@ public class BasicTests {
         parse(program);
     }
 
+    @Test
+    public void testMasking(){
+        String program = "int O = 0;\n" +
+                "h input int S = 0buu;\n" +
+                "S = S & 0b00;\n" +
+                "if (S <= 1) {\n" +
+                "\tO = S;\n" +
+                "}\n" +
+                "l output int o = O;";
+        System.out.println(SSATests.toSSA(program));
+        parse(program).leaks(0).run();
+    }
+
     @ParameterizedTest
     @CsvSource({"'int x = 0b0', 1", "'int x = 0b00', 2", "'int x = 0b000', 3", "'l input int x = 0b0u', 2", "'int x = 1', 2"})
     public void testBitWidthDetection(String program, int expectedBitWidth){

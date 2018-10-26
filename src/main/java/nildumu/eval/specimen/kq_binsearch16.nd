@@ -1,0 +1,18 @@
+/* https://github.com/approxflow/approxflow/blob/master/experiment-tools/experiments/klebanov-qest/binsearch.16.c*/
+h input int I = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+
+int BITS = 16;
+
+int O = 0;
+
+int m = 0;
+int i = 0;
+
+while (i < BITS){
+    m = 1<<(30-i);
+    if (O + m <= I) {
+        O = O + m;
+    }
+    i = i + 1;
+}
+l output int o = O;

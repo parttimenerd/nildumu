@@ -12,9 +12,11 @@ import nildumu.eval.*;
 public abstract class AbstractTool implements Comparable<AbstractTool> {
 
     public final String name;
+    public final boolean supportsFunctions;
 
-    protected AbstractTool(String name) {
+    protected AbstractTool(String name, boolean supportsFunctions) {
         this.name = name;
+        this.supportsFunctions = supportsFunctions;
     }
 
     /**
@@ -40,13 +42,22 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
 
     public static List<AbstractTool> getDefaultTools(){
         return Arrays.asList(
-                new NildumuDemoTool(2, 2),
-                new NildumuDemoTool(5, 5),
-                new LeakWatch());
+                //new NildumuDemoTool(2, 2),
+                //new NildumuDemoTool(5, 5),
+                new Flowcheck()
+                //new LeakWatch(),
+                //new ApproxFlow(),
+                //new Nildumu()
+                //new Quail()
+        );
     }
 
     @Override
     public int compareTo(AbstractTool o) {
         return name.compareTo(o.name);
+    }
+
+    public boolean isInterprocedural(){
+        return supportsFunctions;
     }
 }

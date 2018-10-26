@@ -30,7 +30,7 @@ public class LeakWatch extends JavaBytecodeBasedTool {
                     input.variable,
                     input.variable);
         }, output -> {
-            return String.format("LeakWatchAPI.observe(%s);", output.expression);
+            return String.format("LeakWatchAPI.observe(%s);", program.formatExpression(output.expression));
         });
         return "import bham.leakwatch.LeakWatchAPI;\n" +
                 "\n" +
@@ -50,15 +50,11 @@ public class LeakWatch extends JavaBytecodeBasedTool {
         } catch (IOException e) {
             //e.printStackTrace();
         }
-        return String.format("java -jar leakwatch.jar %s", MAIN_CLASS_NAME);
+        return String.format("java -jar leakwatch.jar --measure mel -i 10 %s", MAIN_CLASS_NAME);
     }
 
     @Override
     public LeakageParser getLeakageParser(TestProgram program) {
-        return (outs, errs) -> {
-            return Float.parseFloat(outs
-                    .split("corrected leakage: ")[1]
-                    .split("bits")[0]);
-        };
+        return LeakageParser.forLinePart(this, " corrected leakage ", " (+/-");
     }
 }

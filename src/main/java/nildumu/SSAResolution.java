@@ -106,7 +106,23 @@ public class SSAResolution implements NodeVisitor<SSAResolution.VisRet> {
 
     @Override
     public VisRet visit(VariableAssignmentNode assignment) {
-        visitChildrenDiscardReturn(assignment.expression);
+        /*variableAccess.definition = resolve(variableAccess.definition);
+        if (currentMethod != null && currentMethod.parameters.parameterNodes.stream().anyMatch(p -> p.definition == variableAccess.definition)){
+            variableAccess.definingExpression = new ParameterAccessNode(variableAccess.location, variableAccess.ident);
+            ((ParameterAccessNode) variableAccess.definingExpression).definition = variableAccess.definition;
+        }*/
+        ExpressionNode definingExpr = null;
+        if (assignment.expression instanceof VariableAccessNode){
+            VariableAccessNode variableAccess = (VariableAccessNode)assignment.expression;
+            VariableAccessNode newVariableAccess = new VariableAccessNode(assignment.expression.location, variableAccess.ident);
+            newVariableAccess.definition = resolve(variableAccess.definition);
+            /*if (assignment.expression instanceof ParameterAccessNode) {
+                assignment.expression =
+            }*/
+            assignment.expression = newVariableAccess;
+        } else {
+            visitChildrenDiscardReturn(assignment.expression);
+        }
         Variable newVariable = create(assignment.definition);
         assignment.definition = newVariable;
         return new VisRet(true,
@@ -187,6 +203,7 @@ public class SSAResolution implements NodeVisitor<SSAResolution.VisRet> {
 
     @Override
     public VisRet visit(WhileStatementNode whileStatement) {
+        
         VisRet ret = visit(whileStatement, whileStatement.body, new BlockNode(whileStatement.location, new ArrayList<>()));
         List<StatementNode> prepend = new ArrayList<>(ret.statementsToPrepend);
         List<StatementNode> stmtsToAdd = new ArrayList<>();
@@ -501,9 +518,9 @@ public class SSAResolution implements NodeVisitor<SSAResolution.VisRet> {
         while (accessesToAccesses.size() > 0){
             new HashSet<>(accessesToAccesses).forEach(access -> {
                 ExpressionNode newDefining = definingExprs.get(((VariableAccessNode)access.definingExpression).definition);
-                if (!(newDefining instanceof VariableAccessNode) || newDefining instanceof ParameterAccessNode){
+                //if (!(newDefining instanceof VariableAccessNode) || newDefining instanceof ParameterAccessNode){
                     accessesToAccesses.remove(access);
-                }
+                //}
             });
         }
     }

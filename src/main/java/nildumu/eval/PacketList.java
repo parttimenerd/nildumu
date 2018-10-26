@@ -2,6 +2,7 @@ package nildumu.eval;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.*;
 
@@ -18,14 +19,16 @@ public class PacketList implements Iterable<AnalysisPacket> {
     }
 
 
-    public String getTemciConfig(){
-        return packets.stream().map(AnalysisPacket::toTemciConfigEntry)
+    public String getTemciConfig(Duration timeLimit){
+        return packets.stream()
+                .filter(p -> !p.emptyPacket)
+                .map(p -> p.getShellCommandWithAbsolutePaths(timeLimit))
                 .collect(Collectors.joining("\n"));
     }
 
-    public void writeTemciConfigOrDie(String filename){
+    public void writeTemciConfigOrDie(String filename, Duration timeLimit){
         try {
-            Files.write(Paths.get(filename), Collections.singleton(getTemciConfig()));
+            Files.write(Paths.get(filename), Collections.singleton(getTemciConfig(timeLimit)));
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(0);

@@ -2,12 +2,13 @@ package nildumu.eval.tools;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.time.Duration;
 import java.util.*;
 
 import nildumu.eval.*;
 
 /**
- * Tool that analyses Java bytecode
+ * Tool that analyses Java bytecode and supports methods
  */
 public abstract class JavaBytecodeBasedTool extends AbstractTool {
 
@@ -16,7 +17,7 @@ public abstract class JavaBytecodeBasedTool extends AbstractTool {
     final Path javaLibForCompilation;
 
     protected JavaBytecodeBasedTool(String name, Path javaLibForCompilation) {
-        super(name);
+        super(name, true);
         this.javaLibForCompilation = javaLibForCompilation;
     }
 
@@ -43,7 +44,7 @@ public abstract class JavaBytecodeBasedTool extends AbstractTool {
         }
         return new AnalysisPacket(this, program) {
             @Override
-            public String getShellCommand(PathFormatter formatter) {
+            public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
                 return String.format("cd %s; javac %s %s.java; %s",
                         formatter.format(folder),
                         javaLibForCompilation == null ? "" :

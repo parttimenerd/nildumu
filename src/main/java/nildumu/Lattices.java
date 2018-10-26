@@ -1018,7 +1018,7 @@ public class Lattices {
             this.val = newVal;
         }
 
-        B val() {
+        public B val() {
             return val;
         }
 
@@ -1169,7 +1169,7 @@ public class Lattices {
         public Value(List<Bit> bits) {
             //assert bits.size() > 1;
             this.bits = bits;
-            for (int i = 0; i < Math.min(bits.size(), vl == null ? 1000 :vl.bitWidth); i++) {
+            for (int i = 0; i < Math.min(bits.size(), vl == null ? 1000 : vl.bitWidth); i++) {
                 Bit bit = bits.get(i);
                 bit.valueIndex(i + 1);
                 bit.value(this);

@@ -1,0 +1,2 @@
+h input int S = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+l output int o = S & 0b11111111111111110000000000000000; /*0xffff0000*/

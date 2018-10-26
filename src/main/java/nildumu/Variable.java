@@ -42,4 +42,8 @@ public class Variable {
         parts.add(name);
         return String.join(" ", parts);
     }
+
+    public String name(){
+        return name;
+    }
 }

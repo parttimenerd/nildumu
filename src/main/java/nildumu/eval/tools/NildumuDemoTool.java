@@ -1,6 +1,7 @@
 package nildumu.eval.tools;
 
 import java.nio.file.*;
+import java.time.Duration;
 
 import nildumu.eval.*;
 
@@ -23,13 +24,13 @@ public class NildumuDemoTool extends AbstractTool {
      * @param scsrec maximum recusion depth for the call string handler used by the summary handler
      */
     public NildumuDemoTool(int csrec, int scsrec){
-        super(String.format("nildumu-demo_%d_%d", csrec, scsrec));
+        super(String.format("nildumu-demo_%d_%d", csrec, scsrec), true);
         this.mih = String.format("handler=call_string;maxrec=%d;bot={handler=summary;csmaxrec=%d}",
                 csrec, scsrec);
     }
 
     public NildumuDemoTool(String mih) {
-        super("nildumu-demo" + mih);
+        super("nildumu-demo" + mih, true);
         this.mih = mih;
     }
 
@@ -39,7 +40,7 @@ public class NildumuDemoTool extends AbstractTool {
                 program.program.toPrettyString());
         return new AnalysisPacket(this, program) {
             @Override
-            public String getShellCommand(PathFormatter formatter) {
+            public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
                 return String.format("java -jar %s %s --handler \"%s\"",
                         formatter.format(JAR_PATH),
                         formatter.format(file), mih);

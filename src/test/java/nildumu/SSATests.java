@@ -126,8 +126,7 @@ public class SSATests {
                 "l output int o = _3_bla(h);");
     }
 
-    @Test
-    public Parser.ProgramNode toSSA(String program){
+    public static Parser.ProgramNode toSSA(String program){
         System.out.println(Parser.process(program).toPrettyString());
         return Parser.process(program);
     }

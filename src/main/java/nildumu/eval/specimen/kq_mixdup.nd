@@ -1,0 +1,5 @@
+/* https://github.com/approxflow/approxflow/blob/master/experiment-tools/experiments/klebanov-qest/mixdup.c*/
+h input int x = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+int y = ( ( x >> 16 ) ^ x ) & 0b11111111111111111111111111111111;
+int O = y | ( y << 16 );
+l output int o = O;

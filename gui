@@ -13,5 +13,6 @@ esac
 PROJECT_DIR=$(dirname "$SCRIPT_PATH")
 
 cd "$PROJECT_DIR"
+mvn clean
 mvn compile
 mvn exec:java -Dgui
