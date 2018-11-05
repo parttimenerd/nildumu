@@ -11,9 +11,23 @@ import nildumu.eval.tools.AbstractTool;
 public class AggregatedAnalysisResults {
 
     public static final AnalysisResultFormatter LEAKAGE =
-            r -> String.format("%.3f", r.leakage);
+            r -> {
+                if (r.hasTimeout){
+                    return "(timeout)";
+                }
+                if (!r.isValid()){
+                    return "-";
+                }
+                return String.format("%.3f", r.leakage);
+            };
     public static final AnalysisResultFormatter RUNTIME =
             r -> {
+                if (r.hasTimeout){
+                    return "(timeout)";
+                }
+                if (!r.isValid()){
+                    return "-";
+                }
                 long seconds = r.runtime.getSeconds();
                 long millis = r.runtime.toMillis() - seconds * 1000;
                 return String.format("%d.%03ds", seconds, millis);
@@ -87,10 +101,7 @@ public class AggregatedAnalysisResults {
                             .map(map::get)
                             .map(m -> m.get(columnHeader))
                             .map(r -> {
-                                if (r.valid){
-                                    return formatter.format(r);
-                                }
-                                return "";
+                                return formatter.format(r);
                             })
                             .collect(Collectors.toList()));
         }

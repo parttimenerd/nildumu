@@ -1,0 +1,11 @@
+/* [1] Z. Meng and G. Smith, Calculating Bounds on Information Leakage Using Two-bit Patterns, in Proceedings of the ACM SIGPLAN 6th Workshop on Programming Languages and Analysis for Security, 2011, p. 1:1--1:12. */
+/* Should leak 4 bits */
+h input int S = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+int O = 0;
+int base = 0b00000000000000000001000000000000;
+if (S < 16){
+    O = base + S;
+} else {
+    O = base;
+}
+l output int o = O;

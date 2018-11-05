@@ -28,16 +28,20 @@ public class Flowcheck extends AbstractTool {
         String methods = program.methodsToJavaCode("", type);
         Util.Box<Integer> argCount = new Util.Box<>(1);
         return "#include <stdio.h>\n#include <stdlib.h>\n" +
-                String.format("#include <%s/include/valgrind/flowcheck.h>\n",
+                String.format("#include <%s/include/valgrind/flowcheck.h>\n\n",
                         approxFlowFolder.toAbsolutePath()) +
+                program.methodsToCDeclarations(type) +
+                methods + "\n\n" +
                 "int main(int argc, char *argv[]){\n" +
                 program.globalToJavaCode(
-                        s -> String.format("%s %s = (%s)atoi(argv[%d]);\nFC_TAINT_WORD(&%s);\n",
-                                type, s.variable, type, argCount.val++, s.variable),
+                        s -> {
+                            return String.format("%s %s = (%s)atoi(argv[%d]);\n",
+                                    type, s.variable, type, argCount.val++)
+                                    + (s.secLevel.equals("h") ? String.format("FC_TAINT_WORD(&%s);\n", s.variable) : "");
+                        },
                         s -> String.format("printf(\"%%d\", (%s)(%s));", type,
                                 program.formatExpression(s.expression)), type) +
-                "}\n\n" +
-                methods;
+                "}";
     }
 
     @Override

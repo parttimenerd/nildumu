@@ -2,6 +2,8 @@ package nildumu.eval.tools;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import nildumu.eval.*;
 
@@ -21,14 +23,12 @@ public class LeakWatch extends JavaBytecodeBasedTool {
     @Override
     public String generateJavaSourceCode(TestProgram program) {
         String global = program.globalToJavaCode(input -> {
-            return String.format("%s %s = (%s) $$rand$$.nextInt(%s);\n" +
-                            "LeakWatchAPI.secret(\"%s\", %s);",
+            return String.format("%s %s = (%s) $$rand$$.nextInt(%s);\n",
                     program.integerType.toJavaTypeName(),
                     input.variable,
                     program.integerType.toJavaTypeName(),
-                    program.integerType.width,
-                    input.variable,
-                    input.variable);
+                    program.integerType.width) + (input.secLevel.equals("h") ? String.format("LeakWatchAPI.secret(\"%s\", %s);", input.variable,
+                    input.variable) : "");
         }, output -> {
             return String.format("LeakWatchAPI.observe(%s);", program.formatExpression(output.expression));
         });
@@ -50,11 +50,22 @@ public class LeakWatch extends JavaBytecodeBasedTool {
         } catch (IOException e) {
             //e.printStackTrace();
         }
-        return String.format("java -jar leakwatch.jar --measure mel -i 10 %s", MAIN_CLASS_NAME);
+        return String.format("java -jar leakwatch.jar --measure mel -i 50 %s", MAIN_CLASS_NAME);
     }
 
     @Override
     public LeakageParser getLeakageParser(TestProgram program) {
-        return LeakageParser.forLinePart(this, " corrected leakage ", " (+/-");
+        return (out, err) -> {
+            String combined = out + "\n" + err;
+            List<String> leakLines = Arrays.stream(combined.toLowerCase().split("estimated leakage:? "))
+                    .map(l -> l.split(" ([(b])")[0]).collect(Collectors.toList());
+            if (leakLines.size() > 0){
+                String leakLine = leakLines.get(leakLines.size() - 1);
+                try {
+                    return Float.parseFloat(leakLine);
+                } catch (NumberFormatException ex) {}
+            }
+            throw new LeakageParserException(this, out, err);
+        };
     }
 }

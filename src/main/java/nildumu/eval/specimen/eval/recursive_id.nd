@@ -1,0 +1,12 @@
+/* Should leak five bit */
+int id(int end){
+    int r = 0;
+    if (end > 0) {
+        r = id(end - 1) + 1;
+    }
+    return r;
+}
+
+h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+int z = id(h & 0b11111);
+l output int o = z;

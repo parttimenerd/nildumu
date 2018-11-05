@@ -4,9 +4,7 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.Collections;
-import java.util.stream.*;
 
-import nildumu.Variable;
 import nildumu.eval.*;
 
 /**
@@ -20,8 +18,15 @@ public class ApproxFlow extends AbstractTool {
 
     static final Path approxFlowFolder = Paths.get("../eval-programs/approxflow");
 
-    protected ApproxFlow() {
-        super("ApproxFlow", true);
+    final int unwindLimit;
+
+    ApproxFlow() {
+        this(32);
+    }
+
+    ApproxFlow(int unwindLimit) {
+        super("ApproxFlow" + unwindLimit, true);
+        this.unwindLimit = unwindLimit;
     }
 
     static String toCCode(TestProgram program){
@@ -30,14 +35,20 @@ public class ApproxFlow extends AbstractTool {
                 program.integerType.toJavaTypeName();
         assert program.getOutputVariables().size() == 1;
         String methods = program.methodsToJavaCode("", type);
-        return String.format("%s nondet(void);\n", type) +
+        return String.format("%s nondet(void);\n\n", type) +
+                program.methodsToCDeclarations(type) +
+                methods + "\n\n" +
                 String.format("%s %s(){\n", type, GLOBAL_FUNCTION) +
                 program.globalToJavaCode(
-                        s -> String.format("%s %s = nondet();", type, s.variable),
+                        s -> {
+                            if (s.secLevel.equals("l")){
+                                throw new UnsupportedLanguageFeatureException(new ApproxFlow(), "low inputs");
+                            }
+                            return String.format("%s %s = nondet();", type, s.variable);
+                        },
                         s -> String.format("return (%s)(%s);", type,
                                 program.formatExpression(s.expression)), type) +
-                "}\n\n" +
-                methods;
+                "}";
     }
 
     @Override
@@ -53,9 +64,10 @@ public class ApproxFlow extends AbstractTool {
             @Override
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
 
-                return String.format("cd %s; cp %s code.c; python ApproxFlow.py code.c %s",
+                return String.format("cd %s; cp %s code.c; UNWIND=%d python ApproxFlow.py code.c %s",
                         formatter.format(approxFlowFolder),
                         sourceFile.toAbsolutePath(),
+                        unwindLimit,
                         GLOBAL_FUNCTION);
             }
 

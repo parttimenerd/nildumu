@@ -34,7 +34,7 @@ public class PacketExecutor {
         long start = System.nanoTime();
         Process process_ = null;
         try {
-            System.err.println("bash -c 'timeout -s9 " + (timeLimit.getSeconds() + 1) + " " +
+            System.err.println("bash -c 'timeout -s9 " + (timeLimit.getSeconds()) + " " +
                     StringEscapeUtils.escapeJava(packet.getShellCommand(timeLimit)) + "'");
             process_ = Runtime.getRuntime().exec(new String[]{"timeout", "-s9",
                     timeLimit.getSeconds() + "",
@@ -52,11 +52,14 @@ public class PacketExecutor {
         Future<String> error = newFixedThreadPool.submit(() -> {
             return IOUtils.toString(process.getErrorStream());
         });
-
+        AnalysisResult timeoutRes = new AnalysisResult(false, -1, null, true);
         newFixedThreadPool.shutdown();
         System.out.println("Hi" + timeLimit.getSeconds());
         try {
-            if (!process.waitFor(timeLimit.getSeconds(), TimeUnit.SECONDS)) {
+            if (!process.waitFor(timeLimit.getSeconds() + 5, TimeUnit.SECONDS)) {
+                try {
+                String out = output.get(timeLimit.getSeconds(), TimeUnit.SECONDS);
+                String err = error.get(timeLimit.getSeconds(), TimeUnit.SECONDS);
                 System.out.println("Ho");
                 process.destroyForcibly();
                 process.waitFor();
@@ -64,16 +67,22 @@ public class PacketExecutor {
                 /*if (output.get().length() > 0) {
                     System.out.println("OUT: " + output.get());
                 }*/
-                if (error.get().length() > 0) {
-                    System.err.println("ERR: " + error.get());
-                }
-                System.out.println("Ho2");
-                try {
+
+                    if (err.length() > 0) {
+                        System.err.println("ERR: " + err);
+                    }
+                    System.out.println("Ho2");
+                    if (process.exitValue() == 124){
+                        return timeoutRes;
+                    }
                     return new AnalysisResult(true, packet.getLeakageParser()
-                            .parse(output.get(), error.get()), timeLimit, true);
-                } catch (LeakageParserException ex){
-                    return new AnalysisResult(false, -1, null, true);
+                            .parse(out, err), timeLimit, true);
+                } catch (LeakageParserException | TimeoutException ex){
+                    return timeoutRes;
                 }
+            }
+            if (process.exitValue() == 124 || process.exitValue() == 137){
+                return timeoutRes;
             }
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
@@ -84,6 +93,9 @@ public class PacketExecutor {
             }
             if (error.get().length() > 0) {
                 System.err.println("ERR: " + error.get());
+            }
+            if (process.exitValue() == 124 || process.exitValue() == 137){
+                return timeoutRes;
             }
             return new AnalysisResult(
                     true, packet.getLeakageParser().parse(output.get(), error.get()),

@@ -51,7 +51,7 @@ public abstract class AnalysisPacket {
         return String.format("- attributes: {description: \"%s\"}\n",
                 StringEscapeUtils.escapeJava(toString())) +
                 "  run_config:\n" +
-                String.format("    run_cmd: \"timeout -s9 %f %s\"",
+                String.format("    run_cmd: \"timeout -s9 %f bash -c '%s'\"",
                         timeLimit.toMillis() / 1000.0,
                         StringEscapeUtils.escapeJava(getShellCommandWithAbsolutePaths(timeLimit)));
     }

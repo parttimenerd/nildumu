@@ -1,0 +1,217 @@
+package nildumu.eval;
+
+import java.util.*;
+import java.util.function.*;
+
+import nildumu.*;
+import swp.lexer.Location;
+
+import static nildumu.Lattices.*;
+import static nildumu.Parser.*;
+
+public class Generator {
+
+    static Location loc() {
+        return new Location(0, 0);
+    }
+
+    public static IfStatementNode createNestedIfStatement(int comparisons,
+                                                          Function<Integer, ExpressionNode> condExprCreator,
+                                                          Function<Integer, StatementNode> thenStmtCreator) {
+        StatementNode cur = new EmptyStatementNode(loc());
+        for (int i = comparisons - 1; i > 0; i--) {
+            cur = new IfStatementNode(loc(), condExprCreator.apply(i), thenStmtCreator.apply(i), cur);
+        }
+        return (IfStatementNode) cur;
+    }
+
+    static IntegerLiteralNode literal(int num){
+        return new IntegerLiteralNode(loc(), vl.parse(num));
+    }
+
+    static VariableAccessNode access(String variable){
+        return new VariableAccessNode(loc(), variable);
+    }
+
+    /**
+     * Each if statement has a condition of the form $h == I$, $h$ being the secret input variable
+     * and $I$ being the nesting level, and $om$ and intermediate output value
+     */
+    public static ProgramNode createProgramOfNestedIfStmtsWithEqs(int comparisons,
+                                                                  Function<Integer, StatementNode> thenStmtCreator) {
+        ProgramNode program = new ProgramNode(new Context(BasicSecLattice.get(), 32));
+        program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h",
+                new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
+                "h"));
+        program.addGlobalStatement(new VariableDeclarationNode(loc(), "om", new IntegerLiteralNode(loc(), vl.parse(0))));
+        program.addGlobalStatement(createNestedIfStatement(comparisons,
+                i -> new BinaryOperatorNode(new VariableAccessNode(loc(), "h"),
+                        new IntegerLiteralNode(loc(), vl.parse(i)), LexerTerminal.EQUALS), thenStmtCreator));
+        program.addGlobalStatement(
+                new OutputVariableDeclarationNode(loc(), "o",
+                        new VariableAccessNode(loc(), "om"), "l"));
+        return program;
+    }
+
+    public static ProgramNode createProgramOfNestedIfStmtsWithEqsAndBasicAssign(int comparisons) {
+        return createProgramOfNestedIfStmtsWithEqs(comparisons, i -> new VariableAssignmentNode(loc(), "o", new IntegerLiteralNode(loc(), vl.parse(i))));
+    }
+
+    public static BlockNode createMultipleIfStatements(int comparisons,
+                                                       Function<Integer, ExpressionNode> condExprCreator,
+                                                       Function<Integer, StatementNode> thenStmtCreator,
+                                                       Function<Integer, StatementNode> elseStmtCreator) {
+        List<StatementNode> ifs = new ArrayList<>();
+        for (int i = 0; i < comparisons; i++) {
+            ifs.add(new IfStatementNode(loc(), condExprCreator.apply(i), thenStmtCreator.apply(i), elseStmtCreator.apply(i)));
+        }
+        return new BlockNode(loc(), ifs);
+    }
+
+    /**
+     * Each if statement has a condition of the form $h == I$, $h$ being the secret input variable
+     * and $I$ being the nesting level, and $om$ and intermediate output value
+     */
+    public static ProgramNode createProgramOfIfStmtsWithEqs(int comparisons,
+                                                                  Function<Integer, StatementNode> thenStmtCreator) {
+        ProgramNode program = new ProgramNode(new Context(BasicSecLattice.get(), 32));
+        program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h",
+                new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
+                "h"));
+        program.addGlobalStatement(new VariableDeclarationNode(loc(), "om", new IntegerLiteralNode(loc(), vl.parse(1))));
+        program.addGlobalStatement(createMultipleIfStatements(comparisons,
+                i -> new BinaryOperatorNode(new VariableAccessNode(loc(), "h"),
+                        literal(i + 1), LexerTerminal.EQUALS), thenStmtCreator,
+                i -> new EmptyStatementNode(loc())));
+        program.addGlobalStatement(
+                new OutputVariableDeclarationNode(loc(), "o",
+                        new VariableAccessNode(loc(), "om"), "l"));
+        return program;
+    }
+
+    public static ProgramNode createProgramOfIfStmtsWithEqsSurroundedByCountingLoop(int comparisons,
+                                                            Function<Integer, StatementNode> thenStmtCreator) {
+        ProgramNode program = new ProgramNode(new Context(BasicSecLattice.get(), 32));
+        program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h",
+                new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
+                "h"));
+        program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "l",
+                new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
+                "l"));
+        program.addGlobalStatement(new VariableDeclarationNode(loc(), "z", literal(1)));
+        List<StatementNode> innerStmts = new ArrayList<>();
+        innerStmts.addAll(createMultipleIfStatements(comparisons,
+                i -> new BinaryOperatorNode(new VariableAccessNode(loc(), "h"),
+                        literal(i + 1), LexerTerminal.EQUALS), thenStmtCreator,
+                i -> new EmptyStatementNode(loc())).statementNodes);
+        innerStmts.add(new VariableAssignmentNode(loc(), "l", new BinaryOperatorNode(new VariableAccessNode(loc(), "l"), literal(1), LexerTerminal.PLUS)));
+        program.addGlobalStatement(new WhileStatementNode(loc(), new BinaryOperatorNode(access("l"), literal(0), LexerTerminal.LOWER), new BlockNode(loc(), innerStmts)));
+        program.addGlobalStatement(
+                new OutputVariableDeclarationNode(loc(), "o",
+                        new VariableAccessNode(loc(), "z"), "l"));
+        return program;
+    }
+
+    public static ProgramNode createProgramOfIfStmtsWithEqsSurroundedByCountingLoop(int comparisons) {
+        return createProgramOfIfStmtsWithEqsSurroundedByCountingLoop(comparisons, i -> new VariableAssignmentNode(loc(), "z", literal(i + 1)));
+    }
+
+    public static ProgramNode repeatedFibonaccis(int comparisons,
+                                                 Function<Integer, ExpressionNode> fibArgumentCreator){
+        ProgramNode program = new ProgramNode(new Context(BasicSecLattice.get(), 32));
+        program.addMethod(((ProgramNode) generator.parse("int fib(int n) { int r = 1; if (n > 2) { r = fib(n - 1) + fib(n - 2);} return r;}"))
+                .getMethod("fib"));
+        program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h",
+                new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
+                "h"));
+        program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h2",
+                new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
+                "h"));
+        program.addGlobalStatement(new VariableDeclarationNode(loc(), "z", literal(1)));
+        List<StatementNode> innerStmts = new ArrayList<>();
+        program.addGlobalStatements(createMultipleIfStatements(comparisons,
+                i -> new BinaryOperatorNode(new VariableAccessNode(loc(), "h"),
+                        literal(i + 1), LexerTerminal.EQUALS), i -> {
+            return new VariableAssignmentNode(loc(), "z", new MethodInvocationNode(loc(), "fib", new ArgumentsNode(loc(), Collections.singletonList(fibArgumentCreator.apply(i)))));
+                },
+                i -> new EmptyStatementNode(loc())).statementNodes);
+        program.addGlobalStatement(
+                new OutputVariableDeclarationNode(loc(), "o",
+                        new VariableAccessNode(loc(), "z"), "l"));
+        return program;
+    }
+
+    public static ProgramNode repeatedFibonaccis(int comparisons){
+        return repeatedFibonaccis(comparisons, i -> new BinaryOperatorNode(
+                new BinaryOperatorNode(access("h2"), access("h"), LexerTerminal.BAND),
+                literal(0xffff), LexerTerminal.BAND));
+    }
+
+    public static ProgramNode repeatedManyFibonaccis(int comparisons,
+                                                 Function<Integer, ExpressionNode> fibArgumentCreator){
+        ProgramNode program = new ProgramNode(new Context(BasicSecLattice.get(), 32));
+        for (int i = 0; i < comparisons; i++) {
+            int other = i + 1 == comparisons ? 1: i + 2 % comparisons;
+            program.addMethod(((ProgramNode) generator.parse(String.format("int fib%d(int n) { int r = 1; if (n > 2) { r = fib%d(n - 1) + fib%d(n - 2);} return r;}",
+                    i + 1, other, other
+                    )))
+                    .getMethod(String.format("fib%d", i + 1)));
+        }
+        program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h",
+                new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
+                "h"));
+        program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h2",
+                new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
+                "h"));
+        program.addGlobalStatement(new VariableDeclarationNode(loc(), "z", literal(1)));
+        List<StatementNode> innerStmts = new ArrayList<>();
+        program.addGlobalStatements(createMultipleIfStatements(comparisons,
+                i -> new BinaryOperatorNode(new VariableAccessNode(loc(), "h"),
+                        literal(i + 1), LexerTerminal.EQUALS), i -> {
+                    return new VariableAssignmentNode(loc(), "z", new MethodInvocationNode(loc(), "fib" + (i + 1), new ArgumentsNode(loc(), Collections.singletonList(fibArgumentCreator.apply(i)))));
+                },
+                i -> new EmptyStatementNode(loc())).statementNodes);
+        program.addGlobalStatement(
+                new OutputVariableDeclarationNode(loc(), "o",
+                        new VariableAccessNode(loc(), "z"), "l"));
+        return program;
+    }
+
+    public static ProgramNode repeatedManyFibonaccis(int comparisons){
+        return repeatedManyFibonaccis(comparisons, i -> new BinaryOperatorNode(
+                new BinaryOperatorNode(access("h2"), access("h"), LexerTerminal.BAND),
+                literal(0xffff), LexerTerminal.BAND)
+        );
+    }
+
+
+    public static ProgramNode createProgramOfIfStmtsWithEqsAndBasicAssign(int comparisons) {
+        return createProgramOfIfStmtsWithEqs(comparisons, i -> new VariableAssignmentNode(loc(), "om", new IntegerLiteralNode(loc(), vl.parse(i))));
+    }
+
+    public static ProgramNode createProgramOfIfStmtsWithEqsSurroundedByWhile(int comparisons,
+                                                            Supplier<BinaryOperatorNode> whileCondCreator,
+                                                            Function<Integer, StatementNode> thenStmtCreator,
+                                                            Function<Integer, StatementNode> elseStmtCreator) {
+        ProgramNode program = new ProgramNode(new Context(BasicSecLattice.get(), 32));
+        program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h",
+                new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
+                "h"));
+        program.addGlobalStatement(new VariableDeclarationNode(loc(), "om", new IntegerLiteralNode(loc(), vl.parse(0))));
+        program.addGlobalStatement(new WhileStatementNode(loc(), whileCondCreator.get(), createMultipleIfStatements(comparisons,
+                i -> new BinaryOperatorNode(new VariableAccessNode(loc(), "h"),
+                        new IntegerLiteralNode(loc(), vl.parse(i)), LexerTerminal.EQUALS), thenStmtCreator,
+                elseStmtCreator)));
+        program.addGlobalStatement(
+                new OutputVariableDeclarationNode(loc(), "o",
+                        new VariableAccessNode(loc(), "om"), "l"));
+        return program;
+    }
+
+    public static ProgramNode createProgramOfIfStmtsWithEqsAndBasicAssignSurroundedByWhile(int comparisons) {
+        return createProgramOfIfStmtsWithEqsSurroundedByWhile(comparisons, () -> {
+            return new BinaryOperatorNode(new BinaryOperatorNode(new VariableAccessNode(loc(), "h"), literal(31), LexerTerminal.LEFT_SHIFT), literal(0), LexerTerminal.EQUALS);
+        }, i -> new VariableAssignmentNode(loc(), "om", new IntegerLiteralNode(loc(), vl.parse(i))),
+                i -> i == comparisons - 1 ? new VariableAssignmentNode(loc(), "h", literal(1)) : new EmptyStatementNode(loc()));
+    }
+}

@@ -22,7 +22,7 @@ public class PacketList implements Iterable<AnalysisPacket> {
     public String getTemciConfig(Duration timeLimit){
         return packets.stream()
                 .filter(p -> !p.emptyPacket)
-                .map(p -> p.getShellCommandWithAbsolutePaths(timeLimit))
+                .map(p -> p.toTemciConfigEntry(timeLimit))
                 .collect(Collectors.joining("\n"));
     }
 
@@ -33,6 +33,11 @@ public class PacketList implements Iterable<AnalysisPacket> {
             e.printStackTrace();
             System.exit(0);
         }
+    }
+
+    public void writeTemciConfigOrDiePerProgram(Path folder, String filenameEnd, Duration timeLimit){
+        Map<Object, PacketList> map = packets.stream().collect(Collectors.groupingBy(p -> p.program.name, PacketList.collector()));
+        map.forEach((name, packets) -> packets.writeTemciConfigOrDie(folder.resolve(name + "_" + filenameEnd).toString(), timeLimit));
     }
 
     public int size() {

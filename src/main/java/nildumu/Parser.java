@@ -121,7 +121,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/blaf5ef65534r6r5df5344474i4f46u7s5f2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/blaff5ef65534r6r5df5344474i4f46u7s5f22", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 builder.addRule("program", "use_sec? bit_width? lines", asts -> {
                             SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>)asts.get(0)).get(0).wrapped;
@@ -149,7 +149,6 @@ public class Parser implements Serializable {
                             int bitWidth = declaredBitWidth;
                             if (declaredBitWidth == -1){
                                 bitWidth = lowerBitWidthBound;
-                                System.out.println(String.format("Using bit width of %d", bitWidth));
                             }
                             ProgramNode node = new ProgramNode(new Context(secLattice, bitWidth));
                             NodeVisitor visitor = new NodeVisitor<Object>(){
@@ -349,8 +348,8 @@ public class Parser implements Serializable {
                                         return new UnaryOperatorNode(child, op);
                                     })
                                     .closeLayer()
-                                    //.binaryLayer(OR)
-                                    //.binaryLayer(AND)
+                                    .binaryLayer(OR)
+                                    .binaryLayer(AND)
                                     .binaryLayer(BOR)
                                     .binaryLayer(BAND)
                                     .binaryLayer(XOR)
@@ -640,7 +639,6 @@ public class Parser implements Serializable {
             return visit((ExpressionStatementNode)returnStatement);
         }
 
-
         /**
          * Visit all direct children statements with the visitor and return the results
          */
@@ -691,6 +689,10 @@ public class Parser implements Serializable {
 
         default R visit(SingleUnaryOperatorNode unaryOperator){
             return visit((UnaryOperatorNode)unaryOperator);
+        }
+
+        default R visit(MethodInvocationNode methodInvocation){
+            return visit((ExpressionNode) methodInvocation);
         }
 
         /**

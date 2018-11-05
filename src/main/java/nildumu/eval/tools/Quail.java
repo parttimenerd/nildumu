@@ -29,7 +29,7 @@ public class Quail extends AbstractTool {
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
-        } catch (UnsupportedLanguageFeature f){
+        } catch (UnsupportedLanguageFeatureException f){
             return AnalysisPacket.empty(this, program);
         }
         return new AnalysisPacket(this, program) {
@@ -49,8 +49,12 @@ public class Quail extends AbstractTool {
     }
 
     private String toQuailLang(TestProgram program){
-        return placeDeclsAtTheBeginning(formatStatement(program.program.globalBlock,
-                "int" + program.integerType.width) + "\nreturn;");
+        if (program.hasSpecialVersion("quail")){
+            return program.getSpecialVersion("quail");
+        }
+        throw new UnsupportedLanguageFeatureException(this, "program transformation");
+        //return placeDeclsAtTheBeginning(formatStatement(program.program.globalBlock,
+        //        "int" + program.integerType.width) + "\nreturn;");
     }
 
     private String placeDeclsAtTheBeginning(String quail){
@@ -130,7 +134,7 @@ public class Quail extends AbstractTool {
             @Override
             public String visit(Parser.IfStatementNode ifStatement) {
                 String thenStr = formatStatement(ifStatement.ifBlock, integerTypeStr);
-                if (ifStatement.hasElseBlock()) {
+                if (ifStatement.hasElseBlock() && !(ifStatement.elseBlock.statementNodes.get(0) instanceof Parser.EmptyStatementNode)) {
                     return String.format("if (%s) then \n%s else \n%s\nfi\n",
                             formatExpression(ifStatement.conditionalExpression), thenStr,
                             formatStatement(ifStatement.elseBlock, integerTypeStr));
@@ -208,8 +212,12 @@ public class Quail extends AbstractTool {
                     case UNEQUALS:
                     case PLUS:
                         return left + binaryOperator.operator.getTerminalDescription().replace("\\", "") + right;
+                    case LEFT_SHIFT:
+                        if (binaryOperator.right instanceof Parser.IntegerLiteralNode){
+                            return left + " * " + (2 << ((Parser.IntegerLiteralNode) binaryOperator.right).value.asInt());
+                        }
                 }
-                throw new UnsupportedLanguageFeature(Quail.this,
+                throw new UnsupportedLanguageFeatureException(Quail.this,
                         binaryOperator.operator.toString());
             }
 

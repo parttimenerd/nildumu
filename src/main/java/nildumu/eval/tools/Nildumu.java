@@ -1,5 +1,7 @@
 package nildumu.eval.tools;
 
+import org.apache.commons.lang3.StringEscapeUtils;
+
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.Duration;
@@ -49,14 +51,16 @@ public class Nildumu extends AbstractTool {
                         "public static void %s(%s){",
                 program.integerType.width,
                 GLOBAL_METHOD,
-                program.getInputVariables().stream()
-                        .map(v -> "@Source " + program.integerType.toJavaTypeName() + " " + v)
+                program.getInputVariablesWSec().stream()
+                        .map(p -> String.format("@Source(level=Level.%s) %s %s", p.second.equals("h") ? "HIGH" : "LOW",
+                                program.integerType.toJavaTypeName(), p.first))
                         .collect(Collectors.joining(", "))) +
                 program.globalToJavaCode(input -> "",
                 output -> {
             return String.format("leak(%s);", program.formatExpression(output.expression));
         }) + "}";
         return "import edu.kit.joana.ui.annotations.Source;\n" +
+                "import edu.kit.joana.ui.annotations.Level;\n" +
                 "import edu.kit.nildumu.ui.EntryPoint;\n" +
                 "\n" +
                 "import static edu.kit.nildumu.ui.CodeUI.*;\n" +
@@ -88,7 +92,7 @@ public class Nildumu extends AbstractTool {
             @Override
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
                 return String.format("cd %s; cp %s %s.java; %s; javac %s %s.java; " +
-                                "java -jar nildumu.jar %s --classpath . --handler \"%s\"",
+                                "java -Xss100m -jar nildumu.jar %s --classpath . --handler \"%s\"",
                         formatter.format(NILDUMU_PATH),
                         sourceFile.toAbsolutePath(),
                         MAIN_CLASS_NAME,
@@ -102,6 +106,13 @@ public class Nildumu extends AbstractTool {
             @Override
             public LeakageParser getLeakageParser() {
                 return LeakageParser.forLinePart(this.tool, "l: ", " bit");
+            }
+
+            public String toTemciConfigEntry(Duration timeLimit){
+                return String.format("- attributes: {description: \"%s\"}\n",
+                        StringEscapeUtils.escapeJava(toString())) +
+                        "  run_config:\n" +
+                        String.format("    run_cmd: '%s'", getShellCommandWithAbsolutePaths(timeLimit));
             }
         };
     }

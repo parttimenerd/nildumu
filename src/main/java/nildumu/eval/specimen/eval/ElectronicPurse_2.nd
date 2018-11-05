@@ -1,9 +1,9 @@
-/* Toy program from paper of Backes et. al: "Automatic */
+/* Toy program from paper of Backes et. al:are  "Automatic */
 /* discovery and quantification of information leaks" */
-/* https://github.com/qif/jpf-qif/blob/master/src/examples/plas/ElectronicPurse.java*/
+/* Should leak 3 bit */
 h input int H = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
 int O = 0;
-while (H >= 5 & H < 20){
+while (H >= 5 && H < 20){
     H = H - 5;
     O = O + 1;
 }

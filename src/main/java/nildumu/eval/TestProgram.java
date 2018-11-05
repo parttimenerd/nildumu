@@ -6,6 +6,8 @@ import java.util.stream.*;
 
 import nildumu.*;
 import nildumu.Parser.ProgramNode;
+import nildumu.eval.tools.AbstractTool;
+import swp.util.Pair;
 
 /**
  * Wrapper around a nildumu test program
@@ -15,6 +17,10 @@ public class TestProgram implements Comparable<TestProgram> {
     public final String name;
     public final ProgramNode program;
     public final IntegerType integerType;
+    /**
+     * Contains special versions for some tools
+     */
+    private Map<String, String> specialVersions = new HashMap<>();
 
     public TestProgram(String name, ProgramNode program, IntegerType integerType) {
         this.name = name;
@@ -54,6 +60,16 @@ public class TestProgram implements Comparable<TestProgram> {
     public String methodsToJavaCode(String signaturePrefix, String integerTypeString){
         return program.methods().stream()
                 .map(m -> methodToJavaCode(m, signaturePrefix, integerTypeString))
+                .collect(Collectors.joining("\n\n"));
+    }
+
+    public String methodsToCDeclarations(String integerTypeString){
+        return program.methods().stream()
+                .map(m ->  String.format("%s %s(%s);\n",
+                        integerType.toJavaTypeName(), m.name,
+                        m.parameters.parameterNodes.stream()
+                                .map(p -> integerTypeString + " " + p.name)
+                                .collect(Collectors.joining(", "))))
                 .collect(Collectors.joining("\n\n"));
     }
 
@@ -105,9 +121,6 @@ public class TestProgram implements Comparable<TestProgram> {
                               Function<Parser.InputVariableDeclarationNode, String> inputHandler,
                               Function<Parser.OutputVariableDeclarationNode, String> outputHandler,
                                   String integerTypeStr){
-        if (integerTypeStr.equals("int")){
-            return stmt.toPrettyString();
-        }
         return stmt.accept(new Parser.StatementVisitor<String>(){
 
             @Override
@@ -146,6 +159,9 @@ public class TestProgram implements Comparable<TestProgram> {
 
             @Override
             public String visit(Parser.BlockNode block) {
+                if (block.statementNodes.isEmpty() || block.statementNodes.get(0) instanceof Parser.EmptyStatementNode){
+                    return "";
+                }
                 return block.statementNodes.stream().map(s ->
                         toJavaCode(s, null, null, integerTypeStr))
                         .collect(Collectors.joining("\n"));
@@ -192,6 +208,8 @@ public class TestProgram implements Comparable<TestProgram> {
                 return String.format("return (%s)(%s);", integerTypeStr,
                         formatExpression(returnStatement.expression));
             }
+
+
         });
     }
 
@@ -211,6 +229,22 @@ public class TestProgram implements Comparable<TestProgram> {
                     @Override
                     public Stream<String> visit(Parser.InputVariableDeclarationNode inputDecl) {
                         return Stream.of(inputDecl.variable);
+                    }
+                })).collect(Collectors.toSet());
+    }
+
+    public Set<Pair<String, String>> getInputVariablesWSec(){
+        return program.globalBlock.statementNodes.stream()
+                .flatMap(n -> n.accept(new Parser.StatementVisitor<Stream<Pair<String, String>>>() {
+
+                    @Override
+                    public Stream<Pair<String, String>> visit(Parser.StatementNode statement) {
+                        return Stream.empty();
+                    }
+
+                    @Override
+                    public Stream<Pair<String, String>> visit(Parser.InputVariableDeclarationNode inputDecl) {
+                        return Stream.of(new Pair<>(inputDecl.variable, inputDecl.secLevel));
                     }
                 })).collect(Collectors.toSet());
     }
@@ -272,6 +306,16 @@ public class TestProgram implements Comparable<TestProgram> {
                 assert false;
                 return null;
             }
+
+            @Override
+            public String visit(Parser.PrimaryExpressionNode primaryExpression) {
+                return primaryExpression.toString();
+            }
+
+            @Override
+            public String visit(Parser.MethodInvocationNode methodInvocation) {
+                return methodInvocation.toString();
+            }
         });
     }
 
@@ -283,5 +327,17 @@ public class TestProgram implements Comparable<TestProgram> {
             builder.append(value.get(i).val());
         }
         return builder.toString();
+    }
+
+    public void addSpecialVersion(String tool, String program){
+        this.specialVersions.put(tool, program);
+    }
+
+    public boolean hasSpecialVersion(String tool){
+        return specialVersions.containsKey(tool);
+    }
+
+    public String getSpecialVersion(String tool){
+        return specialVersions.get(tool);
     }
 }
