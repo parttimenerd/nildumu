@@ -15,7 +15,6 @@ import nildumu.eval.*;
  */
 public class Nildumu extends AbstractTool {
 
-    final static String MAIN_CLASS_NAME = "Mains";
     final static String EXPORT_JAVA8_COMMAND =
             "export PATH=/usr/lib/jvm/java-1.8.0-openjdk-amd64/bin:$PATH";
 
@@ -45,7 +44,7 @@ public class Nildumu extends AbstractTool {
         this.mih = mih;
     }
 
-    public String generateJavaSourceCode(TestProgram program) {
+    public String generateJavaSourceCode(TestProgram program, String name) {
         final String GLOBAL_METHOD = "program";
         String global = String.format("@EntryPoint @Config(intWidth=%d)\n" +
                         "public static void %s(%s){",
@@ -66,7 +65,7 @@ public class Nildumu extends AbstractTool {
                 "import static edu.kit.nildumu.ui.CodeUI.*;\n" +
                 "import edu.kit.nildumu.ui.*;\n" +
                 "\n" +
-                String.format("public class %s {\n", MAIN_CLASS_NAME) +
+                String.format("public class %s {\n", name) +
                 "    public static void main(String[] args) {\n" +
                 String.format("%s(%s);", GLOBAL_METHOD,
                         program.getInputVariables().stream()
@@ -80,8 +79,9 @@ public class Nildumu extends AbstractTool {
 
     @Override
     public AnalysisPacket createPacket(TestProgram program, Path folder) {
-        String sourceCode = generateJavaSourceCode(program);
-        Path sourceFile = folder.resolve(MAIN_CLASS_NAME + ".java");
+        String name = program.getUniqueCodeName("");
+        String sourceCode = generateJavaSourceCode(program, name);
+        Path sourceFile = folder.resolve(name + ".java");
         try {
             Files.write(sourceFile, Collections.singleton(sourceCode));
         } catch (IOException e) {
@@ -95,11 +95,11 @@ public class Nildumu extends AbstractTool {
                                 "java -Xss100m -jar nildumu.jar %s --classpath . --handler \"%s\"",
                         formatter.format(NILDUMU_PATH),
                         sourceFile.toAbsolutePath(),
-                        MAIN_CLASS_NAME,
+                        name,
                         EXPORT_JAVA8_COMMAND,
                         String.format("-cp %s:.", JAR_NAME),
-                        MAIN_CLASS_NAME,
-                        MAIN_CLASS_NAME,
+                        name,
+                        name,
                         mih);
             }
 

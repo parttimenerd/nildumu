@@ -173,7 +173,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
 
             @Override
             public ExpressionNode visit(PhiNode phi) {
-                PhiNode node = new PhiNode(phi.location, phi.controlDeps.stream().map(e -> e.accept(this)).collect(Collectors.toList()), new ArrayList<>(phi.joinedVariables.stream().map(j -> (VariableAccessNode)visit(j)).collect(Collectors.toList())));
+                PhiNode node = new PhiNode(phi.location, new ArrayList<>(), new ArrayList<>(phi.joinedVariables.stream().map(j -> (VariableAccessNode)visit(j)).collect(Collectors.toList())));
                 node.controlDepStatement = phi.controlDepStatement;
                 return node;
             }
@@ -219,7 +219,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     public MJNode visit(ProgramNode program) {
         List<StatementNode> newStatements = program.globalBlock.statementNodes.stream().map(s -> (StatementNode)s.accept(this)).collect(Collectors.toList());
         program.globalBlock.statementNodes.clear();
-        program.globalBlock.statementNodes.addAll(newStatements);
+        program.globalBlock.addAll(newStatements);
         for (String methodName : program.getMethodNames()){
             MethodNode method = program.getMethod(methodName);
             visit(method);
@@ -231,7 +231,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     public MJNode visit(MethodNode method) {
         List<StatementNode> newStatementNodes = method.body.statementNodes.stream().map(v -> (StatementNode)v.accept(this)).collect(Collectors.toList());
         method.body.statementNodes.clear();
-        method.body.statementNodes.addAll(newStatementNodes);
+        method.body.addAll(newStatementNodes);
         return null;
     }
 
@@ -284,10 +284,10 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     @Override
     public MJNode visit(WhileStatementNode whileStatement){
         ConditionalStatementNode stmt = new WhileStatementNode(whileStatement.location,
+                whileStatement.getPreCondVarAss().stream()
+                        .map(v -> (VariableAssignmentNode)v.accept(this)).collect(Collectors.toList()),
                 replaceAndWrapIfNeeded(whileStatement.conditionalExpression),
                 (StatementNode)whileStatement.body.accept(this));
-        ((WhileStatementNode) stmt).addPreCondVarDefs(whileStatement.getPreCondVarDefs().stream()
-                .map(v -> (VariableDeclarationNode)v.accept(this)).collect(Collectors.toList()));
         replacedCondStmtsMap.put(whileStatement, stmt);
         return stmt;
     }
@@ -329,7 +329,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
             @Override
             public Object visit(PhiNode phi) {
                 visitChildrenDiscardReturn(phi);
-                phi.controlDeps = phi.controlDeps.stream().map(MetaOperatorTransformator.this::replace).collect(Collectors.toList());
+                //phi.controlDeps = phi.controlDeps.stream().map(MetaOperatorTransformator.this::replace).collect(Collectors.toList());
                 phi.joinedVariables.forEach(v -> v.definingExpression = replace(v.definingExpression));
                 return null;
             }

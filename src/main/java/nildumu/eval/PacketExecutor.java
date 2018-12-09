@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.*;
 
 /**
  * Allows to execute {@link AnalysisPacket}s and return the
@@ -24,6 +25,26 @@ public class PacketExecutor {
         this.timeLimit = timeLimit;
     }
 
+    public AnalysisResult analyse(AnalysisPacket packet, int runs) {
+          List<AnalysisResult> results = new ArrayList<>();
+          for (int i = 0; i < runs; i++){
+              AnalysisResult res = analyse(packet);
+              if (!res.isValid() || res.hasTimeout){
+                  return new AnalysisResult(res.isValid(), -1, Duration.ofNanos(-1), res.hasTimeout);
+              }
+              results.add(res);
+          }
+          float leakageAvg = (float)results.stream().mapToDouble(r -> r.leakage).average().getAsDouble();
+          float leakageStd = (float)Math.sqrt(results.stream().mapToDouble(r -> Math.pow(r.leakage - leakageAvg, 2)).average().getAsDouble() / (runs - 1));
+          long runtimeAvg = (long)results.stream().mapToLong(r -> r.runtime.toNanos()).average().getAsDouble();
+          float runtimeStd = (float)(Math.sqrt(results.stream().mapToDouble(r -> Math.pow(r.runtime.toNanos() - runtimeAvg, 2)).average().getAsDouble() / (runs - 1)));
+          AnalysisResult res = new AnalysisResult(true, leakageAvg, Duration.ofNanos(runtimeAvg), false, leakageStd / leakageAvg, runtimeStd / runtimeAvg);
+        System.out.println("#####################################################");
+        System.out.println(String.format("-------------- %ds +-%.3f %.3f +-%.3f -------------", res.runtime.getSeconds(), res.runtimeStddev, res.leakage, res.leakageStddev));
+        System.out.println("#####################################################");
+          return res;
+    }
+
     public AnalysisResult analyse(AnalysisPacket packet) {
         if (packet.emptyPacket){
             return new AnalysisResult(false, -1, null, false);
@@ -34,8 +55,6 @@ public class PacketExecutor {
         long start = System.nanoTime();
         Process process_ = null;
         try {
-            System.err.println("bash -c 'timeout -s9 " + (timeLimit.getSeconds()) + " " +
-                    StringEscapeUtils.escapeJava(packet.getShellCommand(timeLimit)) + "'");
             process_ = Runtime.getRuntime().exec(new String[]{"timeout", "-s9",
                     timeLimit.getSeconds() + "",
                     "bash", "-c", packet.getShellCommand(timeLimit)});
@@ -54,16 +73,13 @@ public class PacketExecutor {
         });
         AnalysisResult timeoutRes = new AnalysisResult(false, -1, null, true);
         newFixedThreadPool.shutdown();
-        System.out.println("Hi" + timeLimit.getSeconds());
         try {
             if (!process.waitFor(timeLimit.getSeconds() + 5, TimeUnit.SECONDS)) {
                 try {
                 String out = output.get(timeLimit.getSeconds(), TimeUnit.SECONDS);
                 String err = error.get(timeLimit.getSeconds(), TimeUnit.SECONDS);
-                System.out.println("Ho");
                 process.destroyForcibly();
                 process.waitFor();
-                System.out.println("Ho4");
                 /*if (output.get().length() > 0) {
                     System.out.println("OUT: " + output.get());
                 }*/
@@ -71,7 +87,6 @@ public class PacketExecutor {
                     if (err.length() > 0) {
                         System.err.println("ERR: " + err);
                     }
-                    System.out.println("Ho2");
                     if (process.exitValue() == 124){
                         return timeoutRes;
                     }
@@ -107,11 +122,38 @@ public class PacketExecutor {
         return new AnalysisResult(false, -1, Duration.ofNanos(-1), false);
     }
 
-    public AnalysisResults analysePackets(Iterable<AnalysisPacket> packets) {
-        Map<AnalysisPacket, AnalysisResult> results = new HashMap<>();
-        for (AnalysisPacket packet : packets) {
-            results.put(packet, analyse(packet));
+    public AnalysisResults analysePackets(Iterable<AnalysisPacket> packets, int parallelism, int runs) {
+        if (parallelism == 1) {
+            Map<AnalysisPacket, AnalysisResult> results = new HashMap<>();
+            int i = 1;
+            List<AnalysisPacket> ps = new ArrayList<>();
+            packets.forEach(ps::add);
+            for (AnalysisPacket packet : packets) {
+                System.out.println("#####################################################");
+                System.out.println(String.format("------------------- Packet %d of %d -------------", i, ps.size()));
+                System.out.println("#####################################################");
+                results.put(packet, analyse(packet, runs));
+                i++;
+            }
+            return new AnalysisResults(results);
+        } else {
+            Map<AnalysisPacket, AnalysisResult> results = new ConcurrentHashMap<>();
+            ExecutorService pool = Executors.newWorkStealingPool(parallelism);
+            List<Future<AnalysisResult>> futures = new ArrayList<>();
+            for (AnalysisPacket packet : packets) {
+                futures.add(pool.submit(() -> results.put(packet, analyse(packet, runs))));
+                //results.put(packet, analyse(packet));
+            }
+            futures.forEach(f -> {
+                try {
+                    f.get();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                }
+            });
+            return new AnalysisResults(results);
         }
-        return new AnalysisResults(results);
     }
 }

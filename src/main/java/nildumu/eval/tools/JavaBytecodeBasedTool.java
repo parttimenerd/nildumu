@@ -12,8 +12,6 @@ import nildumu.eval.*;
  */
 public abstract class JavaBytecodeBasedTool extends AbstractTool {
 
-    final static String MAIN_CLASS_NAME = "Main";
-
     final Path javaLibForCompilation;
 
     protected JavaBytecodeBasedTool(String name, Path javaLibForCompilation) {
@@ -21,21 +19,19 @@ public abstract class JavaBytecodeBasedTool extends AbstractTool {
         this.javaLibForCompilation = javaLibForCompilation;
     }
 
-    /**
-     * Generates Java source code within the default package and with a class with name
-     * {@value MAIN_CLASS_NAME}
-     */
-    public abstract String generateJavaSourceCode(TestProgram program);
+    public abstract String generateJavaSourceCode(TestProgram program, String name);
 
-    public abstract String getShellCommand(TestProgram program, Path javaByteCodeFile,
+    public abstract String getShellCommand(TestProgram program, String name,
+                                           Path javaByteCodeFile,
                                            PathFormatter formatter);
 
     public abstract LeakageParser getLeakageParser(TestProgram program);
 
     @Override
     public AnalysisPacket createPacket(TestProgram program, Path folder) {
-        String sourceCode = generateJavaSourceCode(program);
-        Path sourceFile = folder.resolve(MAIN_CLASS_NAME + ".java");
+        String name = program.getUniqueCodeName("");
+        String sourceCode = generateJavaSourceCode(program, name);
+        Path sourceFile = folder.resolve(name + ".java");
         try {
             Files.write(sourceFile, Collections.singleton(sourceCode));
         } catch (IOException e) {
@@ -49,8 +45,9 @@ public abstract class JavaBytecodeBasedTool extends AbstractTool {
                         formatter.format(folder),
                         javaLibForCompilation == null ? "" :
                                 String.format("-cp %s:.", javaLibForCompilation.toAbsolutePath()),
-                        MAIN_CLASS_NAME,
+                        name,
                         JavaBytecodeBasedTool.this.getShellCommand(program,
+                                name,
                                 folder,
                                 formatter));
             }

@@ -18,7 +18,7 @@ public class AggregatedAnalysisResults {
                 if (!r.isValid()){
                     return "-";
                 }
-                return String.format("%.3f", r.leakage);
+                return String.format("%.3f +-%.3f", r.leakage, r.leakageStddev);
             };
     public static final AnalysisResultFormatter RUNTIME =
             r -> {
@@ -30,7 +30,7 @@ public class AggregatedAnalysisResults {
                 }
                 long seconds = r.runtime.getSeconds();
                 long millis = r.runtime.toMillis() - seconds * 1000;
-                return String.format("%d.%03ds", seconds, millis);
+                return String.format("%d.%03ds +-%.3f", seconds, millis, r.runtimeStddev);
             };
 
     public final Map<AbstractTool, Map<TestProgram, AnalysisResult>> perTool;

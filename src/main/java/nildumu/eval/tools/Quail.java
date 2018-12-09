@@ -22,7 +22,7 @@ public class Quail extends AbstractTool {
 
     @Override
     public AnalysisPacket createPacket(TestProgram program, Path folder) {
-        Path sourceFile = folder.resolve("program.quail");
+        Path sourceFile = folder.resolve(program.getUniqueCodeName(".quail"));
         try {
             Files.write(sourceFile, Collections.singletonList(toQuailLang(program)));
             System.out.println(toQuailLang(program));

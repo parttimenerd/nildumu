@@ -21,20 +21,21 @@ public class LeakWatch extends JavaBytecodeBasedTool {
     }
 
     @Override
-    public String generateJavaSourceCode(TestProgram program) {
+    public String generateJavaSourceCode(TestProgram program, String name) {
+        assert program.integerType.width == 32;
         String global = program.globalToJavaCode(input -> {
-            return String.format("%s %s = (%s) $$rand$$.nextInt(%s);\n",
+            return String.format("%s %s = (%s) $$rand$$.nextInt();\n",
                     program.integerType.toJavaTypeName(),
+
                     input.variable,
-                    program.integerType.toJavaTypeName(),
-                    program.integerType.width) + (input.secLevel.equals("h") ? String.format("LeakWatchAPI.secret(\"%s\", %s);", input.variable,
+                    program.integerType.toJavaTypeName()) + (input.secLevel.equals("h") ? String.format("LeakWatchAPI.secret(\"%s\", %s);", input.variable,
                     input.variable) : "");
         }, output -> {
             return String.format("LeakWatchAPI.observe(%s);", program.formatExpression(output.expression));
         });
         return "import bham.leakwatch.LeakWatchAPI;\n" +
                 "\n" +
-                String.format("public class %s {\n", MAIN_CLASS_NAME) +
+                String.format("public class %s {\n", name) +
                 "    public static void main(String[] args) {\n" +
                 "        java.security.SecureRandom $$rand$$ = new java.security.SecureRandom();" +
                 global +
@@ -44,13 +45,13 @@ public class LeakWatch extends JavaBytecodeBasedTool {
     }
 
     @Override
-    public String getShellCommand(TestProgram program, Path folder, PathFormatter formatter) {
+    public String getShellCommand(TestProgram program, String name, Path folder, PathFormatter formatter) {
         try {
             Files.copy(JAR_PATH, folder.resolve("leakwatch.jar"));
         } catch (IOException e) {
             //e.printStackTrace();
         }
-        return String.format("java -jar leakwatch.jar --measure mel -i 50 %s", MAIN_CLASS_NAME);
+        return String.format("java -Xss100m -jar leakwatch.jar --measure mel -i 1000 %s", name);
     }
 
     @Override

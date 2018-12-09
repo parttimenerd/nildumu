@@ -8,6 +8,7 @@ import java.util.stream.*;
 import swp.SWPException;
 import swp.lexer.*;
 import swp.parser.lr.*;
+import swp.util.Pair;
 import swp.util.Utils;
 
 import static nildumu.Checks.checkAndThrow;
@@ -49,12 +50,12 @@ public class Parser implements Serializable {
         VOID("void"),
         USE_SEC("use_sec"),
         BIT_WIDTH("bit_width"),
+        PHI("phi"),
         TILDE("~"),
 
         LOWER_EQUALS("<="),
         GREATER_EQUALS(">="),
         MODULO("%"),
-        LRBRACKET("\\[ ([\\r\\n\\t\\s]? (/\\*([^*]*(\\*[^/])?)*\\*/)?)* \\]"),
 
         PLUS("\\+", "+"),
         MINUS("\\-", "-"),
@@ -75,6 +76,8 @@ public class Parser implements Serializable {
         RIGHT_SHIFT(">>"),
         LPAREN("\\("),
         RPAREN("\\)"),
+        LBRACKET("\\["),
+        RBRACKET("\\]"),
         SEMICOLON("(\\;|\\n)+", ";"),
         INTEGER_LITERAL("(([1-9][0-9]*)|0)|(0b[01]+)|(\\-([1-9][0-9]*))"),
         INPUT_LITERAL("(0b[01u]+)"),
@@ -121,7 +124,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/blaff5ef65534r6r5df5344474i4f46u7s5f22", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/blagrfft45ef56f55344rct6r5df5344474i4f46u7s5f22", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 builder.addRule("program", "use_sec? bit_width? lines", asts -> {
                             SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>)asts.get(0)).get(0).wrapped;
@@ -290,23 +293,40 @@ public class Parser implements Serializable {
                                     asts.getStartLocation(),
                                     asts.get(1).getMatchedString());
                         })
-                        .addRule("var_decl", "INT IDENT EQUAL_SIGN expression", asts -> {
+                        .addRule("var_decl", "INT IDENT EQUAL_SIGN (phi|expression)", asts -> {
                             return new VariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(1).getMatchedString(),
                                     (ExpressionNode)asts.get(3));
                         })
-                        .addRule("local_variable_assignment_statement", "IDENT EQUAL_SIGN expression", asts -> {
+                        .addRule("local_variable_assignment_statement", "IDENT EQUAL_SIGN (phi|expression)", asts -> {
                             return new VariableAssignmentNode(
                                     asts.getStartLocation(),
                                     asts.get(0).getMatchedString(),
                                     (ExpressionNode)asts.get(2));
                         })
-                        .addRule("while_statement", "WHILE LPAREN expression RPAREN block_statement", asts -> {
-                            return new WhileStatementNode(
+                        .addRule("while_statement", "WHILE (LBRACKET assignments RBRACKET)? LPAREN expression RPAREN block_statement", asts -> {
+                            ListAST pres = (ListAST)asts.get(1);
+                            WhileStatementNode whileStatementNode = new WhileStatementNode(
                                     asts.getStartLocation(),
-                                    (ExpressionNode)asts.get(2),
-                                    (StatementNode)asts.get(4));
+                                    pres.isEmpty() ? new ArrayList<>() :
+                                            ((WrapperNode<List<VariableAssignmentNode>>)pres.get(1)).wrapped,
+                                    (ExpressionNode) asts.get(3),
+                                    (StatementNode) asts.get(5));
+                            return whileStatementNode;
+                        })
+                        .addRule("assignments", "local_variable_assignment_statement SEMICOLON assignments SEMICOLON?", asts -> {
+                            WrapperNode<List<VariableAssignmentNode>> left =
+                                    (WrapperNode<List<VariableAssignmentNode>>) asts.get(2);
+                            VariableAssignmentNode right = (VariableAssignmentNode)asts.getAs(0);
+                            left.wrapped.add(0, right);
+                            return left;
+                        })
+                        .addRule("assignments", "local_variable_assignment_statement", asts -> {
+                            return new WrapperNode<>(((MJNode)asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
+                        })
+                        .addRule("assignments", "", asts -> {
+                            return new WrapperNode<>(new Location(0, 0), new ArrayList<>());
                         })
                         .addRule("if_statement", "IF LPAREN expression RPAREN statement", asts -> {
                             return new IfStatementNode(
@@ -372,6 +392,10 @@ public class Parser implements Serializable {
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
                                     new ArgumentsNode(arg.location, Utils.makeArrayList(arg)));
                         })
+                        .addRule("phi", "PHI LPAREN IDENT COMMA IDENT RPAREN", asts -> {
+                            return new PhiNode(asts.getStartLocation(), Arrays.asList(asts.get(2).getMatchedString(),
+                                    asts.get(4).getMatchedString()));
+                        })
                         .addRule("arguments", "", asts -> new ArgumentsNode(new Location(0, 0), new ArrayList<>()))
                         .addRule("arguments", "expression", asts -> {
                             return new ArgumentsNode(((ExpressionNode)asts.get(0)).location, Utils.makeArrayList((ExpressionNode)asts.get(0)));
@@ -387,7 +411,8 @@ public class Parser implements Serializable {
                         .addRule("primary_expression", "INTEGER_LITERAL", asts -> {
                             return new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(asts.getMatchedString()));
                         })
-                        .addRule("primary_expression", "IDENT", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
+                        .addRule("primary_expression", "var_access")
+                        .addRule("var_access", "IDENT", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
                         .addRule("primary_expression", "LPAREN expression RPAREN", asts -> {
                             return asts.get(1);
                         })
@@ -436,13 +461,14 @@ public class Parser implements Serializable {
      * Currently does a name resolution and converts the result into SSA form
      */
     public static ProgramNode process(String input, boolean transformPlus){
-        MJNode.resetIdCounter();
-        Bit.resetNumberOfCreatedBits();
-        ProgramNode program = (ProgramNode) generator.parse(input);
-        new NameResolution(program).resolve();
-        new SSAResolution(program).resolve();
-        checkAndThrow(program);
-        ProgramNode transformedProgram = (ProgramNode)new MetaOperatorTransformator(program.context.maxBitWidth, transformPlus).process(program);
+        Parser.MJNode.resetIdCounter();
+        Lattices.Bit.resetNumberOfCreatedBits();
+        Parser.ProgramNode programNode = (Parser.ProgramNode) generator.parse(input);
+        SSAResolution2.process(programNode);
+        Parser.ProgramNode resolvedProgram = (Parser.ProgramNode)Parser.generator.parse(programNode.toPrettyString());
+        new NameResolution(resolvedProgram).resolve();
+        //checkAndThrow(resolvedProgram);
+        Parser.ProgramNode transformedProgram = (Parser.ProgramNode)new MetaOperatorTransformator(resolvedProgram.context.maxBitWidth, false).process(resolvedProgram);
         checkAndThrow(transformedProgram);
         return transformedProgram;
     }
@@ -522,8 +548,12 @@ public class Parser implements Serializable {
             return visit((ExpressionNode)phi);
         }
 
+        default R visit(ConditionalStatementNode condStatement){
+            return visit((StatementNode)condStatement);
+        }
+
         default R visit(IfStatementNode ifStatement){
-            return visit((StatementNode)ifStatement);
+            return visit((ConditionalStatementNode)ifStatement);
         }
 
         default R visit(IfStatementEndNode ifEndStatement){
@@ -531,7 +561,7 @@ public class Parser implements Serializable {
         }
 
         default R visit(WhileStatementNode whileStatement){
-            return visit((StatementNode)whileStatement);
+            return visit((ConditionalStatementNode)whileStatement);
         }
 
         default R visit(WhileStatementEndNode whileEndStatement){
@@ -615,8 +645,12 @@ public class Parser implements Serializable {
             return visit((StatementNode)block);
         }
 
+        default R visit(ConditionalStatementNode condStatement){
+            return visit((StatementNode)condStatement);
+        }
+
         default R visit(IfStatementNode ifStatement){
-            return visit((StatementNode)ifStatement);
+            return visit((ConditionalStatementNode)ifStatement);
         }
 
         default R visit(IfStatementEndNode ifEndStatement){
@@ -624,7 +658,7 @@ public class Parser implements Serializable {
         }
 
         default R visit(WhileStatementNode whileStatement){
-            return visit((StatementNode)whileStatement);
+            return visit((ConditionalStatementNode)whileStatement);
         }
 
         default R visit(WhileStatementEndNode whileEndStatement){
@@ -894,11 +928,11 @@ public class Parser implements Serializable {
         }
 
         public void addGlobalStatement(StatementNode statement){
-            globalBlock.statementNodes.add(statement);
+            globalBlock.add(statement);
         }
 
         public void addGlobalStatements(List<StatementNode> statements){
-            globalBlock.statementNodes.addAll(statements);
+            globalBlock.addAll(statements);
         }
 
         @Override
@@ -934,7 +968,8 @@ public class Parser implements Serializable {
 
         @Override
         public String toPrettyString(String indent, String incr) {
-            return methods().stream().map(m -> m.toPrettyString(indent, incr)).collect(Collectors.joining("\n")) +
+            return String.format("use_sec %s;\nbit_width %d;", context.sl.latticeName(), context.maxBitWidth) + "\n" +
+                    methods().stream().map(m -> m.toPrettyString(indent, incr)).collect(Collectors.joining("\n")) +
                     globalBlock.toPrettyString(indent, incr);
         }
 
@@ -1211,13 +1246,42 @@ public class Parser implements Serializable {
      */
     public static class BlockNode extends StatementNode {
         public final List<StatementNode> statementNodes;
+        private ConditionalStatementNode lastCondStatement = null;
 
         public BlockNode(Location location, List<StatementNode> statementNodes) {
+            this(location, statementNodes, true);
+        }
+
+        BlockNode(Location location, List<StatementNode> statementNodes, boolean setPhiConds) {
             super(location);
             this.statementNodes = statementNodes;
-            for (BlockPartNode statementNode : statementNodes) {
-                statementNode.setParentBlock(this);
+            ConditionalStatementNode lastCondStatement = null;
+            if (setPhiConds) {
+                for (BlockPartNode statementNode : statementNodes) {
+                    statementNode.setParentBlock(this);
+                    if (lastCondStatement != null) {
+                        lastCondStatement.setPhisCondInNodes(Collections.singletonList(statementNode));
+                    }
+                    if (statementNode instanceof ConditionalStatementNode) {
+                        lastCondStatement = (ConditionalStatementNode) statementNode;
+                    }
+                }
             }
+        }
+
+        public void add(StatementNode statementNode){
+            statementNodes.add(statementNode);
+            statementNode.setParentBlock(this);
+            if (lastCondStatement != null){
+                lastCondStatement.setPhisCondInNodes(Collections.singletonList(statementNode));
+            }
+            if (statementNode instanceof ConditionalStatementNode){
+                lastCondStatement = (ConditionalStatementNode)statementNode;
+            }
+        }
+
+        public void addAll(Collection<StatementNode> statementNodes){
+            statementNodes.forEach(this::add);
         }
 
         @Override
@@ -1264,7 +1328,51 @@ public class Parser implements Serializable {
 
         @Override
         public String toPrettyString(String indent, String incr) {
-            return statementNodes.stream().map(s ->s.toPrettyString(indent, incr)).filter(s -> s.trim().length() != 0).collect(Collectors.joining("\n"));
+            Pair<List<VariableDeclarationNode>, List<StatementNode>> partition = splitIntoDeclsAndRest();
+            String res = "";
+            if (partition.first.size() > 0){
+                res = indent + partition.first.stream().map(s -> s.toPrettyString()).collect(Collectors.joining(" "))
+                        + "\n";
+            }
+            res += partition.second.stream()
+                    .map(s -> s.toPrettyString(indent, incr))
+                    .filter(s -> s.trim().length() != 0)
+                    .collect(Collectors.joining("\n"));
+            return res;
+        }
+
+        private Pair<List<VariableDeclarationNode>, List<StatementNode>> splitIntoDeclsAndRest(){
+            List<VariableDeclarationNode> varDecls = new ArrayList<>();
+            List<StatementNode> stmts = new ArrayList<>();
+            int i = 0;
+            for (; i < statementNodes.size() && statementNodes.get(i) instanceof VariableDeclarationNode && !((VariableDeclarationNode) statementNodes.get(i)).hasInitExpression(); i++) {
+                varDecls.add((VariableDeclarationNode)statementNodes.get(i));
+            }
+            for (; i < statementNodes.size(); i++){
+                stmts.add(statementNodes.get(i));
+            }
+            return new Pair<>(varDecls, stmts);
+        }
+
+        public void prependVariableDeclaration(String variable){
+            statementNodes.add(0, new VariableDeclarationNode(location, variable));
+        }
+
+        public void addAll(int i, List<StatementNode> statements) {
+            statementNodes.addAll(i, statements);
+            lastCondStatement = null;
+            for (StatementNode statement : statements) {
+                if (statements instanceof ConditionalStatementNode){
+                    lastCondStatement = (ConditionalStatementNode)statements;
+                }
+                if (lastCondStatement != null){
+                    lastCondStatement.setPhisCondInNodes(Collections.singletonList(statement));
+                }
+            }
+        }
+
+        public void add(int i, VariableDeclarationNode variableDeclarationNode) {
+            addAll(i, Collections.singletonList(variableDeclarationNode));
         }
     }
 
@@ -1536,26 +1644,29 @@ public class Parser implements Serializable {
      * A while statement
      */
     public static class WhileStatementNode extends ConditionalStatementNode {
-        private final List<VariableDeclarationNode> preCondVarDefs = new ArrayList<>();
+        private final List<VariableAssignmentNode> preCondVarAss;
         public final BlockNode body;
 
-        public WhileStatementNode(Location location, ExpressionNode conditionalExpression, StatementNode body) {
+        public WhileStatementNode(Location location, List<VariableAssignmentNode> preCondVarAss, ExpressionNode conditionalExpression, StatementNode body) {
             super(location, conditionalExpression);
+            this.preCondVarAss = preCondVarAss;
             this.body = appendWhileEnd(body instanceof BlockNode ? (BlockNode)body : new BlockNode(body.location, new ArrayList<>(Arrays.asList(body))));
+            setPhisCondInNodes(preCondVarAss);
+            setPhisCondInNodes(Collections.singletonList(conditionalExpression));
         }
 
         private BlockNode appendWhileEnd(BlockNode blockNode){
             if (!(blockNode.getLastStatementOrNull() instanceof WhileStatementEndNode)){
                 List<StatementNode> tmp = new ArrayList<>(blockNode.statementNodes);
                 tmp.add(new WhileStatementEndNode(this, location));
-                return new BlockNode(blockNode.location, tmp);
+                return new BlockNode(blockNode.location, tmp, false);
             }
             return blockNode;
         }
 
         @Override
         public String toString() {
-            return String.format("while [%s] (%s) %s", preCondVarDefs.stream()
+            return String.format("while [%s] (%s) %s", preCondVarAss.stream()
                     .map(MJNode::toString).collect(Collectors.joining(";")),
                     conditionalExpression, body);
         }
@@ -1572,7 +1683,7 @@ public class Parser implements Serializable {
 
         @Override
         public List<BaseAST> children() {
-            return Stream.concat(preCondVarDefs.stream(), Stream.of(conditionalExpression, body))
+            return Stream.concat(preCondVarAss.stream(), Stream.of(conditionalExpression, body))
                     .collect(Collectors.toList());
         }
 
@@ -1593,18 +1704,18 @@ public class Parser implements Serializable {
 
         @Override
         public String toPrettyString(String indent, String incr) {
-            String pres = preCondVarDefs.stream()
-                    .map(MJNode::toString).collect(Collectors.joining(";"));
+            String pres = preCondVarAss.stream()
+                    .map(MJNode::toString).collect(Collectors.joining(""));
             return String.format("%swhile %s (%s) {\n%s\n%s}", indent, pres.isEmpty() ? "" : "[" + pres + "]",
                     conditionalExpression, body.toPrettyString(indent + incr, incr), indent);
         }
 
-        public List<VariableDeclarationNode> getPreCondVarDefs(){
-            return Collections.unmodifiableList(preCondVarDefs);
+        public List<VariableAssignmentNode> getPreCondVarAss(){
+            return Collections.unmodifiableList(preCondVarAss);
         }
 
-        public void addPreCondVarDefs(List<VariableDeclarationNode> nodes){
-            preCondVarDefs.addAll(nodes);
+        public void addPreCondVarAss(List<VariableAssignmentNode> asList) {
+            preCondVarAss.addAll(asList);
         }
     }
 
@@ -1616,6 +1727,42 @@ public class Parser implements Serializable {
             this.conditionalExpression = conditionalExpression;
         }
 
+        void setPhisCondInNodes(List<? extends BaseAST> nodes){
+            nodes.forEach(n -> {
+                if (n instanceof MJNode){
+                    ((MJNode) n).accept(new NodeVisitor<Object>() {
+                        @Override
+                        public Object visit(MJNode node) {
+                            return null;
+                        }
+
+                        @Override
+                        public Object visit(ConditionalStatementNode condStatement) {
+                            return null;
+                        }
+
+                        @Override
+                        public Object visit(PhiNode phi) {
+                            phi.controlDeps.add(conditionalExpression);
+                            phi.controlDepStatement = ConditionalStatementNode.this;
+                            return null;
+                        }
+
+                        @Override
+                        public Object visit(ExpressionNode expression) {
+                            visitChildrenDiscardReturn(expression);
+                            return null;
+                        }
+
+                        @Override
+                        public Object visit(VariableAssignmentNode assignment) {
+                            visitChildrenDiscardReturn(assignment);
+                            return null;
+                        }
+                    });
+                }
+            });
+        }
     }
 
     /**
@@ -1639,7 +1786,7 @@ public class Parser implements Serializable {
             if (!(blockNode.getLastStatementOrNull() instanceof IfStatementEndNode)){
                 List<StatementNode> tmp = new ArrayList<>(blockNode.statementNodes);
                 tmp.add(new IfStatementEndNode(location));
-                return new BlockNode(blockNode.location, tmp);
+                return new BlockNode(blockNode.location, tmp, false);
             }
             return blockNode;
         }
@@ -2339,7 +2486,7 @@ public class Parser implements Serializable {
      * Access of a variable
      */
     public static class VariableAccessNode extends PrimaryExpressionNode {
-        public final String ident;
+        public String ident;
         Variable definition;
         ExpressionNode definingExpression;
 
@@ -2348,7 +2495,7 @@ public class Parser implements Serializable {
             this.ident = ident;
         }
 
-        public VariableAccessNode(Location location, Variable variable, ExpressionNode definingExpression) {
+        public VariableAccessNode(Location location, Variable variable) {
             super(location);
             this.ident = variable.name;
             this.definition = variable;
@@ -2460,6 +2607,11 @@ public class Parser implements Serializable {
             }).collect(Collectors.toList());
         }
 
+        public PhiNode(Location location, List<String> varsToJoin){
+            this(location, new ArrayList<>(),
+                    varsToJoin.stream().map(Variable::new).collect(Collectors.toList()));
+        }
+
         @Override
         public List<BaseAST> children() {
             List<BaseAST> children = new ArrayList<>(joinedVariables);
@@ -2484,10 +2636,9 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return String.format("ɸ[%s](%s)",
-                    controlDeps.stream().map(MJNode::toString).collect(Collectors.joining(",")),
+            return String.format("phi(%s)",
                     String.join(", ", joinedVariables.stream().map(v -> v.definition.toString())
-                    .collect(Collectors.toList())));
+                            .collect(Collectors.toList())));
         }
 
         @Override

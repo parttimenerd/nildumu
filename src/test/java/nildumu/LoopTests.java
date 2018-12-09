@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.logging.Level;
+
 import static java.time.Duration.ofMillis;
 import static nildumu.Processor.process;
 import static nildumu.util.Util.iter;
@@ -60,8 +62,8 @@ public class LoopTests {
                 "\tx = x | 0b11;\n" +
                 "}\n" +
                 "l output int o = x;")
-                .bit("x3[2]", "u")
-                .bit("x2[1]", "u")
+                //.bit("x3[2]", "u")
+                //.bit("x2[1]", "u")
                 .bit("o[1]", "u")
                 .leaks(1).run();
     }
@@ -82,7 +84,7 @@ public class LoopTests {
                 "while (h){\n" +
                 "\th = h;\n" +
                 "}\n" +
-                "l output int o = h").leaks(1).run();
+                "l output int o = h").leaks(1).val("o", "0bu").run();
     }
 
     @Test
@@ -205,6 +207,50 @@ public class LoopTests {
                         "        }\n" +
                         "     }\n" +
                         "     l output int o = h;").leaks(1).run());
+    }
+
+    @Test
+    public void testBinarySearch(){
+        parse("h input int I = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
+                "\n" +
+                "int BITS = 16;\n" +
+                "\n" +
+                "int O = 0;\n" +
+                "\n" +
+                "int m = 0;\n" +
+                "int i = 0;\n" +
+                "\n" +
+                "while (i < BITS){\n" +
+                "    m = 1<<(31-i);\n" +
+                "    if (O + m <= I) {\n" +
+                "        O = O + m;\n" +
+                "    }\n" +
+                "    i = i + 1;\n" +
+                "}\n" +
+                "l output int o = O;").leaks(32).run();
+    }
+
+    @Test
+    public void testBinarySearch_condensed(){
+        Context.LOG.setLevel(Level.FINE);
+        parse("h input int I = 0buuuuuuu;\n" +
+                "\n" +
+                "int BITS = 3;\n" +
+                "\n" +
+                "int O = 0;\n" +
+                "\n" +
+                "int m = 0;\n" +
+                "int i = 0;\n" +
+                "\n" +
+                "while (i < BITS){\n" +
+                "    m = i;\n" +
+                "    if (O + m <= I) {\n" +
+                "        O = O + m;\n" +
+                "    }\n" +
+                "    i = i + 1;\n" +
+                "}\n" +
+                "l output int o = O;").leaks(32).run();
+        Context.LOG.setLevel(Level.INFO);
     }
 
     ContextMatcher parse(String program){

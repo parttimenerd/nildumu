@@ -1,5 +1,6 @@
 package nildumu;
 
+import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.*;
@@ -145,7 +146,6 @@ public class BasicTests {
                 "\tO = S;\n" +
                 "}\n" +
                 "l output int o = O;";
-        System.out.println(SSATests.toSSA(program));
         parse(program).leaks(0).run();
     }
 
@@ -153,6 +153,19 @@ public class BasicTests {
     @CsvSource({"'int x = 0b0', 1", "'int x = 0b00', 2", "'int x = 0b000', 3", "'l input int x = 0b0u', 2", "'int x = 1', 2"})
     public void testBitWidthDetection(String program, int expectedBitWidth){
         parse(program).bitWidth(expectedBitWidth).run();
+    }
+
+    @Test
+    public void testParsePhi(){
+        Assert.assertEquals(Parser.PhiNode.class,
+                ((Parser.VariableAssignmentNode)((Parser.ProgramNode)Parser.generator.parse("int a = phi(z, l)"))
+                .globalBlock.statementNodes.get(0)).expression.getClass());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"while (a == h){}", "while [] (a == h) {}", "while [a = phi(a, b)] (a == h) {}"})
+    public void testWhileParsing(String program){
+        Parser.generator.parse(program);
     }
 
     public ContextMatcher parse(String program){

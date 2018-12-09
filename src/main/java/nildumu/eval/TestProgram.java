@@ -14,6 +14,7 @@ import swp.util.Pair;
  */
 public class TestProgram implements Comparable<TestProgram> {
 
+    private static int counter = 0;
     public final String name;
     public final ProgramNode program;
     public final IntegerType integerType;
@@ -339,5 +340,9 @@ public class TestProgram implements Comparable<TestProgram> {
 
     public String getSpecialVersion(String tool){
         return specialVersions.get(tool);
+    }
+
+    public String getUniqueCodeName(String ending){
+        return "code" + counter++ + ending;
     }
 }

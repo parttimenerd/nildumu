@@ -132,39 +132,54 @@ public class Evaluation {
         @Parameter(names={"--maxScalAlpha", "--alpha"})
         private int maxScalAlpha = 5;
 
+        @Parameter(names={"--minScalAlpha", "--start"})
+        private int minScalAlpha = 0;
+
         @Parameter(names="--duration")
         private String maxDuration = "PT10S";
 
         @Parameter(names="--normal")
         private List<String> normalBench = Collections.singletonList("all");
         
-        @Parameter(names="--split_temci")
-        private boolean splitTemciFiles = true;
+        @Parameter(names="--dont_split_temci")
+        private boolean dontSplitTemciFiles = false;
         
         @Parameter(names="--tools")
         private List<String> tools = Collections.singletonList("all");
 
         @Parameter(names="--quail")
         private boolean quail = false;
+
+        @Parameter(names="--parallelism", description = "cores to use")
+        private int parallelism = 1;
+
+        @Parameter(names="--exclude_tool_variations")
+        private boolean excludeToolVariations = false;
+
+        @Parameter(names="--runs")
+        private int runs = 1;
     }
 
     public static void main(String[] args) {
         Cmd cmd = new Cmd();
         JCommander com = JCommander.newBuilder().addObject(cmd).build();
         Evaluation evaluation = new Evaluation(IntegerType.INT, "eval");
-        List<AbstractTool> tools = AbstractTool.getDefaultTools();
-        if (!cmd.tools.get(0).equals("all")){
-            tools = tools.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
-        }
-        tools = tools.stream().filter(t -> {
-            if (t instanceof Quail){
-                return cmd.quail;
-            }
-            return true;
-        }).collect(Collectors.toList());
         try {
             System.out.println(String.join(" ", args));
             com.parse(args);
+            List<AbstractTool> tools_ = cmd.excludeToolVariations ?
+                    AbstractTool.getDefaultToolsWithoutVariations() :
+                    AbstractTool.getDefaultTools();
+            if (!cmd.tools.get(0).equals("all")){
+                tools_ = tools_.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
+            }
+            tools_ = tools_.stream().filter(t -> {
+                if (t instanceof Quail){
+                    return cmd.quail;
+                }
+                return true;
+            }).collect(Collectors.toList());
+            List<AbstractTool> tools = tools_;
             System.out.println(cmd.maxDuration);
             Duration duration = Duration.parse(cmd.maxDuration);
             if (cmd.mode.equals("list")){
@@ -175,7 +190,7 @@ public class Evaluation {
                     System.out.println(bench.name().toLowerCase());
                 }
             } else if (!cmd.mode.equals("normal")){
-                cmd.scalBench.forEach(s -> ScalBench.valueOf(s.toUpperCase()).benchmark(cmd.maxScalAlpha, duration));
+                cmd.scalBench.forEach(s -> ScalBench.valueOf(s.toUpperCase()).benchmark(cmd.minScalAlpha, cmd.maxScalAlpha, duration, cmd.parallelism, cmd.runs, tools));
             } else {
                 List<TestProgram> specimen = new ArrayList<>();
                 cmd.normalBench.forEach(s -> {
@@ -190,13 +205,13 @@ public class Evaluation {
                     }
                 });
                 PacketList packets = getPacketsForToolsOrDie(tools, specimen, Paths.get("eval"));
-                if (cmd.splitTemciFiles){
+                if (!cmd.dontSplitTemciFiles){
                     packets.writeTemciConfigOrDiePerProgram(Paths.get("eval"), "run.yaml", duration);
                 } else {
                     packets.writeTemciConfigOrDie("run.yaml", duration);
                 }
                 AggregatedAnalysisResults results =
-                        new PacketExecutor(duration).analysePackets(packets).aggregate();
+                        new PacketExecutor(duration).analysePackets(packets, cmd.parallelism, cmd.runs).aggregate();
                 storeAndPrintAnalysisResults(results, "eval/results.csv");
             }
           } catch (ParameterException | IOException e) {
@@ -205,18 +220,18 @@ public class Evaluation {
         }
     }
 
-    public static void evalPackets(PacketList packets, String temciFile, String csvFile, Duration duration){
+    public static void evalPackets(PacketList packets, String temciFile, String csvFile, Duration duration, int parallelism, int runs){
         Evaluation eval = new Evaluation(IntegerType.INT, "");
         packets.writeTemciConfigOrDie(temciFile, duration);
         AggregatedAnalysisResults results =
-                new PacketExecutor(duration).analysePackets(packets).aggregate();
+                new PacketExecutor(duration).analysePackets(packets, parallelism, runs).aggregate();
         storeAndPrintAnalysisResults(results, csvFile);
     }
 
     public static void storeAndPrintAnalysisResults(AggregatedAnalysisResults results, String csvFile){
-        String csv = results.toStringPerProgram(AggregatedAnalysisResults.LEAKAGE) +
-                results.toStringPerProgram(AggregatedAnalysisResults.RUNTIME) +
-                results.toStringPerTool(AggregatedAnalysisResults.LEAKAGE) +
+        String csv = results.toStringPerProgram(AggregatedAnalysisResults.LEAKAGE) + "\n" +
+                results.toStringPerProgram(AggregatedAnalysisResults.RUNTIME) + "\n" +
+                results.toStringPerTool(AggregatedAnalysisResults.LEAKAGE) + "\n" +
                 results.toStringPerTool(AggregatedAnalysisResults.RUNTIME);
         System.out.println(csv);
         try {
@@ -229,15 +244,16 @@ public class Evaluation {
     public static enum ScalBench {
         ALL(i -> null){
             @Override
-            void benchmark(int endIncl, Duration duration) {
+            void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, List<AbstractTool> tools) {
                 for (ScalBench bench : ScalBench.values()) {
                     if (bench != ALL){
-                        bench.benchmark(endIncl, duration);
+                        bench.benchmark(start, endIncl, duration, parallelism, runs, tools);
                     }
                 }
             }
         },
         IF_STATEMENTS(Generator::createProgramOfIfStmtsWithEqsAndBasicAssign),
+        IF_STATEMENTS2(Generator::createProgramOfIfStmtsWithEqsAndBasicAssign2),
         IF_WHILE_STATEMENTS(Generator::createProgramOfIfStmtsWithEqsSurroundedByCountingLoop),
         REPEATED_FIBONACCIS(Generator::repeatedFibonaccis),
         REPEATED_MANY_FIBONACCIS(Generator::repeatedManyFibonaccis);
@@ -248,16 +264,16 @@ public class Evaluation {
             this.programGenerator = programGenerator;
         }
 
-        void benchmark(int endIncl, Duration duration){
-            evalBenchmark(this.name().toLowerCase(), 0, endIncl, "bench/" + name().toLowerCase(), programGenerator, duration);
+        void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, List<AbstractTool> tools){
+            evalBenchmark(this.name().toLowerCase(), start, endIncl, "bench/" + name().toLowerCase(), programGenerator, duration, parallelism, runs, tools);
         }
     }
 
-    public static void evalBenchmark(String name, int start, int endIncl, String folder, Function<Integer, Parser.ProgramNode> programGenerator, Duration duration){
-        evalPackets(getPacketsForToolsOrDie(AbstractTool.getDefaultTools(), IntStream.rangeClosed(start, endIncl)
+    public static void evalBenchmark(String name, int start, int endIncl, String folder, Function<Integer, Parser.ProgramNode> programGenerator, Duration duration, int parallelism, int runs, List<AbstractTool> tools){
+        evalPackets(getPacketsForToolsOrDie(tools, IntStream.rangeClosed(start, endIncl)
                 .mapToObj(alpha -> new TestProgram(name + "_" + alpha, programGenerator.apply(1 << alpha), IntegerType.INT))
                 .collect(Collectors.toList()), Paths.get(folder)), folder + "/temci_run.yaml",
-                folder + "/results.csv", duration);
+                folder + "/results.csv", duration, parallelism, runs);
     }
 
 }

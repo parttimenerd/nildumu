@@ -36,8 +36,9 @@ public class NildumuDemoTool extends AbstractTool {
 
     @Override
     public AnalysisPacket createPacket(TestProgram program, Path folder) {
-        Path file = this.writeOrDie(folder, "code.nd", "bit_width 32;\n" +
-                program.program.toPrettyString());
+        Path file = this.writeOrDie(folder, "code.nd",
+                program.program.toPrettyString().replaceAll("\\|\\|", "\\|")
+                                                .replaceAll("&&", "&"));
         return new AnalysisPacket(this, program) {
             @Override
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {

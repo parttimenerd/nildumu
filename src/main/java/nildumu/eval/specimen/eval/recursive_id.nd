@@ -8,5 +8,5 @@ int id(int end){
 }
 
 h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
-int z = id(h & 0b11111);
+int z = id(h & 0b00011111);
 l output int o = z;

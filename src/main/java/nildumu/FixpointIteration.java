@@ -61,8 +61,8 @@ public class FixpointIteration {
             }
             Parser.MJNode curNode = nodesToVisit.pop();
             if (curNode instanceof Parser.WhileStatementNode){
-                for (Parser.VariableDeclarationNode preCondVarDef : ((Parser.WhileStatementNode) curNode).getPreCondVarDefs()) {
-                    for (BaseAST childNode : preCondVarDef.children()){
+                for (Parser.VariableAssignmentNode preCondVarAss : ((Parser.WhileStatementNode) curNode).getPreCondVarAss()) {
+                    for (BaseAST childNode : preCondVarAss.children()){
                         if (childNode instanceof Parser.ExpressionNode){
                             if (childNode instanceof Parser.VariableAccessNode){
                                 childNode = ((Parser.VariableAccessNode) childNode).definingExpression;
@@ -70,7 +70,7 @@ public class FixpointIteration {
                             walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode);
                         }
                     }
-                    preCondVarDef.accept(nodeVisitor);
+                    preCondVarAss.accept(nodeVisitor);
                 }
             }
             for (BaseAST childNode : curNode.children()){
@@ -81,7 +81,6 @@ public class FixpointIteration {
                     walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode);
                 }
             }
-            //System.err.println(curNode);
             boolean somethingChanged = curNode.accept(nodeVisitor);
             if (somethingChanged || !visitedBefore.contains(curNode)) {
                 visitedBefore.add(curNode);
@@ -90,7 +89,7 @@ public class FixpointIteration {
                 } else {
                     List<BaseAST> children = curNode.children();
                     if (curNode instanceof Parser.WhileStatementNode){
-                        children.removeAll(((Parser.WhileStatementNode) curNode).getPreCondVarDefs());
+                        children.addAll(((Parser.WhileStatementNode) curNode).getPreCondVarAss());
                     }
                     List<Parser.MJNode> nodesToAdd = children.stream().filter(c -> {
                         if (statementNodesToOmitOneTime.contains(c)) {
@@ -134,10 +133,12 @@ public class FixpointIteration {
             Thread.currentThread().interrupt();
             return;
         }
-        expression.children().stream().filter(c -> c instanceof Parser.ExpressionNode &&
-                !(c instanceof Parser.VariableAccessNode &&
-                        !(c instanceof Parser.ParameterAccessNode)))
-                .forEach(c -> walkExpression(visitor, (Parser.ExpressionNode) c));
+        if (!(expression instanceof Parser.PhiNode)) {
+            expression.children().stream().filter(c -> c instanceof Parser.ExpressionNode &&
+                    !(c instanceof Parser.VariableAccessNode &&
+                            !(c instanceof Parser.ParameterAccessNode)) && !(c instanceof Parser.PhiNode))
+                    .forEach(c -> walkExpression(visitor, (Parser.ExpressionNode) c));
+        }
         visitor.accept(expression);
     }
 

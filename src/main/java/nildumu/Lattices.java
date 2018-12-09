@@ -280,13 +280,11 @@ public class Lattices {
 
     public static interface SecurityLattice<T extends Sec> extends BoundedLattice<T> {
 
-        public static final Map<String, SecurityLattice> LATTICES = lattices();
-
         public static SecurityLattice<?> forName(String name){
-            if (LATTICES.containsKey(name)){
-                return LATTICES.get(name);
+            if (lattices().containsKey(name)){
+                return lattices().get(name);
             }
-            throw new NoSuchElementException(String.format("No such security lattice %s, expected one of these: %s", name, String.join(", ",LATTICES.keySet())));
+            throw new NoSuchElementException(String.format("No such security lattice %s, expected one of these: %s", name, String.join(", ",lattices().keySet())));
         }
 
         public static Map<String, SecurityLattice> lattices(){
@@ -294,6 +292,10 @@ public class Lattices {
             map.put("basic", BasicSecLattice.get());
             map.put("diamond", DiamondSecLattice.get());
             return Collections.unmodifiableMap(map);
+        }
+
+        public default String latticeName(){
+            return lattices().entrySet().stream().filter(e -> getClass().equals(e.getValue().getClass())).findAny().get().getKey();
         }
     }
 
@@ -720,7 +722,7 @@ public class Lattices {
 
     static final DependencySetLattice ds = DependencySetLattice.get();
     static final B bs = B.U;
-    static final BitLattice bl = BitLattice.get();
+    public static final BitLattice bl = BitLattice.get();
     public static final ValueLattice vl = ValueLattice.get();
 
     public static class BitLattice implements Lattice<Bit> {
@@ -1075,7 +1077,7 @@ public class Lattices {
 
         @Override
         public Value bot() {
-            return BOT;
+            return parse("0bxxxxxxxxxxxxxx");
         }
 
         /**
@@ -1353,8 +1355,12 @@ public class Lattices {
         }
 
         public void add(Bit bit){
-            assert bits.size() <= vl.bitWidth;
+            //assert bits.size() <= vl.bitWidth;
             bits.add(bit);
+        }
+
+        public boolean isBot(){
+            return stream().allMatch(b -> b.val == X);
         }
     }
 

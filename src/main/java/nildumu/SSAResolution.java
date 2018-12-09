@@ -171,14 +171,14 @@ public class SSAResolution implements NodeVisitor<SSAResolution.VisRet> {
         pushNewVariablesScope();
 
         VisRet toAppend = ifBlock.accept(this);
-        ifBlock.statementNodes.addAll(0, toAppend.statementsToPrepend);
-        ifBlock.statementNodes.addAll(toAppend.statementsToAdd);
+        ifBlock.addAll(0, toAppend.statementsToPrepend);
+        ifBlock.addAll(toAppend.statementsToAdd);
         Map<Variable, Variable> ifRedefines = newVariables.pop();
 
         pushNewVariablesScope();
         toAppend = elseBlock.accept(this);
-        elseBlock.statementNodes.addAll(0, toAppend.statementsToPrepend);
-        elseBlock.statementNodes.addAll(toAppend.statementsToAdd);
+        elseBlock.addAll(0, toAppend.statementsToPrepend);
+        elseBlock.addAll(toAppend.statementsToAdd);
         Map<Variable, Variable> elseRedefines = newVariables.pop();
 
         Set<Variable> redefinedVariables = new HashSet<>();
@@ -216,11 +216,11 @@ public class SSAResolution implements NodeVisitor<SSAResolution.VisRet> {
 
             replaceVariable(beforeWhile, newWhilePhiVar, whileStatement.body);
             //prepend.add(new VariableDeclarationNode(whileStatement.location, newWhilePhiVar, phi));
-            whileStatement.addPreCondVarDefs(Arrays.asList(new VariableDeclarationNode(whileStatement.location, newWhilePhiPreVar, phi)));
+            whileStatement.addPreCondVarAss(Arrays.asList((VariableAssignmentNode)new VariableDeclarationNode(whileStatement.location, newWhilePhiPreVar, phi)));
             //System.err.println(newWhilePhiPreVar + "  " + newWhilePhiVar);
             replaceVariable(beforeWhile, newWhilePhiPreVar, whileStatement.conditionalExpression);
 
-            whileStatement.body.statementNodes.add(0, new VariableDeclarationNode(whileStatement.location, newWhilePhiVar, phi));
+            whileStatement.body.add(0, new VariableDeclarationNode(whileStatement.location, newWhilePhiVar, phi));
             stmtsToAdd.add(new VariableDeclarationNode(statementNode.location, newWhilePhiVar, phi));
         }
         return new VisRet(ret.removeCurrentStatement,

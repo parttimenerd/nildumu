@@ -53,6 +53,7 @@ public class ApproxFlow extends AbstractTool {
 
     @Override
     public AnalysisPacket createPacket(TestProgram program, Path folder) {
+        String codeFileName = program.getUniqueCodeName(".c");
         Path sourceFile = folder.resolve("code.c");
         try {
             Files.write(sourceFile, Collections.singletonList(toCCode(program)));
@@ -63,11 +64,12 @@ public class ApproxFlow extends AbstractTool {
         return new AnalysisPacket(this, program) {
             @Override
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
-
-                return String.format("cd %s; cp %s code.c; UNWIND=%d python ApproxFlow.py code.c %s",
+                return String.format("cd %s; cp %s %s; UNWIND=%d python ApproxFlow.py %s %s",
                         formatter.format(approxFlowFolder),
                         sourceFile.toAbsolutePath(),
+                        codeFileName,
                         unwindLimit,
+                        codeFileName,
                         GLOBAL_FUNCTION);
             }
 

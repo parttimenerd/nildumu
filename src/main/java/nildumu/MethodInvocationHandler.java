@@ -471,6 +471,7 @@ public abstract class MethodInvocationHandler {
 
         @Override
         public void setup(ProgramNode program) {
+            Context.log(() -> "Setup summary handler");
             Mode _mode = mode;
             callGraph = new CallGraph(program);
             if (_mode == Mode.AUTO){
@@ -499,6 +500,7 @@ public abstract class MethodInvocationHandler {
                 if (node.isMainNode || iteration.val > maxIterations){
                     return s.get(node);
                 }
+                Context.log(() -> String.format("Setup: Analyse %s", node.method.name));
                 iteration.val += 1;
                 BitGraph graph = methodIteration(program.context, callSites.get(node.method), handler, s.get(node).parameters);
                 String name = String.format("%3d %s", iteration.val, node.method.name);
@@ -526,6 +528,10 @@ public abstract class MethodInvocationHandler {
             }
             , node -> node.getCallers().stream().filter(n -> !n.isMainNode).collect(Collectors.toSet()),
             state).entrySet().stream().collect(Collectors.toMap(e -> e.getKey().method, Map.Entry::getValue));
+            state.forEach((node, graph) -> {
+                System.out.println(node.toString() + " # " + graph.paramBitsPerReturnValue);
+            });
+            Context.log(() -> "Finish setup");
         }
 
         BitGraph bot(ProgramNode program, MethodNode method, Map<MethodNode, MethodInvocationNode> callSites, Mode usedMode){

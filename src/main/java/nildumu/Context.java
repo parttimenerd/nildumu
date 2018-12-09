@@ -60,6 +60,35 @@ public class Context {
         LOG.setLevel(Level.INFO);
     }
 
+    public static class Branch {
+        public final ExpressionNode condition;
+        public final boolean val;
+
+        public Branch(ExpressionNode condition, boolean val) {
+            this.condition = condition;
+            this.val = val;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("(%s, %s)", condition, val);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Branch branch = (Branch) o;
+            return val == branch.val &&
+                    Objects.equals(condition, branch.condition);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(condition, val);
+        }
+    }
+
     public final SecurityLattice<?> sl;
 
     public final int maxBitWidth;
@@ -166,7 +195,7 @@ public class Context {
 
             @Override
             public void handleValueUpdate(DefaultMap<MJNode, Integer> map, MJNode key, Integer value) {
-                if (map.get(key) != value){
+                if (!map.get(key).equals(value)){
                     nodeVersionUpdateCount++;
                 }
             }
@@ -178,6 +207,19 @@ public class Context {
         }, FORBID_DELETIONS);
 
         final CallPath path;
+
+        private final Map<Branch, Mods> modsMap = new DefaultMap<>((map, bit) -> {
+            return Mods.empty();
+        });
+
+        private final Stack<Branch> branchStack = new Stack<>();
+
+        private final Map<Branch, Optional<Branch>> parentBranch = new DefaultMap<>((map, branch) -> {
+            return Optional.empty();
+        });
+
+        private final Map<MJNode, List<Integer>> lastParamVersions = new HashMap<>();
+
 
         public NodeValueState(CallPath path) {
             this.path = path;
@@ -194,10 +236,8 @@ public class Context {
 
     /*-------------------------- extended mode specific -------------------------------*/
 
-    private final Stack<Mods> modsStack = new Stack<>();
-
     private final DefaultMap<Bit, ModsCreator> replMap = new DefaultMap<>((map, bit) -> {
-            return ((c, b, a) -> choose(b, a) == a ? new Mods(b, a) : Mods.empty());
+        return ((c, b, a) -> choose(b, a) == a ? new Mods(b, a) : Mods.empty());
     });
 
     /*-------------------------- loop mode specific -------------------------------*/
@@ -312,6 +352,9 @@ public class Context {
     }
 
     public Value op(MJNode node, List<Value> arguments){
+        if (node instanceof ParameterAccessNode){
+            return getVariableValue(((ParameterAccessNode) node).definition);
+        }
         if (node instanceof VariableAccessNode){
             return replace(nodeValue(((VariableAccessNode) node).definingExpression));
         }
@@ -328,20 +371,18 @@ public class Context {
         }).collect(Collectors.toList());
     }
 
-    private final Map<MJNode, List<Integer>> lastParamVersions = new HashMap<>();
-
     private boolean compareAndStoreParamVersion(MJNode node){
         List<Integer> curVersions = paramNode(node).stream().map(nodeValueState.nodeVersionMap::get).collect(Collectors.toList());
         boolean somethingChanged = true;
-        if (lastParamVersions.containsKey(node)){
-            somethingChanged = lastParamVersions.get(node).equals(curVersions);
+        if (nodeValueState.lastParamVersions.containsKey(node)){
+            somethingChanged = !nodeValueState.lastParamVersions.get(node).equals(curVersions);
         }
-        lastParamVersions.put(node, curVersions);
+        nodeValueState.lastParamVersions.put(node, curVersions);
         return somethingChanged;
     }
 
     public boolean evaluate(MJNode node){
-        log(() -> "Evaluate node " + node + " " + nodeValue(node).get(1).deps().size());
+        log(() -> "Evaluate node " + node + " -> old value = " + nodeValue(node));
 
         boolean paramsChanged = compareAndStoreParamVersion(node);
         if (!paramsChanged){
@@ -349,20 +390,35 @@ public class Context {
         }
 
         List<MJNode> paramNodes = paramNode(node);
-
-        List<Value> args = paramNodes.stream().map(this::nodeValue).map(this::replace).collect(Collectors.toList());
-        Value newValue = op(node, args);
-        boolean somethingChanged = false;
-        if (inLoopMode() && nodeValue(node) != vl.bot()) { // dismiss first iteration
-            Value oldValue = nodeValue(node);
-            merge(oldValue, newValue);
-            if (somethingChanged){
-                nodeValueState.nodeVersionMap.put(node, nodeValueState.nodeVersionMap.get(node) + 1);
+        List<Value> args;
+        if (node instanceof PhiNode){
+            PhiNode phi = (PhiNode)node;
+            assert phi.joinedVariables.size() == 2;
+            ExpressionNode condition = phi.controlDepStatement.conditionalExpression;
+            args = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                args.add(replace(nodeValue(phi.joinedVariables.get(i)), new Branch(condition, i == 0)));
             }
         } else {
-            somethingChanged = nodeValue(node).valueEquals(vl.bot());
+            args = paramNodes.stream()
+                    .map(this::nodeValue)
+                    .map(this::replace).collect(Collectors.toList());
         }
-        nodeValue(node, newValue);
+        Value newValue = op(node, args);
+        boolean somethingChanged = false;
+        if (inLoopMode() && !nodeValue(node).isBot()) {
+            Value oldValue = nodeValue(node);
+            somethingChanged = merge(oldValue, newValue) || !oldValue.valueEquals(newValue);
+            nodeValue(node, oldValue);
+        } else {
+            somethingChanged = nodeValue(node).isBot();
+            nodeValue(node, newValue);
+        }
+        if (somethingChanged){
+            nodeValueState.nodeVersionMap.put(node, nodeValueState.nodeVersionMap.get(node) + 1);
+            nodeValueState.nodeVersionUpdateCount++;
+        }
+        log(() -> "Evaluate node " + node + " -> new value = " + nodeValue(node));
         newValue.description(node.getTextualId()).node(node);
         return somethingChanged;
     }
@@ -415,7 +471,7 @@ public class Context {
 
     public Value setVariableValue(Variable variable, Value value){
         if (variableStates.size() == 1) {
-            if (variable.isInput && !variableStates.get(0).get(variable).equals(vl.bot())) {
+            if (variable.isInput && !variableStates.get(0).get(variable).isBot()) {
                 throw new UnsupportedOperationException(String.format("Setting an input variable (%s)", variable));
             }
         }
@@ -484,16 +540,44 @@ public class Context {
         return variables;
     }
 
-    public void pushMods(Bit condBit, Bit assumedValue){
-        if (inExtendedMode()){
-            modsStack.push(repl(condBit).apply(this, condBit, assumedValue));
+    public void addModsForCondition(ExpressionNode condition){
+        if (inExtendedMode()) {
+            Bit condBit = nodeValue(condition).get(1);
+            ModsCreator modsCreator = repl(nodeValue(condition).get(1));
+            for (Boolean val : new Boolean[]{true, false}) {
+                Branch branch = new Branch(condition, val);
+                Mods newMods = modsCreator.apply(this, condBit, bl.create(B.ONE));
+                if (nodeValueState.modsMap.containsKey(branch)) {
+                    nodeValueState.modsMap.put(branch, merge(nodeValueState.modsMap.get(branch), newMods));
+                } else {
+                    nodeValueState.modsMap.put(branch, newMods);
+                }
+            }
         }
     }
 
-    public void popMods(){
+    public void initModsForBranch(Branch branch){
         if (inExtendedMode()) {
-            modsStack.pop();
+            Bit condBit = nodeValue(branch.condition).get(1);
+            ModsCreator modsCreator = repl(nodeValue(branch.condition).get(1));
+            Mods newMods = modsCreator.apply(this, condBit, bl.create(B.ONE));
+            if (nodeValueState.modsMap.containsKey(branch)) {
+                nodeValueState.modsMap.put(branch, merge(nodeValueState.modsMap.get(branch), newMods));
+            } else {
+                nodeValueState.modsMap.put(branch, newMods);
+            }
         }
+    }
+
+    public void pushBranch(Branch branch){
+        Optional<Branch> parent =
+                nodeValueState.branchStack.isEmpty() ? Optional.empty() : Optional.of(nodeValueState.branchStack.peek());
+        nodeValueState.branchStack.push(branch);
+        nodeValueState.parentBranch.put(branch, parent);
+    }
+
+    public void popBranch(){
+        nodeValueState.branchStack.pop();
     }
 
     /**
@@ -515,22 +599,31 @@ public class Context {
 
     /* -------------------------- extended mode specific -------------------------------*/
 
-    public Bit replace(Bit bit){
+    public Bit replace(Bit bit, Branch branch){
         if (inExtendedMode()) {
-            for (int i = modsStack.size() - 1; i >= 0; i--){
-                Mods cur = modsStack.get(i);
-                if (cur.definedFor(bit)){
-                    return cur.replace(bit);
+            Optional<Branch> optCur = Optional.of(branch);
+            while (optCur.isPresent()){
+                Mods curMods = nodeValueState.modsMap.get(optCur.get());
+                if (curMods.definedFor(bit)){
+                    return curMods.replace(bit);
                 }
+                optCur = nodeValueState.parentBranch.get(optCur.get());
             }
         }
         return bit;
     }
 
     public Value replace(Value value) {
+        if (nodeValueState.branchStack.isEmpty()){
+            return value;
+        }
+        return replace(value, nodeValueState.branchStack.peek());
+    }
+
+    public Value replace(Value value, Branch branch) {
         Util.Box<Boolean> replacedABit = new Util.Box<>(false);
         Value newValue = value.stream().map(b -> {
-            Bit r = replace(b);
+            Bit r = replace(b, branch);
             if (r != b){
                 replacedABit.val = true;
             }
@@ -559,24 +652,36 @@ public class Context {
         return replMap.get(bit);
     }
 
-    public int c1(Bit bit){
-        return c1(bit, new HashSet<>());
-    }
-
-    private int c1(Bit bit, Set<Bit> alreadyVisitedBits){
+    private int c1(Bit bit){
         if (!currentCallPath.isEmpty() && methodParameterBits.peek().contains(bit)){
             return 1;
         }
         if (isInputBit(bit) && sec(bit) != sl.bot()){
             return 1;
         }
-        return bit.deps().stream().filter(Bit::isUnknown).filter(b -> {
-            if (alreadyVisitedBits.contains(b)) {
-                return false;
+        if (isInputBit(bit) && sec(bit) != sl.bot()){
+            return 1;
+        }
+        Queue<Bit> q = new ArrayDeque<>();
+        Set<Bit> alreadyVisitedBits = new HashSet<>();
+        q.add(bit);
+        Set<Bit> anchors = new HashSet<>();
+        while (!q.isEmpty()) {
+            Bit cur = q.poll();
+            if ((!currentCallPath.isEmpty() && methodParameterBits.peek().contains(cur)) ||
+                    isInputBit(cur) && sec(cur) != sl.bot()) {
+                anchors.add(cur);
+            } else {
+                cur.deps().stream().filter(Bit::isUnknown).filter(b -> {
+                    if (alreadyVisitedBits.contains(b)) {
+                        return false;
+                    }
+                    alreadyVisitedBits.add(b);
+                    return true;
+                }).forEach(q::offer);
             }
-            alreadyVisitedBits.add(b);
-            return true;
-        }).mapToInt(b -> c1(b, alreadyVisitedBits)).sum();
+        }
+        return anchors.size();
     }
 
     public Bit choose(Bit a, Bit b){
@@ -602,6 +707,7 @@ public class Context {
     public void weight(Bit bit, int weight){
         assert weight == 1 || weight == INFTY;
         if (weight == 1){
+            weightMap.remove(bit, weight);
             return;
         }
         weightMap.put(bit, weight);
@@ -620,19 +726,29 @@ public class Context {
     public boolean merge(Bit o, Bit n){
         B vt = bs.sup(v(o), v(n));
         int oldDepsCount = o.deps().size();
+        boolean somethingChanged = false;
+        if (vt != v(o)) {
+            o.setVal(vt);
+            somethingChanged = true;
+        }
         o.addDependencies(d(n));
-        if (oldDepsCount == o.deps().size() && vt == v(o)){
+        if (oldDepsCount == o.deps().size() && !somethingChanged){
             replMap.remove(n);
             return false;
         }
-        o.setVal(vt);
         repl(o, (c, b, a) -> {
-            Mods oMods = repl(o).apply(c, b, a);
-            Mods nMods = repl(n).apply(c, b, a);
-            return Mods.empty().add(oMods).merge(nMods);
+           // Mods oMods = repl(o).apply(c, b, a);
+           // Mods nMods = repl(n).apply(c, b, a);
+            //return merge(oMods, nMods);
+            return Mods.empty();
         });
         replMap.remove(n);
         return true;
+    }
+
+    private Mods merge(Mods a, Mods b){
+        // TODO: fix endless recursion
+        return Mods.empty();//.add(oMods).merge(nMods);
     }
 
     public void setReturnValue(Value value){

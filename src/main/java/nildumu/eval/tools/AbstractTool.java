@@ -44,14 +44,30 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
         return Arrays.asList(
                 //new NildumuDemoTool(2, 2),
                 //new NildumuDemoTool(5, 5),
-               new Flowcheck(),
-                new LeakWatch(),
-                new ApproxFlow(),
-                new ApproxFlow(2),
-               new ApproxFlow(5),
-               new Nildumu(2, 2),
-                new Nildumu(5, 5),
-               new Quail()
+               //new Flowcheck(),
+          //      new LeakWatch(),
+           //     new ApproxFlow(2),
+            //   new ApproxFlow(5),
+               // new ApproxFlow(),
+               //new Nildumu(2, 2)//,
+                new NildumuDemoTool()//,
+                //new Nildumu()
+              //  new Nildumu(5, 5)//,
+               //new Quail()
+        );
+    }
+
+    public static List<AbstractTool> getDefaultToolsWithoutVariations(){
+        return Arrays.asList(
+                //new NildumuDemoTool(2, 2),
+                //new NildumuDemoTool(5, 5),
+               // new Flowcheck(),
+               // new LeakWatch(),
+               // new ApproxFlow(),
+                new NildumuDemoTool(),
+                new Nildumu()
+                //new Nildumu()//,
+                //new Quail()
         );
     }
 

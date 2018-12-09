@@ -72,7 +72,7 @@ l output int o = fib(h);
     @ParameterizedTest
     @MethodSource("handlers")
     public void testFibonacci(String handler){
-        assertTimeoutPreemptively(ofSeconds(10), () -> parse("bit_width 2;\n" +
+        assertTimeoutPreemptively(ofSeconds(5), () -> parse("bit_width 2;\n" +
 "h input int h = 0b0u;\n" +
 "int fib(int a){\n" +
 "	int r = 1;\n" +
@@ -152,7 +152,7 @@ l output int o = fib(h);
     @MethodSource("handlers")
     public void testWeirdFibonacciTermination(String handler){
         Context.LOG.setLevel(Level.INFO);
-        assertTimeoutPreemptively(ofSeconds(10), () -> parse(
+        assertTimeoutPreemptively(ofSeconds(10000), () -> parse(
                 "     h input int h = 0b0u;\n" +
                 "     l input int l = 0b0u;\n" +
                 "     int res = 0;\n" +
@@ -221,9 +221,23 @@ l output int o = fib(h);
     public void testNestedMethodCalls_smaller2(String handler){
         parse("int f(int x) {\n" +
                 "\t    return h(x);\n" +
-                "    } int h(int x){ return x }\n" +
+                "    } " +
+                "int h(int x){ return x }\n" +
                 "    high input int h = 0buu;\n" +
                 "    low output int o = f(h);", handler).leaksAtLeast(2).run();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"basic", "handler=summary;reduction=basic;bot=basic;dot=tmp2"})
+    public void testNestedMethodCalls_smaller3(String handler){
+        Context.LOG.setLevel(Level.FINE);
+        parse("int f(int x) {\n" +
+                "\t    return h(x);\n" +
+                "    } " +
+                "int h(int x){ return x }\n" +
+                "    high input int h = 0buu;\n" +
+                "    low output int o = f(h);", handler).leaksAtLeast(2).run();
+        Context.LOG.setLevel(Level.INFO);
     }
 
     /**
