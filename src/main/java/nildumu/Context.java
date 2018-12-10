@@ -442,7 +442,7 @@ public class Context {
         boolean somethingChanged = false;
         int i = 1;
         for (; i <= Math.min(oldValue.size(), newValue.size()); i++){
-            somethingChanged = merge(oldValue.get(i), newValue.get(i)) || somethingChanged;
+            somethingChanged = merge(oldValue.get(i), newValue.get(i));
         }
         for (; i <= newValue.size(); i++){
             oldValue.add(newValue.get(i));
@@ -540,29 +540,13 @@ public class Context {
         return variables;
     }
 
-    public void addModsForCondition(ExpressionNode condition){
-        if (inExtendedMode()) {
-            Bit condBit = nodeValue(condition).get(1);
-            ModsCreator modsCreator = repl(nodeValue(condition).get(1));
-            for (Boolean val : new Boolean[]{true, false}) {
-                Branch branch = new Branch(condition, val);
-                Mods newMods = modsCreator.apply(this, condBit, bl.create(B.ONE));
-                if (nodeValueState.modsMap.containsKey(branch)) {
-                    nodeValueState.modsMap.put(branch, merge(nodeValueState.modsMap.get(branch), newMods));
-                } else {
-                    nodeValueState.modsMap.put(branch, newMods);
-                }
-            }
-        }
-    }
-
     public void initModsForBranch(Branch branch){
         if (inExtendedMode()) {
             Bit condBit = nodeValue(branch.condition).get(1);
             ModsCreator modsCreator = repl(nodeValue(branch.condition).get(1));
             Mods newMods = modsCreator.apply(this, condBit, bl.create(B.ONE));
             if (nodeValueState.modsMap.containsKey(branch)) {
-                nodeValueState.modsMap.put(branch, merge(nodeValueState.modsMap.get(branch), newMods));
+                nodeValueState.modsMap.put(branch, Mods.empty().add(nodeValueState.modsMap.get(branch)).merge(newMods));
             } else {
                 nodeValueState.modsMap.put(branch, newMods);
             }
@@ -736,19 +720,15 @@ public class Context {
             replMap.remove(n);
             return false;
         }
+        ModsCreator oModsCreator = repl(o);
+        ModsCreator nModsCreator = repl(n);
         repl(o, (c, b, a) -> {
-           // Mods oMods = repl(o).apply(c, b, a);
-           // Mods nMods = repl(n).apply(c, b, a);
-            //return merge(oMods, nMods);
-            return Mods.empty();
+            Mods oMods = oModsCreator.apply(c, b, a);
+            Mods nMods = nModsCreator.apply(c, b, a);
+            return Mods.empty().add(oMods).merge(nMods);
         });
         replMap.remove(n);
         return true;
-    }
-
-    private Mods merge(Mods a, Mods b){
-        // TODO: fix endless recursion
-        return Mods.empty();//.add(oMods).merge(nMods);
     }
 
     public void setReturnValue(Value value){
