@@ -25,7 +25,7 @@ public class Nildumu extends AbstractTool {
     private final String mih;
 
     public Nildumu() {
-        this("call_string");
+        this("inlining");
     }
 
     /**
@@ -35,7 +35,7 @@ public class Nildumu extends AbstractTool {
      */
     public Nildumu(int csrec, int scsrec){
         super(String.format("nildumu_%d_%d", csrec, scsrec), true);
-        this.mih = String.format("handler=call_string;maxrec=%d;bot={handler=summary;csmaxrec=%d}",
+        this.mih = String.format("handler=inlining;maxrec=%d;bot={handler=summary;csmaxrec=%d}",
                 csrec, scsrec);
     }
 
