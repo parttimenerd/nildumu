@@ -196,7 +196,7 @@ public class LoopTests {
      * </code>
      */
     @Test
-    public void testBasicLoopNested(){
+    public void testBasicLoopNested() {
         assertTimeoutPreemptively(ofMillis(1000000), () ->
                 parse("     bit_width 2;\n" +
                         "     h input int h = 0b0u;\n" +
@@ -207,6 +207,41 @@ public class LoopTests {
                         "        }\n" +
                         "     }\n" +
                         "     l output int o = h;").leaks(1).run());
+    }
+
+    @Test
+    public void testElectronicPurse(){
+        parse("h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
+                "int z = 0;\n" +
+                "while (h >= 1){\n" +
+                "    h = h - 1;\n" +
+                "    z = z + 1;\n" +
+                "}\n" +
+                "l output int o = z;").leaks(32).run();
+    }
+
+    @Test
+    public void testElectronicPurseCondensed(){
+        parse("h input int h = 0buu;\n" +
+                "int z = 0;\n" +
+                "while (h != 1){\n" +
+                "    h = h + 1;\n" +
+                "    z = z + 1;\n" +
+                "}\n" +
+                "l output int o = z;").leaks(2).run();
+    }
+
+    @Test
+    public void testElectronicPurseCondensed2(){
+        Context.LOG.setLevel(Level.FINE);
+        parse("h input int h = 0buuu;\n" +
+                "int z = 0;\n" +
+                "while (h != 0){\n" +
+                "    h = h - 1;\n" +
+                "    z = h;\n" +
+                "}\n" +
+                "l output int o = z;").leaks(3).run();
+        Context.LOG.setLevel(Level.INFO);
     }
 
     @Test
@@ -255,6 +290,6 @@ public class LoopTests {
 
     ContextMatcher parse(String program){
         System.out.println(" ##SSA " + Parser.process(program).toPrettyString());
-        return new ContextMatcher(process(program, Context.Mode.LOOP));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse("summary"), false));
     }
 }

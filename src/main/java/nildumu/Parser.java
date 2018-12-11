@@ -468,7 +468,7 @@ public class Parser implements Serializable {
         Parser.ProgramNode resolvedProgram = (Parser.ProgramNode)Parser.generator.parse(programNode.toPrettyString());
         new NameResolution(resolvedProgram).resolve();
         //checkAndThrow(resolvedProgram);
-        Parser.ProgramNode transformedProgram = (Parser.ProgramNode)new MetaOperatorTransformator(resolvedProgram.context.maxBitWidth, false).process(resolvedProgram);
+        Parser.ProgramNode transformedProgram = (Parser.ProgramNode)new MetaOperatorTransformator(resolvedProgram.context.maxBitWidth, transformPlus).process(resolvedProgram);
         checkAndThrow(transformedProgram);
         return transformedProgram;
     }

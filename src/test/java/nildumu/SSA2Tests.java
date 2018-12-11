@@ -5,6 +5,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
+import java.util.logging.Level;
 
 import static nildumu.Checks.checkAndThrow;
 import static nildumu.Parser.generator;
@@ -171,6 +172,7 @@ public class SSA2Tests {
     }
 
     public static Parser.ProgramNode toSSA(String program, boolean log){
+        Context.LOG.setLevel(Level.FINE);
         Parser.MJNode.resetIdCounter();
         Lattices.Bit.resetNumberOfCreatedBits();
         Parser.ProgramNode programNode = (Parser.ProgramNode) generator.parse(program);

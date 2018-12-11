@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static nildumu.Lattices.vl;
 import static nildumu.Parser.*;
 
 /**

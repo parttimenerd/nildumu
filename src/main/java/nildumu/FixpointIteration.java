@@ -2,6 +2,7 @@ package nildumu;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 import swp.parser.lr.BaseAST;
@@ -76,7 +77,11 @@ public class FixpointIteration {
             for (BaseAST childNode : curNode.children()){
                 if (childNode instanceof Parser.ExpressionNode){
                     if (childNode instanceof Parser.VariableAccessNode){
-                        childNode = ((Parser.VariableAccessNode) childNode).definingExpression;
+                        Parser.ExpressionNode defExpr =
+                                ((Parser.VariableAccessNode) childNode).definingExpression;
+                        if (defExpr != null) {
+                            childNode = defExpr;
+                        }
                     }
                     walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode);
                 }
@@ -89,7 +94,7 @@ public class FixpointIteration {
                 } else {
                     List<BaseAST> children = curNode.children();
                     if (curNode instanceof Parser.WhileStatementNode){
-                        children.addAll(((Parser.WhileStatementNode) curNode).getPreCondVarAss());
+                        //children.addAll(((Parser.WhileStatementNode) curNode).getPreCondVarAss());
                     }
                     List<Parser.MJNode> nodesToAdd = children.stream().filter(c -> {
                         if (statementNodesToOmitOneTime.contains(c)) {
@@ -133,12 +138,16 @@ public class FixpointIteration {
             Thread.currentThread().interrupt();
             return;
         }
-        if (!(expression instanceof Parser.PhiNode)) {
-            expression.children().stream().filter(c -> c instanceof Parser.ExpressionNode &&
-                    !(c instanceof Parser.VariableAccessNode &&
-                            !(c instanceof Parser.ParameterAccessNode)) && !(c instanceof Parser.PhiNode))
-                    .forEach(c -> walkExpression(visitor, (Parser.ExpressionNode) c));
-        }
+        //if (!(expression instanceof Parser.PhiNode)) {
+            try {
+                expression.children().stream().filter(c -> c instanceof Parser.ExpressionNode &&
+                        !((c instanceof Parser.VariableAccessNode && ((Parser.VariableAccessNode) c).definingExpression != null) &&
+                                !(c instanceof Parser.ParameterAccessNode)) && !(c instanceof Parser.PhiNode))
+                        .forEach(c -> walkExpression(visitor, (Parser.ExpressionNode) c));
+            } catch (NullPointerException ex){
+                System.out.println("hi");
+            }
+        //}
         visitor.accept(expression);
     }
 

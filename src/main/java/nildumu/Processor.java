@@ -90,7 +90,8 @@ public class Processor {
 
             @Override
             public Boolean visit(VariableAssignmentNode assignment) {
-                context.setVariableValue(assignment.definition, context.nodeValue(assignment.expression));
+                System.out.println(assignment.definition + " = " + context.nodeValue(assignment.expression));
+                context.setVariableValue(assignment.definition, context.nodeValue(assignment.expression), assignment.expression);
                 return false;
             }
 

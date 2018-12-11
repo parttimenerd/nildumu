@@ -22,6 +22,12 @@ public interface Operator {
         }
     }
 
+    public static Bit wrapBit(Context c, Bit source) {
+        Bit wrap = bl.create(source.val(), ds.create(source));
+        c.repl(wrap, ((con, b, a) -> con.choose(b, a) == a ? new Mods(b, a).add(c.repl(source).apply(con, source, a)) : Mods.empty()));
+        return wrap;
+    }
+
     public static class ParameterAccess implements Operator {
 
         private final Variable variable;
@@ -311,7 +317,7 @@ public interface Operator {
             List<B> bitValues = computeBitValues(x, y);
             List<DependencySet> dataDeps = computeDataDependencies(x, y, bitValues);
             List<Bit> bits = new ArrayList<>();
-            for (int i = 0; i < x.size(); i++){
+            for (int i = 0; i < Math.max(x.size(), y.size()); i++){
                 if (bitValues.get(i).isConstant()){
                     bits.add(bl.create(bitValues.get(i)));
                 } else {
@@ -325,7 +331,7 @@ public interface Operator {
 
         public List<B> computeBitValues(Value x, Value y) {
             List<B> bs = new ArrayList<>();
-            for (int i = 1; i <= x.size(); i++){
+            for (int i = 1; i <= Math.max(x.size(), y.size()); i++){
                 bs.add(computeBitValue(i, x, y));
             }
             return bs;
@@ -683,20 +689,18 @@ public interface Operator {
         @Override
         Bit compute(Context c, Bit x, Bit y) {
             if (x.val() == X){
-                return y;
-            } else if (y.val() == X){
-                return x;
-            } else if (x == y){
-                return x;
+                return wrapBit(c, y);
+            } else if (y.val() == X || x == y){
+                return wrapBit(c, x);
             }
             Parser.PhiNode phi = (Parser.PhiNode)currentNode;
             if (phi.controlDeps.size() == 1){
                 B condVal = c.nodeValue(phi.controlDeps.get(0)).get(1).val();
                 switch (condVal){
                     case ONE:
-                        return x;
+                        return wrapBit(c, x);
                     case ZERO:
-                        return y;
+                        return wrapBit(c, y);
                 }
             }
             Lattices.B bitValue = computeBitValue(x, y);
@@ -753,6 +757,11 @@ public interface Operator {
         @Override
         void checkArguments(List<Value> arguments) {
         }
+
+        @Override
+        public boolean allowsUnevaluatedArguments() {
+            return true;
+        }
     };
 
     static final BitWiseOperator PHI_GENERIC = new BitWiseOperatorStructured("phi") {
@@ -761,10 +770,10 @@ public interface Operator {
         Bit computeBit(Context c, List<Bit> bits) {
             List<Bit> nonBots = bits.stream().filter(b -> b.val() != X).collect(Collectors.toList());
             if (nonBots.size() == 1){
-                return nonBots.get(0);
+                return wrapBit(c, nonBots.get(0));
             }
-            if (bits.size() > 0 && bits.stream().filter(b -> b != bits.get(0)).count() == 0){
-                return bits.get(0);
+            if (bits.size() > 0 && bits.stream().noneMatch(b -> b != bits.get(0))){
+                return wrapBit(c, bits.get(0));
             }
             Lattices.B bitValue = computeBitValue(bits);
             if (bitValue.isConstant()) {
@@ -798,6 +807,11 @@ public interface Operator {
         @Override
         Context.ModsCreator computeModsCreator(Bit r, DependencySet dataDeps) {
             return PHI.computeModificator(null, null, r, dataDeps);
+        }
+
+        @Override
+        public boolean allowsUnevaluatedArguments() {
+            return true;
         }
     };
 
@@ -1000,4 +1014,8 @@ public interface Operator {
     }
 
     public String toString(List<Value> arguments);
+
+    public default boolean allowsUnevaluatedArguments(){
+        return false;
+    }
 }

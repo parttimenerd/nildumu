@@ -360,11 +360,11 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
 
             @Override
             public Object visit(VariableAccessNode variableAccess) {
-                variableAccess.definingExpression = variableToExpr.get(variableAccess.definition);
+                /*variableAccess.definingExpression = variableToExpr.get(variableAccess.definition);
                 if (currentMethod != null && currentMethod.parameters.parameterNodes.stream().anyMatch(p -> p.definition == variableAccess.definition)){
                     variableAccess.definingExpression = new ParameterAccessNode(variableAccess.location, variableAccess.ident);
                     ((ParameterAccessNode) variableAccess.definingExpression).definition = variableAccess.definition;
-                }
+                }*/
                 return null;
             }
 

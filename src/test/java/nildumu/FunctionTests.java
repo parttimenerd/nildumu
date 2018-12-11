@@ -46,6 +46,7 @@ public class FunctionTests {
             "'bit_width 3; int bla(int a){return a + 1} int x = bla(1)', '2'"
     })
     public void testBasicFunctionCalls(String program, String expectedValue){
+        Context.LOG.setLevel(Level.FINE);
         parse(program).val("x", expectedValue).run();
     }
 

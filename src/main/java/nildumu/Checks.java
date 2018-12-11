@@ -159,7 +159,7 @@ public class Checks {
     static ErrorPipe definitionChecks(MJNode node) {
         return node.accept(new ErrorReportingVisitor(ErrorType.DEFINITION_MISSING) {
 
-            @Override
+            /*@Override
             public ErrorPipe visit(VariableAccessNode variableAccess) {
                 return process(variableAccess, node -> {
                     if (variableAccess.definition == null) {
@@ -169,7 +169,7 @@ public class Checks {
                         error("%s has no defining expression", node);
                     }
                 });
-            }
+            }*/
 
             @Override
             public ErrorPipe visit(ParameterAccessNode variableAccess) {

@@ -99,6 +99,8 @@ public class Context {
 
     private final Stack<State> variableStates = new Stack<>();
 
+    public final boolean USE_REDUCED_ADD_OPERATOR = true;
+
     private final DefaultMap<Bit, Sec<?>> secMap =
             new DefaultMap<>(
                     new IdentityHashMap<>(),
@@ -202,6 +204,18 @@ public class Context {
 
             @Override
             public Integer defaultValue(Map<MJNode, Integer> map, MJNode key) {
+                return 0;
+            }
+        }, FORBID_DELETIONS);
+
+        final DefaultMap<Variable, Integer> variableVersionMap = new DefaultMap<>(new LinkedHashMap<>(), new DefaultMap.Extension<Variable, Integer>() {
+
+            @Override
+            public void handleValueUpdate(DefaultMap<Variable, Integer> map, Variable key, Integer value) {
+            }
+
+            @Override
+            public Integer defaultValue(Map<Variable, Integer> map, Variable key) {
                 return 0;
             }
         }, FORBID_DELETIONS);
@@ -336,7 +350,10 @@ public class Context {
         if (node instanceof ParameterAccessNode){
             return getVariableValue(((ParameterAccessNode) node).definition);
         } else if (node instanceof VariableAccessNode){
-            return nodeValue(((VariableAccessNode) node).definingExpression);
+            if (((VariableAccessNode) node).definingExpression != null) {
+                return nodeValue(((VariableAccessNode) node).definingExpression);
+            }
+            //return getVariableValue(((VariableAccessNode) node).definition);
         } else if (node instanceof WrapperNode){
             return ((WrapperNode<Value>) node).wrapped;
         }
@@ -356,23 +373,40 @@ public class Context {
             return getVariableValue(((ParameterAccessNode) node).definition);
         }
         if (node instanceof VariableAccessNode){
-            return replace(nodeValue(((VariableAccessNode) node).definingExpression));
+            VariableAccessNode access = (VariableAccessNode)node;
+            if (access.definingExpression != null) {
+                return replace(nodeValue(access.definingExpression));
+            }
         }
-        return operatorForNode(node).compute(this, node, arguments);
+        Operator operator = operatorForNode(node);
+        if (operator.allowsUnevaluatedArguments() || arguments.stream().noneMatch(Value::isBot)) {
+            return operator.compute(this, node, arguments);
+        }
+        return vl.bot();
     }
 
     @SuppressWarnings("unchecked")
     public List<MJNode> paramNode(MJNode node){
         return (List<MJNode>) (List<?>) node.children().stream().map(n -> {
             if (n instanceof  VariableAccessNode){
-                return ((VariableAccessNode) n).definingExpression;
+                VariableAccessNode access = (VariableAccessNode)n;
+                if (access.definingExpression != null) {
+                    return access.definingExpression;
+                }
+                return access;
             }
             return n;
         }).collect(Collectors.toList());
     }
 
     private boolean compareAndStoreParamVersion(MJNode node){
-        List<Integer> curVersions = paramNode(node).stream().map(nodeValueState.nodeVersionMap::get).collect(Collectors.toList());
+        List<Integer> curVersions = paramNode(node).stream().map(n -> {
+            if (n instanceof VariableAccessNode && ((VariableAccessNode) n).definingExpression == null){
+                return nodeValueState.variableVersionMap.get(((VariableAccessNode) n).definition);
+            }
+            return nodeValueState.nodeVersionMap.get(n);
+        }).collect(Collectors.toList());
+        System.out.println(String.format("param versions of %s: %s", node, curVersions));
         boolean somethingChanged = true;
         if (nodeValueState.lastParamVersions.containsKey(node)){
             somethingChanged = !nodeValueState.lastParamVersions.get(node).equals(curVersions);
@@ -383,6 +417,17 @@ public class Context {
 
     public boolean evaluate(MJNode node){
         log(() -> "Evaluate node " + node + " -> old value = " + nodeValue(node));
+
+        if (node instanceof VariableAccessNode){
+            Value newVal = getVariableValue(((VariableAccessNode) node).definition);
+            boolean somethingChanged = !newVal.valueEquals(nodeValue(node));
+            if (somethingChanged){
+                nodeValueState.nodeVersionMap.put(node, nodeValueState.nodeVersionMap.get(node) + 1);
+                nodeValueState.nodeVersionUpdateCount++;
+            }
+            nodeValue(node, newVal);
+            return somethingChanged;
+        }
 
         boolean paramsChanged = compareAndStoreParamVersion(node);
         if (!paramsChanged){
@@ -404,11 +449,14 @@ public class Context {
                     .map(this::nodeValue)
                     .map(this::replace).collect(Collectors.toList());
         }
+        if (args.stream().allMatch(Value::isBot) && args.size() > 0){
+            return false;
+        }
         Value newValue = op(node, args);
         boolean somethingChanged = false;
         if (inLoopMode() && !nodeValue(node).isBot()) {
             Value oldValue = nodeValue(node);
-            somethingChanged = merge(oldValue, newValue) || !oldValue.valueEquals(newValue);
+            somethingChanged = !oldValue.valueEquals(newValue) | merge(oldValue, newValue);
             nodeValue(node, oldValue);
         } else {
             somethingChanged = nodeValue(node).isBot();
@@ -470,11 +518,16 @@ public class Context {
     }
 
     public Value setVariableValue(Variable variable, Value value){
+        return setVariableValue(variable, value, null);
+    }
+
+    public Value setVariableValue(Variable variable, Value value, MJNode node){
         if (variableStates.size() == 1) {
             if (variable.isInput && !variableStates.get(0).get(variable).isBot()) {
                 throw new UnsupportedOperationException(String.format("Setting an input variable (%s)", variable));
             }
         }
+        nodeValueState.variableVersionMap.put(variable, nodeValueState.nodeVersionMap.get(node));
         variableStates.peek().set(variable, value);
         return value;
     }

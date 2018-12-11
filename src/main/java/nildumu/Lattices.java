@@ -16,6 +16,11 @@ import static nildumu.util.Util.*;
  */
 public class Lattices {
 
+    /**
+     * If true, then enable additional checks
+     */
+    private static final boolean PARANOID_MODE = true;
+
     @FunctionalInterface
     public static interface IdToElement {
         public static IdToElement DEFAULT = x -> null;
@@ -1170,11 +1175,14 @@ public class Lattices {
 
         public Value(List<Bit> bits) {
             //assert bits.size() > 1;
-            this.bits = bits;
+            this.bits = new ArrayList<>(bits);
             for (int i = 0; i < Math.min(bits.size(), vl == null ? 1000 : vl.bitWidth); i++) {
                 Bit bit = bits.get(i);
                 bit.valueIndex(i + 1);
                 bit.value(this);
+            }
+            if (PARANOID_MODE) {
+                assert !hasDuplicateBits();
             }
         }
 
@@ -1236,7 +1244,10 @@ public class Lattices {
          */
         public Bit get(int index){
             assert index > 0;
-            return bits.get(Math.min(index, size()) - 1);
+            while (bits.size() < index){
+                bits.add(this.signBit().copy());
+            }
+            return bits.get(index - 1);
         }
 
         public boolean hasDependencies(){
@@ -1344,6 +1355,9 @@ public class Lattices {
                 bits.get(i + 1).mergeVal(val);
                 bits.get(i + 1).addDependencies(deps);
             }
+            if (PARANOID_MODE) {
+                assert !hasDuplicateBits();
+            }
         }
 
         public boolean isPowerOfTwo(){
@@ -1361,6 +1375,14 @@ public class Lattices {
 
         public boolean isBot(){
             return stream().allMatch(b -> b.val == X);
+        }
+
+        public int numberOfDistinctBits(){
+            return (int)stream().map(b -> b.bitNo).distinct().count();
+        }
+
+        public boolean hasDuplicateBits(){
+            return numberOfDistinctBits() != size();
         }
     }
 
