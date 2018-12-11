@@ -25,7 +25,7 @@ public class NildumuDemoTool extends AbstractTool {
      */
     public NildumuDemoTool(int csrec, int scsrec){
         super(String.format("nildumu-demo_%d_%d", csrec, scsrec), true);
-        this.mih = String.format("handler=call_string;maxrec=%d;bot={handler=summary;csmaxrec=%d}",
+        this.mih = String.format("handler=inlining;maxrec=%d;bot={handler=summary;csmaxrec=%d}",
                 csrec, scsrec);
     }
 

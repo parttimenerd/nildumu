@@ -123,7 +123,7 @@ All configurations and inputs are stored continously in the
         - this yields to maximal over-approximation, but it is fast
           and therefore used as default handler to gather some kind of
           basis for other handlers
-   - the `call_string` handler
+   - the `inlining` handler
         - A call string based handler that just inlines a function.
         - If a function was inlined in the current call path more
           than a defined number of times (`maxRec`), then another

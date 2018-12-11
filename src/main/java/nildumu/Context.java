@@ -406,7 +406,6 @@ public class Context {
             }
             return nodeValueState.nodeVersionMap.get(n);
         }).collect(Collectors.toList());
-        System.out.println(String.format("param versions of %s: %s", node, curVersions));
         boolean somethingChanged = true;
         if (nodeValueState.lastParamVersions.containsKey(node)){
             somethingChanged = !nodeValueState.lastParamVersions.get(node).equals(curVersions);

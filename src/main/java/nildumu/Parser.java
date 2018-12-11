@@ -158,7 +158,6 @@ public class Parser implements Serializable {
 
                                 @Override
                                 public Object visit(MJNode node) {
-                                    System.out.println("ignore " + node);
                                     return null;
                                 }
 

@@ -139,15 +139,11 @@ public class FixpointIteration {
             return;
         }
         //if (!(expression instanceof Parser.PhiNode)) {
-            try {
-                expression.children().stream().filter(c -> c instanceof Parser.ExpressionNode &&
-                        !((c instanceof Parser.VariableAccessNode && ((Parser.VariableAccessNode) c).definingExpression != null) &&
-                                !(c instanceof Parser.ParameterAccessNode)) && !(c instanceof Parser.PhiNode))
-                        .forEach(c -> walkExpression(visitor, (Parser.ExpressionNode) c));
-            } catch (NullPointerException ex){
-                System.out.println("hi");
-            }
-        //}
+            expression.children().stream().filter(c -> c instanceof Parser.ExpressionNode &&
+                    !((c instanceof Parser.VariableAccessNode && ((Parser.VariableAccessNode) c).definingExpression != null) &&
+                            !(c instanceof Parser.ParameterAccessNode)) && !(c instanceof Parser.PhiNode))
+                    .forEach(c -> walkExpression(visitor, (Parser.ExpressionNode) c));
+    //}
         visitor.accept(expression);
     }
 
@@ -158,7 +154,6 @@ public class FixpointIteration {
         worklist2(new Parser.NodeVisitor<Boolean>() {
             @Override
             public Boolean visit(Parser.MJNode node) {
-                System.out.println("→ " + node.toString());
                 return false;
             }
 

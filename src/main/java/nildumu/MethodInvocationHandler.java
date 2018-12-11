@@ -219,7 +219,7 @@ public abstract class MethodInvocationHandler {
      * If a function was inlined in the current call path more than a defined number of times,
      * then another handler is used to compute a conservative approximation.
      */
-    public static class CallStringHandler extends MethodInvocationHandler {
+    public static class InliningHandler extends MethodInvocationHandler {
 
         final int maxRec;
 
@@ -227,7 +227,7 @@ public abstract class MethodInvocationHandler {
 
         private DefaultMap<MethodNode, Integer> methodCallCounter = new DefaultMap<>((map, method) -> 0);
 
-        CallStringHandler(int maxRec, MethodInvocationHandler botHandler) {
+        InliningHandler(int maxRec, MethodInvocationHandler botHandler) {
             this.maxRec = maxRec;
             this.botHandler = botHandler;
         }
@@ -528,9 +528,6 @@ public abstract class MethodInvocationHandler {
             }
             , node -> node.getCallers().stream().filter(n -> !n.isMainNode).collect(Collectors.toSet()),
             state).entrySet().stream().collect(Collectors.toMap(e -> e.getKey().method, Map.Entry::getValue));
-            state.forEach((node, graph) -> {
-                System.out.println(node.toString() + " # " + graph.paramBitsPerReturnValue);
-            });
             Context.log(() -> "Finish setup");
         }
 
@@ -575,7 +572,7 @@ public abstract class MethodInvocationHandler {
                 }
             };
             if (callStringMaxRec > 0){
-                return new CallStringHandler(callStringMaxRec, handler);
+                return new InliningHandler(callStringMaxRec, handler);
             }
             return handler;
         }
@@ -647,11 +644,11 @@ public abstract class MethodInvocationHandler {
             }
         });
         examplePropLines.add("handler=basic");
-        register("call_string", s -> s.add("maxrec", "2").add("bot", "basic"), ps -> {
-            return new CallStringHandler(Integer.parseInt(ps.getProperty("maxrec")), parse(ps.getProperty("bot")));
+        register("inlining", s -> s.add("maxrec", "2").add("bot", "basic"), ps -> {
+            return new InliningHandler(Integer.parseInt(ps.getProperty("maxrec")), parse(ps.getProperty("bot")));
         });
-        examplePropLines.add("handler=call_string;maxrec=2;bot=basic");
-        examplePropLines.add("handler=call_string;maxrec=2;bot={handler=summary;bot=call_string}");
+        examplePropLines.add("handler=inlining;maxrec=2;bot=basic");
+        examplePropLines.add("handler=inlining;maxrec=2;bot={handler=summary;bot=inlining}");
         Consumer<PropertyScheme> propSchemeCreator = s ->
                 s.add("maxiter", "1")
                         .add("bot", "basic")
@@ -675,7 +672,7 @@ public abstract class MethodInvocationHandler {
     }
 
     public static String getDefaultPropString(){
-        return "handler=call_string;maxrec=2;bot=basic";
+        return "handler=inlining;maxrec=2;bot=basic";
     }
 
     public void setup(ProgramNode program){

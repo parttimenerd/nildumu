@@ -114,8 +114,8 @@ l output int o = fib(h);
     @ParameterizedTest
     @CsvSource({
             "'handler=basic', 'o[1]=u;o[2]=u;h[1]=u;h[2]=0'",
-            "'handler=call_string', 'o[1]=1'",
-            "'handler=call_string;maxrec=3', 'o[1]=1'"
+            "'handler=inlining', 'o[1]=1'",
+            "'handler=inlining;maxrec=3', 'o[1]=1'"
     })
     public void testDepsOnFunctionResult(String handler, String bitComp){
         Lattices.Bit.toStringGivesBitNo = true;
@@ -392,7 +392,7 @@ l output int o = fib(h);
     }
 
     static Stream<String> handlers(){
-        return Stream.concat(Stream.of("handler=basic", "handler=call_string;maxrec=1;bot=basic", "handler=call_string;maxrec=2;bot=basic", "summary","handler=summary;mode=ind"), MethodInvocationHandler.getExamplePropLines().stream());
+        return Stream.concat(Stream.of("handler=basic", "handler=inlining;maxrec=1;bot=basic", "handler=inlining;maxrec=2;bot=basic", "summary","handler=summary;mode=ind"), MethodInvocationHandler.getExamplePropLines().stream());
     }
 
     static Stream<Arguments> handlersWBitWidth(){

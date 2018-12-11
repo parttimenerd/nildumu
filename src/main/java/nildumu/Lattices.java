@@ -19,7 +19,7 @@ public class Lattices {
     /**
      * If true, then enable additional checks
      */
-    private static final boolean PARANOID_MODE = true;
+    private static final boolean ENABLE_MISC_CHECKS = false;
 
     @FunctionalInterface
     public static interface IdToElement {
@@ -1203,7 +1203,7 @@ public class Lattices {
                 bit.valueIndex(i + 1);
                 bit.value(this);
             }
-            if (PARANOID_MODE) {
+            if (ENABLE_MISC_CHECKS) {
                 assert !hasDuplicateBits();
             }
         }
@@ -1377,7 +1377,7 @@ public class Lattices {
                 bits.get(i + 1).mergeVal(val);
                 bits.get(i + 1).addDependencies(deps);
             }
-            if (PARANOID_MODE) {
+            if (ENABLE_MISC_CHECKS) {
                 assert !hasDuplicateBits();
             }
         }
