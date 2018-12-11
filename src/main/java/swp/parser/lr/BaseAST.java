@@ -28,7 +28,7 @@ public abstract class BaseAST {
 	}
 
 	public String toPrettyString(){
-		return toPrettyString("", "\t");
+		return toPrettyString("", "  ");
 	}
 
 	public String toPrettyString(String indent, String incr){

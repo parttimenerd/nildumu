@@ -2636,7 +2636,7 @@ public class Parser implements Serializable {
         @Override
         public String toString() {
             return String.format("phi(%s)",
-                    String.join(", ", joinedVariables.stream().map(v -> v.definition.toString())
+                    String.join(", ", joinedVariables.stream().map(v -> v.ident.toString())
                             .collect(Collectors.toList())));
         }
 

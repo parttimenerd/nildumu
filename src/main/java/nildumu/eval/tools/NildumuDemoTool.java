@@ -15,7 +15,7 @@ public class NildumuDemoTool extends AbstractTool {
     private final String mih;
 
     public NildumuDemoTool() {
-        this("call_string");
+        this("inlining");
     }
 
     /**

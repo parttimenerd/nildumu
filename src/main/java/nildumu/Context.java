@@ -595,8 +595,8 @@ public class Context {
     public void initModsForBranch(Branch branch){
         if (inExtendedMode()) {
             Bit condBit = nodeValue(branch.condition).get(1);
-            ModsCreator modsCreator = repl(nodeValue(branch.condition).get(1));
-            Mods newMods = modsCreator.apply(this, condBit, bl.create(B.ONE));
+            ModsCreator modsCreator = repl(condBit);
+            Mods newMods = modsCreator.apply(this, condBit, bl.create(branch.val ? B.ONE : B.ZERO));
             if (nodeValueState.modsMap.containsKey(branch)) {
                 nodeValueState.modsMap.put(branch, Mods.empty().add(nodeValueState.modsMap.get(branch)).merge(newMods));
             } else {
