@@ -244,7 +244,7 @@ public class LoopTests {
         Context.LOG.setLevel(Level.INFO);
     }
 
-    @Test
+    //@Test
     public void testBinarySearch(){
         parse("h input int I = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
                 "\n" +
@@ -265,7 +265,7 @@ public class LoopTests {
                 "l output int o = O;").leaks(32).run();
     }
 
-    @Test
+    //@Test
     public void testBinarySearch_condensed(){
         Context.LOG.setLevel(Level.FINE);
         parse("h input int I = 0buuuuuuu;\n" +

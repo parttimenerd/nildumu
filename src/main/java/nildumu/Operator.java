@@ -871,11 +871,14 @@ public interface Operator {
     static final BinaryOperator ADD = new BinaryOperator("+") {
         @Override
         Value compute(Context c, Value first, Value second) {
-            List<Bit> res = new ArrayList<>();
+            Set<Bit> argBits = Stream.concat(first.stream(), second.stream()).collect(Collectors.toSet());
             Util.Box<Bit> carry = new Util.Box<>(bl.create(ZERO));
             return  vl.mapBitsToValue(first, second, (a, b) -> {
                 Pair<Bit, Bit> add = fullAdder(c, a, b, carry.val);
                 carry.val = add.second;
+                if (c.USE_REDUCED_ADD_OPERATOR){
+                    return bl.create(add.first.val(), ds.create(add.first.calculateReachedBits(argBits)));
+                }
                 return add.first;
             }, vl.bitWidth);
         }

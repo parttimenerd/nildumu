@@ -1058,6 +1058,28 @@ public class Lattices {
         public int hashCode() {
             return Objects.hash(bitNo);
         }
+
+        public Set<Bit> calculateReachedBits(Set<Bit> bitsToReach){
+            Queue<Bit> q = new ArrayDeque<>();
+            Set<Bit> alreadyVisitedBits = new HashSet<>();
+            q.add(this);
+            Set<Bit> reachedBits = new HashSet<>();
+            while (!q.isEmpty()) {
+                Bit cur = q.poll();
+                if (bitsToReach.contains(cur)) {
+                    reachedBits.add(cur);
+                } else {
+                    cur.deps().stream().filter(Bit::isUnknown).filter(b -> {
+                        if (alreadyVisitedBits.contains(b)) {
+                            return false;
+                        }
+                        alreadyVisitedBits.add(b);
+                        return true;
+                    }).forEach(q::offer);
+                }
+            }
+            return reachedBits;
+        }
     }
 
     public static class ValueLattice implements Lattice<Value> {
