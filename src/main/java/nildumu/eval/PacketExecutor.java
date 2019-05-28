@@ -40,7 +40,7 @@ public class PacketExecutor {
           float runtimeStd = (float)(Math.sqrt(results.stream().mapToDouble(r -> Math.pow(r.runtime.toNanos() - runtimeAvg, 2)).average().getAsDouble() / (runs - 1)));
           AnalysisResult res = new AnalysisResult(true, leakageAvg, Duration.ofNanos(runtimeAvg), false, leakageStd / leakageAvg, runtimeStd / runtimeAvg);
         System.out.println("#####################################################");
-        System.out.println(String.format("-------------- %ds +-%.3f %.3f +-%.3f -------------", res.runtime.getSeconds(), res.runtimeStddev, res.leakage, res.leakageStddev));
+        System.out.println(String.format("-------------- %fs +-%.3f %.3f +-%.3f -------------", res.runtime.toMillis() / 1000.0, res.runtimeStddev, res.leakage, res.leakageStddev));
         System.out.println("#####################################################");
           return res;
     }

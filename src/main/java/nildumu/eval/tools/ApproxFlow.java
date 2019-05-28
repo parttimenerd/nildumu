@@ -18,7 +18,7 @@ public class ApproxFlow extends AbstractTool {
 
     static final Path approxFlowFolder = Paths.get("../eval-programs/approxflow");
 
-    final int unwindLimit;
+    private int unwindLimit;
 
     ApproxFlow() {
         this(32);
@@ -78,5 +78,10 @@ public class ApproxFlow extends AbstractTool {
                 return LeakageParser.forLine(ApproxFlow.this, GLOBAL_FUNCTION + " : ", "");
             }
         };
+    }
+
+    @Override
+    public AbstractTool setUnwindingLimit(int limit) {
+        return new ApproxFlow(limit);
     }
 }

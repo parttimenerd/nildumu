@@ -1,7 +1,5 @@
 package nildumu;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.stream.*;
@@ -1009,7 +1007,7 @@ public interface Operator {
     };
 
     default Value compute(Context c, List<Value> arguments){
-        throw new NotImplementedException();
+        throw new RuntimeException("Not implemented");
     }
 
     default Value compute(Context c, Parser.MJNode node, List<Value> arguments){

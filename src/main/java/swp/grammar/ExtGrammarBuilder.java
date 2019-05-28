@@ -1,7 +1,5 @@
 package swp.grammar;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import java.io.Serializable;
 import java.util.*;
 import java.util.function.Consumer;
@@ -674,7 +672,7 @@ public class ExtGrammarBuilder extends GrammarBuilder implements Serializable {
 				if (start == 0 && end == 1){
 					return builder.maybe(child.toObjectArr(builder));
 				}
-				throw new NotImplementedException();
+				throw new RuntimeException("Not implemented");
 			}
 		}
 	}

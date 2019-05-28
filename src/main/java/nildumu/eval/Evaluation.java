@@ -256,8 +256,16 @@ public class Evaluation {
         IF_STATEMENTS2(Generator::createProgramOfIfStmtsWithEqsAndBasicAssign2),
         IF_WHILE_STATEMENTS(Generator::createProgramOfIfStmtsWithEqsSurroundedByCountingLoop),
         REPEATED_FIBONACCIS(Generator::repeatedFibonaccis),
-        REPEATED_MANY_FIBONACCIS(Generator::repeatedManyFibonaccis);
-
+        REPEATED_MANY_FIBONACCIS(Generator::repeatedManyFibonaccis),
+        WHILE_UNWINDING(alpha -> (Parser.ProgramNode)Parser.generator.parse(String.format("h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu; int z = 0; while (0 < h && h < %s){z = z + 1; h = h + 1} l output int o = z;", alpha))) {
+            @Override
+            void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, List<AbstractTool> tools) {
+                evalPackets(IntStream.rangeClosed(start, endIncl)
+                        .mapToObj(alpha -> getPacketsForToolsOrDie(tools.stream().map(t -> t.setUnwindingLimit(1 << alpha)).collect(Collectors.toList()), new TestProgram("while_unwinding_" + alpha, programGenerator.apply(1 << alpha), IntegerType.INT), Paths.get("bench").resolve("while_unwinding_" + alpha)))
+                        .flatMap(PacketList::stream)
+                        .collect(PacketList.collector()),"bench/temci_run.yaml",
+                        "bench/results.csv", duration, parallelism, runs);       }
+        };
         final Function<Integer, Parser.ProgramNode> programGenerator;
 
         ScalBench(Function<Integer, Parser.ProgramNode> programGenerator) {

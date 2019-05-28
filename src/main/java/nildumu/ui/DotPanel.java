@@ -23,7 +23,7 @@ import swp.util.Pair;
 
 public class DotPanel extends JPanel {
 
-    private JPanel rootPanel;
+    public JPanel rootPanel;
     private JComboBox topicSelector;
     private JComboBox fileSelector;
     private JButton launchNewButton;

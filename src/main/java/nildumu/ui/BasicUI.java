@@ -115,7 +115,7 @@ public class BasicUI {
         panel3.add(panel5, new GridConstraints(0, 0, 1, 9, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         storeSelectComboBox = new JComboBox();
         storeSelectComboBox.setEditable(true);
-        Font storeSelectComboBoxFont = this.$$$getFont$$$(null, -1, -1, storeSelectComboBox.getFont());
+        Font storeSelectComboBoxFont = this.$$$getFont$$$(null, -1, -1, storeSelectComboBox.getFont(), 1);
         if (storeSelectComboBoxFont != null) storeSelectComboBox.setFont(storeSelectComboBoxFont);
         final DefaultComboBoxModel defaultComboBoxModel1 = new DefaultComboBoxModel();
         storeSelectComboBox.setModel(defaultComboBoxModel1);
@@ -191,7 +191,7 @@ public class BasicUI {
         final JPanel panel10 = new JPanel();
         panel10.setLayout(new BorderLayout(0, 0));
         splitPane1.setRightComponent(panel10);
-        panel10.add(dotPanel.$$$getRootComponent$$$(), BorderLayout.CENTER);
+        panel10.add(dotPanel.rootPanel, BorderLayout.CENTER);
         parserErrorLabel = new JLabel();
         parserErrorLabel.setText("Label");
         rootPanel.add(parserErrorLabel, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
@@ -200,7 +200,7 @@ public class BasicUI {
     /**
      * @noinspection ALL
      */
-    private Font $$$getFont$$$(String fontName, int style, int size, Font currentFont) {
+    private Font $$$getFont$$$(String fontName, int style, int size, Font currentFont, int bla) {
         if (currentFont == null) return null;
         String resultName;
         if (fontName == null) {

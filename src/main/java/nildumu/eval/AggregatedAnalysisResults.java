@@ -12,6 +12,9 @@ public class AggregatedAnalysisResults {
 
     public static final AnalysisResultFormatter LEAKAGE =
             r -> {
+                if (r == null){
+                    return "";
+                }
                 if (r.hasTimeout){
                     return "(timeout)";
                 }
@@ -22,6 +25,9 @@ public class AggregatedAnalysisResults {
             };
     public static final AnalysisResultFormatter RUNTIME =
             r -> {
+                if (r == null){
+                    return "";
+                }
                 if (r.hasTimeout){
                     return "(timeout)";
                 }
