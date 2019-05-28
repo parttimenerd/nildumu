@@ -8,8 +8,7 @@ structure for a while-language with functions, one data type (`int`)
 and a C like syntax. Example programs can be found in the `examples`
 directory.
 
-It is based, and developed alongside, my master thesis.
-A working draft can be found at https://git.scc.kit.edu/uqddy/ma.
+It is based, and developed alongside, my [master's thesis](https://pp.info.uni-karlsruhe.de/publication.php?id=bechberger18masterarbeit) and as draft version of the analysis, finally implemented on top of (and as part of) [JOANA](https://pp.ipd.kit.edu/projects/joana/).
 It uses the *swp* parser and lexer generator for parsing the demo
 language. The generator was originally written some years ago, but it
 changed slightly during the implementation of this project, as this
