@@ -18,9 +18,9 @@ public class Nildumu extends AbstractTool {
     final static String EXPORT_JAVA8_COMMAND =
             "export PATH=/usr/lib/jvm/java-1.8.0-openjdk-amd64/bin:$PATH";
 
-    private static final Path NILDUMU_PATH = Paths.get("../joana_workspace/nildumu");
+    private static final Path NILDUMU_PATH = Paths.get(".");
 
-    private static final String JAR_NAME = "nildumu.jar";
+    private static final String JAR_NAME = "joana.ifc.sdg.qifc.nildumu.jar";
 
     private final String mih;
 
@@ -55,15 +55,12 @@ public class Nildumu extends AbstractTool {
                                 program.integerType.toJavaTypeName(), p.first))
                         .collect(Collectors.joining(", "))) +
                 program.globalToJavaCode(input -> "",
-                output -> {
-            return String.format("leak(%s);", program.formatExpression(output.expression));
-        }) + "}";
+                output -> String.format("leak(%s);", program.formatExpression(output.expression))) + "}";
         return "import edu.kit.joana.ui.annotations.Source;\n" +
                 "import edu.kit.joana.ui.annotations.Level;\n" +
-                "import edu.kit.nildumu.ui.EntryPoint;\n" +
                 "\n" +
-                "import static edu.kit.nildumu.ui.CodeUI.*;\n" +
-                "import edu.kit.nildumu.ui.*;\n" +
+                "import static edu.kit.joana.ifc.sdg.qifc.nildumu.ui.CodeUI.*;\n" +
+                "import edu.kit.joana.ifc.sdg.qifc.nildumu.ui.*;\n" +
                 "\n" +
                 String.format("public class %s {\n", name) +
                 "    public static void main(String[] args) {\n" +
@@ -92,7 +89,7 @@ public class Nildumu extends AbstractTool {
             @Override
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
                 return String.format("cd %s; cp %s %s.java; %s; javac %s %s.java; " +
-                                "java -Xss100m -jar nildumu.jar %s --classpath . --handler \"%s\"",
+                                "java -Xss100m -jar joana.ifc.sdg.qifc.nildumu.jar %s --classpath . --handler \"%s\"",
                         formatter.format(NILDUMU_PATH),
                         sourceFile.toAbsolutePath(),
                         name,
