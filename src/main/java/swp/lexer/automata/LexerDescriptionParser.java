@@ -50,10 +50,10 @@ public class LexerDescriptionParser {
 		a.addTerminal("ESCAPED", ms-> ms.use("$escaped"));
 		a.addMacro("$range_char", ms -> ms.use("$escaped").or(ms.create('0', 'Z')).or(ms.create('a', 'z'))
 				.or('_', '+', '/', '.', '(', ')', '<', '>', '=', '?', '\'', '|', '{', '}', '~', '!', '"',
-						'$', '%', '&', '`', '/', ':', ';', '#', ',', '*'));
+						'$', '%', '&', '`', '/', ':', ';', '#', ',', '*', '@'));
 		a.addTerminal("CHAR", ms -> ms.create('a', 'z')
 				.or('_', '/', '<', '>', '\'', '~', '!', '"',
-						'$', '%', '&', '`', '/', ':', ','));
+						'$', '%', '&', '`', '/', ':', ',', '@'));
 		a.addMacro("$range", ms -> ms.use("$range_char").append("-").append(ms.use("$range_char")));
 		a.addTerminal("CHAR_RANGE", ms ->
 				ms.create().append("[").append(ms.create("^").maybe()).append(ms.use("$range").or(ms.create().append(ms.use("$escaped").or(ms.use("$range_char")))).or(ms.use("$range_char")).star()).append("]")

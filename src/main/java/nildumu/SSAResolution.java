@@ -292,7 +292,7 @@ public class SSAResolution implements NodeVisitor<SSAResolution.VisRet> {
     private Variable create(Variable variable){
         Variable origin = resolveOrigin(variable);
         String name = origin.name + (numberOfVersions(origin) + 1);
-        Variable newVariable = new Variable(name, false, false);
+        Variable newVariable = new Variable(name);
         Variable pred = resolve(variable);
         directPredecessor.put(newVariable, pred);
         versionCount.put(origin, numberOfVersions(origin) + 1);
@@ -304,7 +304,7 @@ public class SSAResolution implements NodeVisitor<SSAResolution.VisRet> {
     private Variable basicCreate(Variable variable){
         Variable origin = resolveOrigin(variable);
         String name = origin.name + (numberOfVersions(origin) + 1);
-        Variable newVariable = new Variable(name, false, false);
+        Variable newVariable = new Variable(name);
         reverseMapping.put(newVariable, resolveOrigin(variable));
         return newVariable;
     }

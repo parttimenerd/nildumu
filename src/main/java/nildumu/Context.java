@@ -268,11 +268,15 @@ public class Context {
 
     /*-------------------------- unspecific -------------------------------*/
 
-    public Context(SecurityLattice sl, int maxBitWidth) {
+    public Context(SecurityLattice sl, int maxBitWidth, State.OutputState outputState) {
         this.sl = sl;
         this.maxBitWidth = maxBitWidth;
-        this.variableStates.push(new State());
+        this.variableStates.push(new State(outputState));
         ValueLattice.get().bitWidth = maxBitWidth;
+    }
+
+    public Context(SecurityLattice sl, int maxBitWidth) {
+        this(sl, maxBitWidth, new State.OutputState());
     }
 
     public static B v(Bit bit) {
@@ -314,6 +318,10 @@ public class Context {
             }
         }
         return value;
+    }
+
+    public void addAppendOnlyVariable(Sec<?> sec, String variable){
+        variableStates.peek().outputState.add(sec, variable);
     }
 
     public Value addOutputValue(Sec<?> sec, Value value){
@@ -820,7 +828,7 @@ public class Context {
 
     public void pushNewMethodInvocationState(MethodInvocationNode callSite, Set<Bit> argumentBits){
         currentCallPath = currentCallPath.push(callSite);
-        variableStates.push(new State());
+        variableStates.push(new State(variableStates.peek().outputState));
         methodParameterBits.push(argumentBits);
         nodeValueState = nodeValueStates.get(currentCallPath);
     }

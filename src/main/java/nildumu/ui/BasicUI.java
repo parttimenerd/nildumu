@@ -749,7 +749,11 @@ public class BasicUI {
                 "basic"
         ).forEach(a -> provider.addCompletion(new BasicCompletion(provider, a)));
 
-        Arrays.asList(p("hi", "h input int"), p("lo", "l output int"), p("diamond", "use_sec diamond;")).forEach(p -> provider.addCompletion(new ShorthandCompletion(provider, p.first, p.second)));
+        Arrays.asList(p("hi", "h input int"),
+                p("lo", "l output int"),
+                p("diamond", "use_sec diamond;"),
+                p("a", "low append"))
+                .forEach(p -> provider.addCompletion(new ShorthandCompletion(provider, p.first, p.second)));
 
         return provider;
     }

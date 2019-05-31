@@ -1,6 +1,7 @@
 package nildumu;
 
 import java.io.Serializable;
+import java.sql.Statement;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.*;
@@ -40,6 +41,7 @@ public class Parser implements Serializable {
         LBRK("[\\r\\n][\\r\\n]+"),
         INPUT("input"),
         OUTPUT("output"),
+        APPEND_ONLY("append"),
         INT("int"),
         RETURN("return"),
         IF("if"),
@@ -78,9 +80,10 @@ public class Parser implements Serializable {
         RPAREN("\\)"),
         LBRACKET("\\["),
         RBRACKET("\\]"),
+        APPEND("@"),
         SEMICOLON("(\\;|\\n)+", ";"),
-        INTEGER_LITERAL("(([1-9][0-9]*)|0)|(0b[01]+)|(\\-([1-9][0-9]*))"),
-        INPUT_LITERAL("(0b[01u]+)"),
+        INTEGER_LITERAL("(([1-9][0-9]*)|0)|(0b[01e]*)|(\\-([1-9][0-9]*))"),
+        INPUT_LITERAL("(0b[01us]+)"),
         IDENT("[A-Za-z_][A-Za-z0-9_]*"),
         LCURLY("\\{"),
         RCURLY("\\}"),
@@ -124,7 +127,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/blagrfft45ef56f55344rct6r5df5344474i4f46u7s5f22", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/i4fg47s5f22", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 builder.addRule("program", "use_sec? bit_width? lines", asts -> {
                             SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>)asts.get(0)).get(0).wrapped;
@@ -153,7 +156,7 @@ public class Parser implements Serializable {
                             if (declaredBitWidth == -1){
                                 bitWidth = lowerBitWidthBound;
                             }
-                            ProgramNode node = new ProgramNode(new Context(secLattice, bitWidth));
+                            ProgramNode node = new ProgramNode(new Context(secLattice, bitWidth, new State.OutputState()));
                             NodeVisitor visitor = new NodeVisitor<Object>(){
 
                                 @Override
@@ -177,6 +180,13 @@ public class Parser implements Serializable {
                                 public Object visit(InputVariableDeclarationNode inputDecl) {
                                     node.context.addInputValue(secLattice.parse(inputDecl.secLevel), ((IntegerLiteralNode)inputDecl.expression).value);
                                     visit((StatementNode)inputDecl);
+                                    return null;
+                                }
+
+                                @Override
+                                public Object visit(AppendOnlyVariableDeclarationNode appendDecl){
+                                    node.context.addAppendOnlyVariable(secLattice.parse(appendDecl.secLevel), appendDecl.variable);
+                                    visit((StatementNode)appendDecl);
                                     return null;
                                 }
                             };
@@ -205,10 +215,12 @@ public class Parser implements Serializable {
                         .addRule("line_w_semi", "block_statement_w_semi")
                         .addRule("line_w_semi", "output_decl_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("line_w_semi", "input_decl_statement SEMICOLON", asts -> asts.get(0))
+                        .addRule("line_w_semi", "append_decl_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("line", "method")
                         .addRule("line", "block_statement")
                         .addRule("line", "output_decl_statement")
                         .addRule("line", "input_decl_statement")
+                        .addRule("line", "append_decl_statement")
                         .addRule("output_decl_statement", "IDENT OUTPUT INT IDENT EQUAL_SIGN expression", asts -> {
                             return new OutputVariableDeclarationNode(
                                     asts.get(0).getMatchedTokens().get(0).location,
@@ -221,6 +233,12 @@ public class Parser implements Serializable {
                                     asts.getStartLocation(),
                                     asts.get(3).getMatchedString(),
                                     (IntegerLiteralNode)asts.get(5),
+                                    asts.get(0).getMatchedString());
+                        })
+                        .addRule("append_decl_statement", "IDENT APPEND_ONLY INT IDENT", asts -> {
+                            return new AppendOnlyVariableDeclarationNode(
+                                    asts.getStartLocation(),
+                                    asts.get(3).getMatchedString(),
                                     asts.get(0).getMatchedString());
                         })
                         .addRule("method", "INT IDENT LPAREN parameters RPAREN method_body", asts -> {
@@ -367,6 +385,7 @@ public class Parser implements Serializable {
                                         return new UnaryOperatorNode(child, op);
                                     })
                                     .closeLayer()
+                                    .binaryLayer(APPEND)
                                     .binaryLayer(OR)
                                     .binaryLayer(AND)
                                     .binaryLayer(BOR)
@@ -527,6 +546,10 @@ public class Parser implements Serializable {
             return visit((VariableDeclarationNode) outputDecl);
         }
 
+        default R visit(AppendOnlyVariableDeclarationNode appendDecl){
+            return visit((VariableDeclarationNode) appendDecl);
+        }
+
         default R visit(InputVariableDeclarationNode inputDecl){
             return visit((VariableDeclarationNode) inputDecl);
         }
@@ -634,6 +657,10 @@ public class Parser implements Serializable {
 
         default R visit(OutputVariableDeclarationNode outputDecl){
             return visit((VariableDeclarationNode) outputDecl);
+        }
+
+        default R visit(AppendOnlyVariableDeclarationNode appendDecl){
+            return visit((VariableDeclarationNode) appendDecl);
         }
 
         default R visit(InputVariableDeclarationNode inputDecl){
@@ -1489,6 +1516,45 @@ public class Parser implements Serializable {
         }
     }
 
+    public static class AppendOnlyVariableDeclarationNode extends VariableDeclarationNode {
+        final String secLevel;
+
+        public AppendOnlyVariableDeclarationNode(Location location, String name, String secLevel) {
+            super(location, name, null);
+            this.secLevel = secLevel;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s append %s", secLevel, super.toString());
+        }
+
+        @Override
+        public String type() {
+            return "append_decl";
+        }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R> R accept(StatementVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public Operator getOperator(Context c) {
+            return null;
+        }
+
+        @Override
+        public String shortType() {
+            return "da";
+        }
+    }
+
     public static class InputVariableDeclarationNode extends VariableDeclarationNode {
         public final String secLevel;
 
@@ -2106,6 +2172,8 @@ public class Parser implements Serializable {
                     return Operator.RIGHT_SHIFT;
                 case MODULO:
                     return Operator.MODULO;
+                case APPEND:
+                    return Operator.APPEND;
                 default:
                     return null;
             }

@@ -20,14 +20,17 @@ public class Variable {
      */
     final boolean isInput;
 
-    public Variable(String name, boolean isInput, boolean isOutput) {
+    final boolean isAppendOnly;
+
+    public Variable(String name, boolean isInput, boolean isOutput, boolean isAppendOnly) {
         this.name = name;
         this.isOutput = isOutput;
         this.isInput = isInput;
+        this.isAppendOnly = isAppendOnly;
     }
 
     public Variable(String name){
-        this(name, false, false);
+        this(name, false, false, false);
     }
 
     @Override

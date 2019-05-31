@@ -685,6 +685,11 @@ public interface Operator {
     static final BitWiseBinaryOperatorStructured PHI = new BitWiseBinaryOperatorStructured("phi") {
 
         @Override
+        public boolean supportsArguments(List<Value> arguments) {
+            return PHI.supportsArguments(arguments);
+        }
+
+        @Override
         Bit compute(Context c, Bit x, Bit y) {
             if (x.val() == X){
                 return wrapBit(c, y);
@@ -763,6 +768,11 @@ public interface Operator {
     };
 
     static final BitWiseOperator PHI_GENERIC = new BitWiseOperatorStructured("phi") {
+
+        @Override
+        public boolean supportsArguments(List<Value> arguments) {
+            return !(arguments.get(0) instanceof AppendOnlyValue) || arguments.stream().allMatch(a -> a instanceof AppendOnlyValue);
+        }
 
         @Override
         Bit computeBit(Context c, List<Bit> bits) {
@@ -1006,11 +1016,35 @@ public interface Operator {
         }
     };
 
+    static final BinaryOperator APPEND = new BinaryOperator("@") {
+
+        @Override
+        public boolean supportsArguments(List<Value> arguments) {
+            return arguments.get(0) instanceof AppendOnlyValue;
+        }
+
+        @Override
+        Value compute(Context c, Value first, Value second) {
+            if (!(first instanceof AppendOnlyValue)){
+                return compute(c, new AppendOnlyValue(first.stream().toArray(Bit[]::new)), second);
+            }
+            return ((AppendOnlyValue)first).append(second);
+        }
+
+        @Override
+        public boolean allowsUnevaluatedArguments() {
+            return true;
+        }
+    };
+
     default Value compute(Context c, List<Value> arguments){
         throw new RuntimeException("Not implemented");
     }
 
     default Value compute(Context c, Parser.MJNode node, List<Value> arguments){
+        if (!supportsArguments(arguments)){
+            throw new NildumuError("Unsupported operation " + toString(arguments));
+        }
         return compute(c, arguments);
     }
 
@@ -1018,5 +1052,9 @@ public interface Operator {
 
     public default boolean allowsUnevaluatedArguments(){
         return false;
+    }
+
+    default boolean supportsArguments(List<Value> arguments){
+        return !arguments.stream().anyMatch(a -> a instanceof AppendOnlyValue);
     }
 }

@@ -47,6 +47,11 @@ public class SSA2Tests {
         process(program).val("a3", "0").run();
     }
 
+    @Test
+    public void append(){
+        toSSA("bit_width 3; l append int abc; abc = abc @ 3");
+    }
+
     /**
      <code>
      int r = 0;

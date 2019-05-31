@@ -48,6 +48,13 @@ public class ContextMatcher {
         return this;
     }
 
+    public ContextMatcher print(){
+        builder.add(() -> {
+            System.out.println(context);
+        });
+        return this;
+    }
+
     private Lattices.Value getValue(String variable){
         return context.getVariableValue(variable);
     }

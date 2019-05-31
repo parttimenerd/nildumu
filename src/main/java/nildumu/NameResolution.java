@@ -1,5 +1,8 @@
 package nildumu;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import static nildumu.Parser.*;
 
 /**
@@ -18,10 +21,12 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     private SymbolTable symbolTable;
     private final ProgramNode program;
+    private final Set<Variable> appendVariables;
 
     public NameResolution(ProgramNode program) {
         this.program = program;
         this.symbolTable = new SymbolTable();
+        this.appendVariables = new HashSet<>();
     }
 
     public void resolve(){
@@ -36,6 +41,20 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(ProgramNode program) {
+        program.globalBlock.children().forEach(n -> ((MJNode)n).accept(new NodeVisitor<Object>() {
+            @Override
+            public Object visit(MJNode node) {
+                return null;
+            }
+
+            @Override
+            public Object visit(AppendOnlyVariableDeclarationNode appendDecl) {
+                Variable definition = new Variable(appendDecl.variable, false, false, true);
+                appendDecl.definition = definition;
+                appendVariables.add(definition);
+                return null;
+            }
+        }));
         visitChildrenDiscardReturn(program);
         NodeVisitor<Object> visitor = new NodeVisitor<Object>(){
 
@@ -62,13 +81,20 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
     }
 
     @Override
+    public Object visit(AppendOnlyVariableDeclarationNode appendDecl) {
+        symbolTable.insert(appendDecl.variable, appendDecl.definition);
+        return null;
+    }
+
+    @Override
     public Object visit(VariableDeclarationNode variableDeclaration) {
         if (symbolTable.isDirectlyInCurrentScope(variableDeclaration.variable)){
             throw new MJError(String.format("Variable %s already defined in scope", variableDeclaration.variable));
         }
         Variable definition = new Variable(variableDeclaration.variable,
                 variableDeclaration instanceof InputVariableDeclarationNode,
-                variableDeclaration instanceof OutputVariableDeclarationNode);
+                variableDeclaration instanceof OutputVariableDeclarationNode,
+                variableDeclaration instanceof AppendOnlyVariableDeclarationNode);
         symbolTable.insert(variableDeclaration.variable, definition);
         variableDeclaration.definition = definition;
         return visit((VariableAssignmentNode)variableDeclaration);
@@ -104,6 +130,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         SymbolTable oldSymbolTable = symbolTable;
         symbolTable = new SymbolTable();
         symbolTable.enterScope();
+        appendVariables.forEach(v -> symbolTable.insert(v.name, v));
         visitChildrenDiscardReturn(method);
         symbolTable.leaveScope();
         symbolTable = oldSymbolTable;

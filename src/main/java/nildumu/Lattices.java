@@ -459,22 +459,36 @@ public class Lattices {
     public static enum B implements BoundedLattice<B>, LatticeElement<B, B> {
 
         /**
-         * Bit isn't needed
+         * Bit represents a *
          */
-        X("x", Optional.empty()),
+        S("s", Optional.empty(), 4),
+        /**
+         * Bit represents a *
+         */
+        N("n", Optional.empty(), 3),
+        /**
+         * Bit might not be present
+         */
+        E("e", Optional.empty(), 1),
+        /**
+         * Bit is not yet evaluated
+         */
+        X("x", Optional.empty(), 0),
         /**
          * Value is unknown, can be 1 or 0
          */
-        U("u", Optional.empty()),
-        ZERO("0", Optional.of(0)),
-        ONE("1", Optional.of(1));
+        U("u", Optional.empty(), 2),
+        ZERO("0", Optional.of(0), 1),
+        ONE("1", Optional.of(1), 1);
 
         public final String name;
         public final Optional<Integer> value;
+        public final int level;
 
-        private B(String name, Optional<Integer> value) {
+        private B(String name, Optional<Integer> value, int level) {
             this.name = name;
             this.value = value;
+            this.level = level;
         }
 
         public B top(){
@@ -486,12 +500,19 @@ public class Lattices {
             if (a != b && a.isConstant() && b.isConstant()){
                 return U;
             }
+            if ((a.isConstant() || b.isConstant()) && (a.isE() || b.isE())){
+                return N;
+            }
             return lowerEqualsThan(a, b) ? b : a;
+        }
+
+        private boolean isE() {
+            return this == E;
         }
 
         @Override
         public boolean lowerEqualsThan(B a, B b) {
-            return a == X || a == b || (a.isConstant() && b == U);
+            return a.level < b.level || (a != b && a.level == b.level);
         }
 
         @Override
@@ -502,6 +523,9 @@ public class Lattices {
         @Override
         public B inf(B a, B b) {
             if (a != b && a.isConstant() && b.isConstant()){
+                return X;
+            }
+            if ((a.isE() || b.isE()) && (lowerEqualsThan(a, E) || lowerEqualsThan(b, E))){
                 return X;
             }
             return lowerEqualsThan(a, b) ? a : b;
@@ -518,6 +542,9 @@ public class Lattices {
                 case 'u': return new Pair<>(U, start + 1);
                 case '0': return new Pair<>(ZERO, start + 1);
                 case '1': return new Pair<>(ONE, start + 1);
+                case 'e': return new Pair<>(E, start + 1);
+                case 'n': return new Pair<>(N, start + 1);
+                case 's': return new Pair<>(S, start + 1);
             }
             throw new ParsingError(str, start, String.format("No such bit lattice element '%s'", str.substring(start, start + 1)));
         }
@@ -527,26 +554,13 @@ public class Lattices {
             return name;
         }
 
-        B supremum(B other){
-            if (this == other){
-                return this;
-            }
-            if (this.isConstant() && other.isConstant()){
-                return U;
-            }
-            if (this == U || other == X){
-                return this;
-            }
-            return other;
-        }
-
         public boolean isConstant(){
             return value.isPresent();
         }
 
         @Override
         public Set<B> elements() {
-            return new HashSet<>(Arrays.asList(X, U, ZERO, ONE));
+            return new HashSet<>(Arrays.asList(X, U, ZERO, ONE, S, E));
         }
 
         @Override
@@ -1033,9 +1047,6 @@ public class Lattices {
             return deps;
         }
 
-        public void mergeVal(B val){
-            this.val = bs.sup(this.val, val);
-        }
 
         public Bit copy(){
             return new Bit(val, deps.copy());
@@ -1195,6 +1206,10 @@ public class Lattices {
         private String description = "";
         private Parser.MJNode node = null;
 
+        protected Value(){
+            this.bits = new ArrayList<>();
+        }
+
         public Value(List<Bit> bits) {
             //assert bits.size() > 1;
             this.bits = new ArrayList<>(bits);
@@ -1277,7 +1292,7 @@ public class Lattices {
         }
 
         public boolean isConstant(){
-            return bits.stream().allMatch(Bit::isConstant);
+            return bits.stream().allMatch(Bit::isConstant) && bits.size() > 0;
         }
 
         public int asInt(){
@@ -1355,31 +1370,12 @@ public class Lattices {
             return signBit().val == ONE;
         }
 
-        public boolean isNonNegative(){
-            return signBit().val == ZERO;
-        }
-
         public Value map(Function<Bit, Bit> mapper){
             return stream().map(mapper).collect(Value.collector());
         }
 
         public Set<Bit> bitSet(){
             return new HashSet<>(bits);
-        }
-
-        public void mergeBit(int i, B val, DependencySet deps){
-            if (bits.size() <= i){
-                while (bits.size() < i){
-                    bits.add(bits.get(bits.size()).copy());
-                }
-                bits.add(bl.create(val, deps));
-            } else {
-                bits.get(i + 1).mergeVal(val);
-                bits.get(i + 1).addDependencies(deps);
-            }
-            if (ENABLE_MISC_CHECKS) {
-                assert !hasDuplicateBits();
-            }
         }
 
         public boolean isPowerOfTwo(){
@@ -1408,4 +1404,41 @@ public class Lattices {
         }
     }
 
+    /**
+     * Only appending bits is possible, but not accessing the individual
+     */
+    static class AppendOnlyValue extends Value {
+
+        public AppendOnlyValue(Bit... bits) {
+            super(bits);
+        }
+
+        @Override
+        public Bit get(int index) {
+            assert index > 0;
+            while (size() < index){
+                add(new Bit(E));
+            }
+            return super.get(index);
+        }
+
+        public AppendOnlyValue append(Value value, int bitWidth){
+            AppendOnlyValue newValue = new AppendOnlyValue();
+            stream().filter(b -> !b.val.isE() && b.val != X).forEach(newValue::add);
+            value.stream().forEach(newValue::add);
+            return newValue;
+        }
+
+        public AppendOnlyValue append(Value value){
+            return append(value, vl.bitWidth);
+        }
+
+        static AppendOnlyValue createEmpty(){
+            AppendOnlyValue val = new AppendOnlyValue();
+            for (int i = 0; i < vl.bitWidth; i++) {
+                val.add(new Bit(E));
+            }
+            return val;
+        }
+    }
 }

@@ -1,13 +1,8 @@
 package nildumu;
 
-import swp.parser.lr.BaseAST;
-
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import static nildumu.Lattices.vl;
 import static nildumu.Parser.*;
 
 /**
@@ -71,6 +66,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     private final List<String> introducedVariables;
 
+    private final Set<String> appendOnlyVariables;
+
     public SSAResolution2(MethodNode method) {
         reverseMapping = new HashMap<>();
         versionCount = new HashMap<>();
@@ -78,6 +75,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         newVariables = new Stack<>();
         this.currentMethod = Optional.ofNullable(method);
         this.introducedVariables = new ArrayList<>();
+        appendOnlyVariables = new HashSet<>();
     }
 
     public List<String> resolve(MJNode node){
@@ -105,6 +103,12 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         visitChildrenDiscardReturn(program);
         popNewVariablesScope();
         return VisRet.DEFAULT;
+    }
+
+    @Override
+    public VisRet visit(AppendOnlyVariableDeclarationNode appendDecl) {
+        appendOnlyVariables.add(appendDecl.variable);
+        return new VisRet(true, appendDecl, new VariableAssignmentNode(appendDecl.location, create(appendDecl.variable), new IntegerLiteralNode(appendDecl.location, new Lattices.AppendOnlyValue().createEmpty())));
     }
 
     @Override
@@ -211,6 +215,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         resolution.pushNewVariablesScope();
         resolution.resolve(method.parameters);
         resolution.resolve(method.body).forEach(method.body::prependVariableDeclaration);
+        resolution.assignAppendOnlyVariables(method.body);
     }
 
     public static void process(ProgramNode program){
@@ -218,7 +223,14 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         resolution.pushNewVariablesScope();
         resolution.resolve(program.globalBlock)
                 .forEach(program.globalBlock::prependVariableDeclaration);
+        resolution.assignAppendOnlyVariables(program.globalBlock);
         program.methods().forEach(SSAResolution2::process);
+    }
+
+    void assignAppendOnlyVariables(BlockNode block){
+        this.appendOnlyVariables.forEach(v -> {
+            block.add(new VariableAssignmentNode(block.location, v, new VariableAccessNode(block.location, resolve(v))));
+        });
     }
 
     @Override

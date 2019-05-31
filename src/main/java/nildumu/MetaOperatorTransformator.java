@@ -264,6 +264,14 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     }
 
     @Override
+    public MJNode visit(AppendOnlyVariableDeclarationNode decl){
+        AppendOnlyVariableDeclarationNode node = new AppendOnlyVariableDeclarationNode(decl.location, decl.variable, decl.secLevel);
+        node.definition = decl.definition;
+        return node;
+    }
+
+
+    @Override
     public MJNode visit(BlockNode block){
         return new BlockNode(block.location, block.statementNodes.stream().map(s -> (StatementNode)s.accept(this)).filter(Objects::nonNull).collect(Collectors.toList()));
     }
