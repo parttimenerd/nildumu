@@ -578,6 +578,10 @@ public class Lattices {
                     return this;
             }
         }
+
+        public boolean isAtLeastUnknown() {
+            return bs.greaterEqualsThan(this, U);
+        }
     }
 
     public static interface DependencySet extends Set<Bit> {
@@ -776,7 +780,7 @@ public class Lattices {
         }
 
         public Bit create(B val, DependencySet deps) {
-            if (val != U){
+            if (!val.isAtLeastUnknown()){
                 return create(val);
             }
             return new Bit(val, deps);
@@ -995,6 +999,10 @@ public class Lattices {
             return val == B.U;
         }
 
+        public boolean isAtLeastUnknown() {
+            return val.isAtLeastUnknown();
+        }
+
         public boolean isInputBit(){
             return isUnknown() && !hasDependencies();
         }
@@ -1012,8 +1020,7 @@ public class Lattices {
         }
 
         public void addDependency(Bit newDependency){
-            //assert isUnknown(); //TODO: fix
-            if (!isUnknown()){
+            if (!isAtLeastUnknown()){
                 return;
             }
             if (deps instanceof EmptyDependencySet){
@@ -1080,7 +1087,7 @@ public class Lattices {
                 if (bitsToReach.contains(cur)) {
                     reachedBits.add(cur);
                 } else {
-                    cur.deps().stream().filter(Bit::isUnknown).filter(b -> {
+                    cur.deps().stream().filter(Bit::isAtLeastUnknown).filter(b -> {
                         if (alreadyVisitedBits.contains(b)) {
                             return false;
                         }

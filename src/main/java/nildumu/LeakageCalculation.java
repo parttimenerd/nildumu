@@ -20,9 +20,9 @@ public class LeakageCalculation {
             this.context = context;
         }
 
-        public abstract int leakage(Sec<?> outputLevel);
+        public abstract double leakage(Sec<?> outputLevel);
 
-        public Map<Sec<?>, Integer> leakages() {
+        public Map<Sec<?>, Double> leakages() {
             return context.sl.elements().stream().collect(Collectors.toMap(s -> s, s -> s == context.sl.top() ? 0 : leakage(s)));
         }
 
@@ -41,7 +41,7 @@ public class LeakageCalculation {
         }
 
         @Override
-        public int leakage(Sec<?> outputLevel) {
+        public double leakage(Sec<?> outputLevel) {
             return compRes.get(outputLevel).maxFlow;
         }
 

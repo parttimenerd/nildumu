@@ -45,14 +45,14 @@ public class MinCut {
 
     public static class ComputationResult {
         public final Set<Bit> minCut;
-        public final int maxFlow;
+        public final double maxFlow;
 
-        public ComputationResult(Set<Bit> minCut, long maxFlow) {
+        public ComputationResult(Set<Bit> minCut, double maxFlow) {
             this.minCut = minCut;
             if (maxFlow > INFTY){
                 this.maxFlow = INFTY;
             } else {
-                this.maxFlow = (int)maxFlow;
+                this.maxFlow = maxFlow;
             }
             if (minCut.size() > maxFlow) {
                 System.err.println("#min cut > max flow");
@@ -64,9 +64,9 @@ public class MinCut {
 
         final Set<Bit> sourceNodes;
         final Set<Bit> sinkNodes;
-        final Function<Bit, Integer> weights;
+        final Function<Bit, Double> weights;
 
-        protected Algorithm(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Integer> weights) {
+        protected Algorithm(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Double> weights) {
             this.sourceNodes = sourceNodes;
             this.sinkNodes = sinkNodes;
             this.weights = weights;
@@ -88,32 +88,32 @@ public class MinCut {
              * Flow from the current bit to the bit that is key in the map (flow on the edge
              * between them), the capacity of these outer bit edges is infinite
              */
-            Map<Bit, Long> cRev = new HashMap<>();
+            Map<Bit, Double> cRev = new HashMap<>();
 
             /**
              * Inner edge capacity
              */
-            final long innerCapacity;
+            final double innerCapacity;
 
             /**
              * Inner edge flow
              */
-            long innerFlow = 0;
+            double innerFlow = 0;
 
-            BitInfo(int parentVersion, long innerCapacity) {
+            BitInfo(int parentVersion, double innerCapacity) {
                 this.parentVersion = parentVersion;
                 this.innerCapacity = innerCapacity;
             }
 
-            long residualCapacity(){
+            double residualCapacity(){
                 return innerCapacity - innerFlow;
             }
 
-            long residualBackEdgeCapacity(){
+            double residualBackEdgeCapacity(){
                 return innerFlow;
             }
 
-            void increaseInnerFlow(long delta){
+            void increaseInnerFlow(double delta){
                 innerFlow += delta;
             }
 
@@ -121,13 +121,13 @@ public class MinCut {
                 return innerCapacity == innerFlow; //|| (innerCapacity == INFTY && innerFlow > INFTY / 2);
             }
 
-            void increaseFlow(Bit dep, long delta){
+            void increaseFlow(Bit dep, double delta){
                 try {
                     cRev.put(dep, cRev.get(dep) + delta);
                 } catch (NullPointerException ex){}
             }
 
-            long getFlow(Bit dep){
+            double getFlow(Bit dep){
                 return cRev.get(dep);
             }
         }
@@ -136,14 +136,14 @@ public class MinCut {
 
             private static int versionCounter = 0;
 
-            final Function<Bit, Integer> weights;
+            final Function<Bit, Double> weights;
             final Bit source;
             final Bit sink;
             final Map<Bit, Set<Bit>> revs = new DefaultMap<>((map, b) -> new HashSet<>());
             final Set<Bit> bits = new HashSet<>();
             final int version;
 
-            Graph(Function<Bit, Integer> weights, Bit source, Bit sink){
+            Graph(Function<Bit, Double> weights, Bit source, Bit sink){
                 this.weights = weights;
                 this.source = source;
                 this.sink = sink;
@@ -161,7 +161,7 @@ public class MinCut {
                 bit.store = info;
                 bit.deps().forEach(d -> {
                     revs.get(d).add(bit);
-                    info.cRev.put(d, 0L);
+                    info.cRev.put(d, 0d);
                 });
             }
 
@@ -323,11 +323,11 @@ public class MinCut {
                 return predInPath;
             }
 
-            Pair<Long, List<Bit>> augmentPath(){
+            Pair<Double, List<Bit>> augmentPath(){
                 // see https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm
                 Map<Bit, Pair<Bit, Boolean>> predInPath = bfs();
                 // augmenting path found
-                long df = INFTY;
+                double df = INFTY;
                 // calculate the flow on this path
                 List<Bit> path = new ArrayList<>();
 
@@ -418,12 +418,12 @@ public class MinCut {
             }*/
 
             ComputationResult findMinCut(){
-                Pair<Long, List<Bit>> roundRes;
+                Pair<Double, List<Bit>> roundRes;
                 /*if (DEBUG) {
                     writeDotGraph("0", source, sink, null);
                 }*/
                 int iteration = 0;
-                long flow = 0;
+                double flow = 0;
                 while ((roundRes = augmentPath()).first > 0){
                     iteration++;
                     /*if (DEBUG) {
@@ -468,7 +468,7 @@ public class MinCut {
                 }
                 //System.out.println(String.format("reachable %s, minCut %s", reachable, minCut));
                 //minCut = minimize(minCut);
-                return new ComputationResult(minCut, minCut.stream().mapToInt(b -> weights.apply(b)).sum());
+                return new ComputationResult(minCut, minCut.stream().mapToDouble(b -> weights.apply(b)).sum());
             }
 
             Set<Bit> nonInftyDeps(Bit bit){
@@ -514,7 +514,7 @@ public class MinCut {
             }
         }
 
-        ApproxEdmondsKarp(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Integer> weights) {
+        ApproxEdmondsKarp(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Double> weights) {
             super(sourceNodes, sinkNodes, weights);
         }
 
@@ -559,7 +559,7 @@ public class MinCut {
 
     public static class GraphTPP extends Algorithm {
 
-        protected GraphTPP(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Integer> weights) {
+        protected GraphTPP(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Double> weights) {
             super(sourceNodes, sinkNodes, weights);
         }
 
@@ -604,7 +604,7 @@ public class MinCut {
     /**
      * Choose the algorithm by setting the static {@link MinCut#usedAlgo} variable
      */
-    public static ComputationResult compute(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Integer> weights){
+    public static ComputationResult compute(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Double> weights){
         Algorithm cur = null;
         switch (usedAlgo){
             case GRAPHT_PP:

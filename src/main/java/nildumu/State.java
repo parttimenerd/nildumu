@@ -49,6 +49,9 @@ class State extends GenericState {
                     .collect(Collectors.joining("\n"));
         }
 
+        public Value getBits(Sec s) {
+            return valuesPerSec.get(s).stream().flatMap(v -> get(v).stream()).collect(Value.collector());
+        }
     }
 
     private Value returnValue = vl.bot();

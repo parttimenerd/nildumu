@@ -713,7 +713,7 @@ public interface Operator {
             DependencySet dataDeps = computeDataDependencies(x, y, bitValue);
             Bit r = bl.create(bitValue, dataDeps);
             c.repl(r, computeModificator(x, y, r, dataDeps));
-            r.addDependencies(computeControlDeps(c, phi, U, null));
+            r.addDependencies(computeControlDeps(c, phi, bitValue, null));
             return r;
         }
 
@@ -729,7 +729,7 @@ public interface Operator {
 
         public DependencySet computeControlDeps(Context context, Parser.MJNode node, B computedBitValue, DependencySet computedDataDependencies) {
             assert node instanceof Parser.PhiNode;
-            if (computedBitValue == B.U) {
+            if (bs.greaterEqualsThan(computedBitValue, U)) {
                 return ((Parser.PhiNode) node).controlDeps.stream().map(n -> context.nodeValue(n).get(1)).collect(DependencySet.collector());
             }
             return ds.empty();

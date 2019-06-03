@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.function.*;
 import java.util.logging.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import nildumu.util.*;
 import swp.util.Pair;
@@ -256,7 +257,7 @@ public class Context {
 
     /*-------------------------- loop mode specific -------------------------------*/
 
-    private final HashMap<Bit, Integer> weightMap = new HashMap<>();
+    private final HashMap<Bit, Double> weightMap = new HashMap<>();
 
     public static final int INFTY = Integer.MAX_VALUE;
 
@@ -744,11 +745,18 @@ public class Context {
 
     /* -------------------------- loop mode specific -------------------------------*/
 
-    public int weight(Bit bit){
-        return weightMap.getOrDefault(bit, 1);
+    public double weight(Bit bit){
+        double weight = weightMap.getOrDefault(bit, 1d);
+        if (bit.val() == bs.N){
+            weight = Math.max(Util.log2(3), weight);
+        }
+        if (bit.val() == bs.S){
+            weight = INFTY;
+        }
+        return weight;
     }
 
-    public void weight(Bit bit, int weight){
+    public void weight(Bit bit, double weight){
         assert weight == 1 || weight == INFTY;
         if (weight == 1){
             weightMap.remove(bit, weight);
@@ -863,7 +871,8 @@ public class Context {
                 .stream()
                 .map(s -> (Sec<?>) s)
                 .filter(s -> ((Lattice) sl).lowerEqualsThan(s, sec))
-                .flatMap(s -> output.getBits((Sec) s).stream())
+                .flatMap(s -> Stream.concat(output.getBits((Sec) s).stream(),
+                        variableStates.peek().outputState.getBits((Sec) s).stream()))
                 .collect(Collectors.toSet());
     }
 
