@@ -22,15 +22,18 @@ public class Variable {
 
     final boolean isAppendOnly;
 
-    public Variable(String name, boolean isInput, boolean isOutput, boolean isAppendOnly) {
+    final boolean hasAppendValue;
+
+    public Variable(String name, boolean isInput, boolean isOutput, boolean isAppendOnly, boolean hasAppendValue) {
         this.name = name;
         this.isOutput = isOutput;
         this.isInput = isInput;
         this.isAppendOnly = isAppendOnly;
+        this.hasAppendValue = hasAppendValue;
     }
 
     public Variable(String name){
-        this(name, false, false, false);
+        this(name, false, false, false, false);
     }
 
     @Override

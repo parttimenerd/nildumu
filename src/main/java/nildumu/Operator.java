@@ -863,11 +863,13 @@ public interface Operator {
 
         @Override
         public Value compute(Context c, List<Value> arguments) {
-            if (!callSite.definition.hasReturnValue()){
-                System.err.println("Called method without return statement: " + toString(arguments));
-                return vl.bot();
-            }
-            return c.methodInvocationHandler().analyze(c, callSite, arguments);
+            Map<String, AppendOnlyValue> globals = callSite.globals.globalVarSSAVars.entrySet().stream()
+                    .collect(Collectors.toMap(e -> e.getKey(), e -> c.getVariableValue(e.getValue().first).asAppendOnly()));
+            MethodInvocationHandler.MethodReturnValue ret = c.methodInvocationHandler().analyze(c, callSite, arguments, globals);
+            callSite.globalDefs.forEach((v, p) -> {
+                c.setVariableValue(p.second, ret.globals.get(v));
+            });
+            return ret.value;
         }
 
         @Override

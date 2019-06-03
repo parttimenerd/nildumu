@@ -1,9 +1,12 @@
 package nildumu;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static nildumu.Parser.*;
+import static nildumu.util.Util.p;
 
 /**
  * A simple name resolution that sets the {@code definition} variable in {@link VariableAssignmentNode},
@@ -49,7 +52,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
             @Override
             public Object visit(AppendOnlyVariableDeclarationNode appendDecl) {
-                Variable definition = new Variable(appendDecl.variable, false, false, true);
+                Variable definition = new Variable(appendDecl.variable, false, false, true, true);
                 appendDecl.definition = definition;
                 appendVariables.add(definition);
                 return null;
@@ -94,7 +97,8 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         Variable definition = new Variable(variableDeclaration.variable,
                 variableDeclaration instanceof InputVariableDeclarationNode,
                 variableDeclaration instanceof OutputVariableDeclarationNode,
-                variableDeclaration instanceof AppendOnlyVariableDeclarationNode);
+                variableDeclaration instanceof AppendOnlyVariableDeclarationNode,
+                variableDeclaration.hasAppendValue);
         symbolTable.insert(variableDeclaration.variable, definition);
         variableDeclaration.definition = definition;
         return visit((VariableAssignmentNode)variableDeclaration);
@@ -159,6 +163,9 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         if (methodInvocation.arguments.size() != method.parameters.size()){
             throw new WrongNumberOfArgumentsError(methodInvocation, String.format("Expected %d arguments got %d", method.parameters.size(), methodInvocation.arguments.size()));
         }
+        methodInvocation.globalDefs = methodInvocation.globals.globalVarSSAVars.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> p(symbolTable.lookup(e.getValue().first),
+                    symbolTable.lookup(e.getValue().second))));
         return null;
     }
 }

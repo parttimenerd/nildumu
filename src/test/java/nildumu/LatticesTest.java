@@ -6,10 +6,14 @@ import java.util.HashSet;
 import java.util.function.BiPredicate;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import swp.util.Pair;
 
 import static nildumu.Lattices.BasicSecLattice.*;
 import static nildumu.Lattices.bl;
+import static nildumu.Lattices.bs;
 import static nildumu.util.Util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -87,5 +91,11 @@ public class LatticesTest {
     @SafeVarargs
     final <T> void assertParsingCorrect(Lattices.Lattice<T> lattice, Pair<String, T>... pairs){
         assertParsingCorrect(lattice, Object::equals, pairs);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"u, u, u", "u, e, n"})
+    public void testBitValueLatticeSup(String first, String second, String expectedSupremum){
+        assertEquals(bs.parse(expectedSupremum), bs.sup(bs.parse(first), bs.parse(second)));
     }
 }

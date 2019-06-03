@@ -238,7 +238,7 @@ public abstract class MethodInvocationHandler {
         }
 
         @Override
-        public Value analyze(Context c, MethodInvocationNode callSite, List<Value> arguments) {
+        public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals) {
             MethodNode method = callSite.definition;
             if (methodCallCounter.get(method) < maxRec) {
                 methodCallCounter.put(method, methodCallCounter.get(method) + 1);
@@ -248,11 +248,13 @@ public abstract class MethodInvocationHandler {
                 }
                 Processor.process(c, method.body);
                 Value ret = c.getReturnValue();
+                Map<String, AppendOnlyValue> globalVals = callSite.globalDefs.keySet().stream()
+                        .collect(Collectors.toMap(v -> v, v -> (AppendOnlyValue)c.getVariableValue(v)));
                 c.popMethodInvocationState();
                 methodCallCounter.put(method, methodCallCounter.get(method) - 1);
-                return ret;
+                return new MethodReturnValue(ret, globalVals);
             }
-            return botHandler.analyze(c, callSite, arguments);
+            return botHandler.analyze(c, callSite, arguments, globals);
         }
     }
 
@@ -489,7 +491,7 @@ public abstract class MethodInvocationHandler {
             Mode usedMode = _mode;
             Context c = program.context;
             Map<MethodNode, MethodInvocationNode> callSites = new DefaultMap<>((map, method) -> {
-                MethodInvocationNode callSite = new MethodInvocationNode(method.location, method.name, null);
+                MethodInvocationNode callSite = new MethodInvocationNode(method.location, method.name, null, null);
                 callSite.definition = method;
                 return callSite;
             });
@@ -632,15 +634,32 @@ public abstract class MethodInvocationHandler {
         }
     }
 
+    static class MethodReturnValue {
+        final Value value;
+        final Map<String, AppendOnlyValue> globals;
+
+        MethodReturnValue(Value value, Map<String, AppendOnlyValue> globals) {
+            this.value = value;
+            this.globals = globals;
+        }
+    }
+
     static {
         register("basic", s -> {}, ps -> new MethodInvocationHandler(){
             @Override
-            public Value analyze(Context c, MethodInvocationNode callSite, List<Value> arguments) {
-                if (arguments.isEmpty() || !callSite.definition.hasReturnValue()){
-                    return vl.bot();
+            public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals) {
+                if (arguments.isEmpty()){
+                    return new MethodReturnValue(vl.bot(), globals);
                 }
                 DependencySet set = arguments.stream().flatMap(Value::stream).collect(DependencySet.collector());
-                return IntStream.range(0, arguments.stream().mapToInt(Value::size).max().getAsInt()).mapToObj(i -> bl.create(U, set)).collect(Value.collector());
+                Map<String, AppendOnlyValue> newGlobals = globals.entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(new Value(bl.create(B.S, set)))));
+                if (!callSite.definition.hasReturnValue()){
+                    return new MethodReturnValue(vl.bot(), newGlobals);
+                }
+                Value value = IntStream.range(0, arguments.stream().mapToInt(Value::size).max().getAsInt())
+                        .mapToObj(i -> bl.create(U, set)).collect(Value.collector());
+                return new MethodReturnValue(value, newGlobals);
             }
         });
         examplePropLines.add("handler=basic");
@@ -678,5 +697,15 @@ public abstract class MethodInvocationHandler {
     public void setup(ProgramNode program){
     }
 
-    public abstract Lattices.Value analyze(Context c, MethodInvocationNode callSite, List<Value> arguments);
+    public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals){
+        DependencySet set = arguments.stream().flatMap(Value::stream).collect(DependencySet.collector());
+        Map<String, AppendOnlyValue> newGlobals = globals.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(new Value(bl.create(B.S, set)))));
+        Value ret = analyze(c, callSite, arguments);
+        return new MethodReturnValue(ret, newGlobals);
+    }
+
+    public Value analyze(Context c, MethodInvocationNode callSite, List<Value> arguments){
+        throw new RuntimeException("Not yet implemented");
+    }
 }

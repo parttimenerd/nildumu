@@ -194,7 +194,13 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
 
             @Override
             public ExpressionNode visit(MethodInvocationNode methodInvocation) {
-                MethodInvocationNode node = new MethodInvocationNode(methodInvocation.location, methodInvocation.method, new Parser.ArgumentsNode(methodInvocation.arguments.location, methodInvocation.arguments.arguments.stream().map(this::replace).collect(Collectors.toList())));
+                MethodInvocationNode node =
+                        new MethodInvocationNode(methodInvocation.location, methodInvocation.method,
+                                new Parser.ArgumentsNode(methodInvocation.arguments.location,
+                                        methodInvocation.arguments.arguments.stream()
+                                                .map(this::replace).collect(Collectors.toList())),
+                                methodInvocation.globals);
+                node.globalDefs = methodInvocation.globalDefs;
                 node.definition = methodInvocation.definition;
                 return node;
             }

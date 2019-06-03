@@ -142,7 +142,7 @@ public class Context {
             return new CallPath(newPath);
         }
 
-        public CallPath pop(){
+        public CallPath pop() {
             List<MethodInvocationNode> newPath = new ArrayList<>(path);
             newPath.remove(newPath.size() - 1);
             return new CallPath(newPath);

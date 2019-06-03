@@ -75,6 +75,9 @@ class State extends GenericState {
     }
 
     public void set(Variable variable, Lattices.Value value){
+        if (variable.hasAppendValue){
+            value = value.asAppendOnly();
+        }
         if (variable.isAppendOnly){
             outputState.set(variable, value);
         } else {

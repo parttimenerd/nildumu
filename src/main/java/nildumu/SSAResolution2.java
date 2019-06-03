@@ -1,5 +1,7 @@
 package nildumu;
 
+import swp.util.Pair;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -68,6 +70,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     private final Set<String> appendOnlyVariables;
 
+    private final Set<String> appendValueVariables;
+
     public SSAResolution2(MethodNode method) {
         reverseMapping = new HashMap<>();
         versionCount = new HashMap<>();
@@ -76,6 +80,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         this.currentMethod = Optional.ofNullable(method);
         this.introducedVariables = new ArrayList<>();
         appendOnlyVariables = new HashSet<>();
+        appendValueVariables = new HashSet<>();
     }
 
     public List<String> resolve(MJNode node){
@@ -108,7 +113,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     @Override
     public VisRet visit(AppendOnlyVariableDeclarationNode appendDecl) {
         appendOnlyVariables.add(appendDecl.variable);
-        return new VisRet(true, appendDecl, new VariableAssignmentNode(appendDecl.location, create(appendDecl.variable), new IntegerLiteralNode(appendDecl.location, new Lattices.AppendOnlyValue().createEmpty())));
+        appendValueVariables.add(appendDecl.variable);
+        return new VisRet(true, appendDecl, new VariableAssignmentNode(appendDecl.location, create(appendDecl.variable, true), new IntegerLiteralNode(appendDecl.location, new Lattices.AppendOnlyValue().createEmpty())));
     }
 
     @Override
@@ -210,11 +216,12 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
                 prepend);
     }
 
-    public static void process(MethodNode method) {
+    public static void process(SSAResolution2 parent, MethodNode method) {
         SSAResolution2 resolution = new SSAResolution2(method);
+        resolution.appendOnlyVariables.addAll(parent.appendOnlyVariables);
         resolution.pushNewVariablesScope();
         resolution.resolve(method.parameters);
-        resolution.resolve(method.body).forEach(method.body::prependVariableDeclaration);
+        resolution.resolve(method.body).forEach(v -> method.body.prependVariableDeclaration(v, false));
         resolution.assignAppendOnlyVariables(method.body);
     }
 
@@ -222,9 +229,9 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         SSAResolution2 resolution = new SSAResolution2(null);
         resolution.pushNewVariablesScope();
         resolution.resolve(program.globalBlock)
-                .forEach(program.globalBlock::prependVariableDeclaration);
+                .forEach(v -> program.globalBlock.prependVariableDeclaration(v, resolution.appendValueVariables.contains(v)));
         resolution.assignAppendOnlyVariables(program.globalBlock);
-        program.methods().forEach(SSAResolution2::process);
+        program.methods().forEach(m -> SSAResolution2.process(resolution, m));
     }
 
     void assignAppendOnlyVariables(BlockNode block){
@@ -267,7 +274,13 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     @Override
     public VisRet visit(MethodInvocationNode methodInvocation) {
+        Map<String, String> appToBeforeSSA = appendOnlyVariables.stream().collect(Collectors.toMap(s -> s, this::resolve));
         visitChildrenDiscardReturn(methodInvocation);
+        Map<String, String> afterSSA = appendOnlyVariables.stream()
+                .map(v -> new Pair<>(v, create(v))).collect(Collectors.toMap(p -> p.first, p -> p.second));
+        Map<String, Pair<String, String>> combined = appendOnlyVariables.stream()
+                .collect(Collectors.toMap(v -> v, v -> new Pair<>(appToBeforeSSA.get(v), afterSSA.get(v))));
+        methodInvocation.globals.globalVarSSAVars.putAll(combined);
         return VisRet.DEFAULT;
     }
 
@@ -291,10 +304,14 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         return versionCount.getOrDefault(variable, 0);
     }
 
+    private String create(String variable){
+        return create(variable, appendOnlyVariables.contains(resolveOrigin(variable)));
+    }
+
     /**
      * Create a new variable and add a declaration to beginning
      */
-    private String create(String variable){
+    private String create(String variable, boolean hasAppendValue){
         String origin = resolveOrigin(variable);
         String newVariable = origin + (numberOfVersions(origin) + 1);
         String pred = resolve(variable);
@@ -303,6 +320,9 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         reverseMapping.put(newVariable, origin);
         newVariables.get(newVariables.size() - 1).put(origin, newVariable);
         introducedVariables.add(newVariable);
+        if (hasAppendValue) {
+            appendValueVariables.add(newVariable);
+        }
         return newVariable;
     }
 

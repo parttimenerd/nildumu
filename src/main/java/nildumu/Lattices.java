@@ -500,7 +500,7 @@ public class Lattices {
             if (a != b && a.isConstant() && b.isConstant()){
                 return U;
             }
-            if ((a.isConstant() || b.isConstant()) && (a.isE() || b.isE())){
+            if ((lowerEqualsThan(a, U) || lowerEqualsThan(b, U)) && (a.isE() || b.isE())){
                 return N;
             }
             return lowerEqualsThan(a, b) ? b : a;
@@ -1402,6 +1402,10 @@ public class Lattices {
         public boolean hasDuplicateBits(){
             return numberOfDistinctBits() != size();
         }
+
+        public AppendOnlyValue asAppendOnly() {
+            return new AppendOnlyValue(bits.toArray(new Bit[0]));
+        }
     }
 
     /**
@@ -1439,6 +1443,11 @@ public class Lattices {
                 val.add(new Bit(E));
             }
             return val;
+        }
+
+        @Override
+        public AppendOnlyValue asAppendOnly() {
+            return this;
         }
     }
 }

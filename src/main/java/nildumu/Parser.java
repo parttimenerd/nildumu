@@ -15,6 +15,7 @@ import swp.util.Utils;
 import static nildumu.Checks.checkAndThrow;
 import static nildumu.Lattices.*;
 import static nildumu.Parser.LexerTerminal.*;
+import static nildumu.util.Util.p;
 
 /**
  * Parser and AST for a basic Java based language that has only integer as a data type.
@@ -41,8 +42,9 @@ public class Parser implements Serializable {
         LBRK("[\\r\\n][\\r\\n]+"),
         INPUT("input"),
         OUTPUT("output"),
-        APPEND_ONLY("append"),
+        APPEND_ONLY("append_only"),
         INT("int"),
+        APPEND_INT("aint"),
         RETURN("return"),
         IF("if"),
         WHILE("while"),
@@ -80,6 +82,7 @@ public class Parser implements Serializable {
         RPAREN("\\)"),
         LBRACKET("\\["),
         RBRACKET("\\]"),
+        ARROW("\\->", "->"),
         APPEND("@"),
         SEMICOLON("(\\;|\\n)+", ";"),
         INTEGER_LITERAL("(([1-9][0-9]*)|0)|(0b[01e]*)|(\\-([1-9][0-9]*))"),
@@ -127,7 +130,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/i4fg47s5f22", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/i4fioio47s5f22", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 builder.addRule("program", "use_sec? bit_width? lines", asts -> {
                             SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>)asts.get(0)).get(0).wrapped;
@@ -297,7 +300,7 @@ public class Parser implements Serializable {
                         .addRule("block_statement_w_semi", "var_decl SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "local_variable_assignment_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "while_statement")
-                        .addRule("block_statement_w_semi", " if_statement")
+                        .addRule("block_statement_w_semi", "if_statement")
                         .addRule("block_statement_w_semi", "expression_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement", "statement", asts -> asts.get(0))
                         .addRule("block_statement", "var_decl", asts -> asts.get(0))
@@ -305,16 +308,19 @@ public class Parser implements Serializable {
                         .addRule("block_statement", "while_statement")
                         .addRule("block_statement", "if_statement")
                         .addRule("block_statement", "expression_statement")
-                        .addRule("var_decl", "INT IDENT", asts -> {
-                            return new VariableDeclarationNode(
-                                    asts.getStartLocation(),
-                                    asts.get(1).getMatchedString());
-                        })
-                        .addRule("var_decl", "INT IDENT EQUAL_SIGN (phi|expression)", asts -> {
+                        .addRule("var_decl", "(INT|APPEND_INT) IDENT", asts -> {
                             return new VariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(1).getMatchedString(),
-                                    (ExpressionNode)asts.get(3));
+                                    null,
+                                    asts.getMatchedTokens("APPEND_INT").size() > 0);
+                        })
+                        .addRule("var_decl", "(INT|APPEND_INT) IDENT EQUAL_SIGN (phi|expression)", asts -> {
+                            return new VariableDeclarationNode(
+                                    asts.getStartLocation(),
+                                    asts.get(1).getMatchedString(),
+                                    (ExpressionNode)asts.get(3),
+                                    asts.getMatchedTokens("APPEND_INT").size() > 0);
                         })
                         .addRule("local_variable_assignment_statement", "IDENT EQUAL_SIGN (phi|expression)", asts -> {
                             return new VariableAssignmentNode(
@@ -401,14 +407,25 @@ public class Parser implements Serializable {
                         })
                         .addRule("postfix_expression", "primary_expression")
                         .addEitherRule("postfix_expression", "method_invocation")
+                        .addRule("method_invocation", "IDENT globals LPAREN arguments RPAREN", asts -> {
+                            return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
+                                    (ArgumentsNode)asts.get(3), asts.get(1).as());
+                        })
+                        .addRule("method_invocation", "IDENT globals LPAREN expression RPAREN", asts -> {
+                            ExpressionNode arg = (ExpressionNode)asts.get(3);
+                            return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
+                                    new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
+                                    asts.get(1).as());
+                        })
                         .addRule("method_invocation", "IDENT LPAREN arguments RPAREN", asts -> {
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
-                                    (ArgumentsNode)asts.get(2));
+                                    (ArgumentsNode)asts.get(2), new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
                         })
                         .addRule("method_invocation", "IDENT LPAREN expression RPAREN", asts -> {
                             ExpressionNode arg = (ExpressionNode)asts.get(2);
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
-                                    new ArgumentsNode(arg.location, Utils.makeArrayList(arg)));
+                                    new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
+                                    new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
                         })
                         .addRule("phi", "PHI LPAREN IDENT COMMA IDENT RPAREN", asts -> {
                             return new PhiNode(asts.getStartLocation(), Arrays.asList(asts.get(2).getMatchedString(),
@@ -439,6 +456,25 @@ public class Parser implements Serializable {
                             Collections.reverse(rev);
                             return new IntegerLiteralNode(new Value(rev));*/
                             return new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(asts.getMatchedString()));
+                        })
+                        .addRule("globals", "", asts -> new GlobalVariablesNode(new Location(0, 0), new HashMap<>()))
+                        .addRule("globals", "LBRACKET globals_ RBRACKET", asts -> asts.get(1))
+                        .addRule("globals_", "", asts -> new GlobalVariablesNode(new Location(0, 0), new HashMap<>()))
+                        .addRule("globals_", "global", asts -> {
+                            Map<String, Pair<String, String>> globs = new HashMap<>();
+                            Utils.Triple<String, String, String> glob = asts.get(0).<WrapperNode<Utils.Triple<String, String, String>>>as().wrapped;
+                            globs.put(glob.first, p(glob.second, glob.third));
+                            return new GlobalVariablesNode(new Location(0, 0), globs);
+                        })
+                        .addRule("globals_", "global COMMA globals_", asts -> {
+                            Map<String, Pair<String, String>> globals = asts.get(0).<WrapperNode<Map<String, Pair<String, String>>>>as().wrapped;
+                            GlobalVariablesNode globalNode = ((GlobalVariablesNode)asts.get(2));
+                            globals.putAll(globalNode.globalVarSSAVars);
+                            return new GlobalVariablesNode(asts.getStartLocation(), globals);
+                        })
+                        .addRule("global", "IDENT ARROW IDENT ARROW IDENT", asts -> {
+                            return new WrapperNode<>(asts.getStartLocation(),
+                                    new Utils.Triple<>(asts.get(0).getMatchedString(), asts.get(2).getMatchedString(), asts.get(4).getMatchedString()));
                         });
             }, "program");
 
@@ -1380,8 +1416,8 @@ public class Parser implements Serializable {
             return new Pair<>(varDecls, stmts);
         }
 
-        public void prependVariableDeclaration(String variable){
-            statementNodes.add(0, new VariableDeclarationNode(location, variable));
+        public void prependVariableDeclaration(String variable, boolean hasAppendValue){
+            statementNodes.add(0, new VariableDeclarationNode(location, variable, null, hasAppendValue));
         }
 
         public void addAll(int i, List<StatementNode> statements) {
@@ -1407,8 +1443,15 @@ public class Parser implements Serializable {
      */
     public static class VariableDeclarationNode extends VariableAssignmentNode {
 
-        public VariableDeclarationNode(Location location, String name, ExpressionNode initExpression) {
+        final boolean hasAppendValue;
+
+        public VariableDeclarationNode(Location location, String name, ExpressionNode initExpression, boolean hasAppendValue) {
             super(location, name, initExpression);
+            this.hasAppendValue = hasAppendValue;
+        }
+
+        public VariableDeclarationNode(Location location, String name, ExpressionNode initExpression) {
+            this(location, name, initExpression, false);
         }
 
         public VariableDeclarationNode(Location location, String name) {
@@ -1426,10 +1469,11 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
+            String intStr = hasAppendValue && !(this instanceof AppendOnlyVariableDeclarationNode) ? "aint" : "int";
             if (hasInitExpression()){
-                return String.format("int %s = %s;", variable, expression);
+                return String.format("%s %s = %s;", intStr, variable, expression);
             } else {
-                return String.format("int %s;", variable);
+                return String.format("%s %s;", intStr, variable);
             }
         }
 
@@ -1526,7 +1570,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return String.format("%s append %s", secLevel, super.toString());
+            return String.format("%s append_only %s", secLevel, super.toString());
         }
 
         @Override
@@ -2402,6 +2446,45 @@ public class Parser implements Serializable {
     }
 
     /**
+     * Global arguments for a method call
+     */
+    public static class GlobalVariablesNode extends BlockPartNode {
+        public final Map<String, Pair<String, String>> globalVarSSAVars;
+
+        public GlobalVariablesNode(Location location, Map<String, Pair<String, String>> globalVarSSAVars) {
+            super(location);
+            this.globalVarSSAVars = globalVarSSAVars;
+        }
+
+        @Override
+        public String type() {
+            return "arguments";
+        }
+
+        @Override
+        public String toString() {
+            return globalVarSSAVars.entrySet().stream()
+                    .map(e -> String.format("%s -> %s -> %s", e.getKey(), e.getValue().first, e.getValue().second))
+                    .collect(Collectors.joining(", "));
+        }
+
+        @Override
+        public BlockPartNode[] getBlockParts() {
+            return new BlockPartNode[0];
+        }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public String shortType() {
+            return "globals";
+        }
+    }
+
+    /**
      * Base class for all primary expressions
      */
     public static abstract class PrimaryExpressionNode extends ExpressionNode {
@@ -2491,16 +2574,23 @@ public class Parser implements Serializable {
         public MethodNode definition;
         public final String method;
         public final ArgumentsNode arguments;
+        public final GlobalVariablesNode globals;
+        Map<String, Pair<Variable, Variable>> globalDefs = null;
 
-        public MethodInvocationNode(Location location, String method, ArgumentsNode arguments) {
+        public MethodInvocationNode(Location location, String method, ArgumentsNode arguments, GlobalVariablesNode globals) {
             super(location);
             this.method = method;
             this.arguments = arguments;
+            this.globals = globals;
         }
+        public MethodInvocationNode(Location location, String method, ArgumentsNode arguments) {
+            this(location, method, arguments, new GlobalVariablesNode(location, new HashMap<>()));
+        }
+
 
         @Override
         public String toString() {
-            return String.format("%s(%s)", method, arguments);
+            return String.format("%s[%s](%s)", method, globals, arguments);
         }
 
         @Override
