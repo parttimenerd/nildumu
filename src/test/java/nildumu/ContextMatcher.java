@@ -120,7 +120,7 @@ public class ContextMatcher {
         return leakage(l -> l.leaks(attackerSec, leakage));
     }
 
-    public ContextMatcher leaks(int leakage){
+    public ContextMatcher leaks(double leakage){
         return leakage(l -> l.leaks(context.sl.bot(), leakage));
     }
 

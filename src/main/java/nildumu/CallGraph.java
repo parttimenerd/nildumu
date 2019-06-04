@@ -136,7 +136,8 @@ public class CallGraph {
                                 new Location(0, 0),
                                 "$main$",
                                 new ParametersNode(new Location(0, 0), Collections.emptyList()),
-                                program.globalBlock),
+                                program.globalBlock,
+                                new GlobalVariablesNode(new Location(0, 0), new HashMap<>())),
                         new HashSet<>(),
                         Collections.emptySet(),
                         true);

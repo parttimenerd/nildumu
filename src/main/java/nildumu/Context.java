@@ -840,7 +840,7 @@ public class Context {
 
     public void pushNewMethodInvocationState(MethodInvocationNode callSite, Set<Bit> argumentBits){
         currentCallPath = currentCallPath.push(callSite);
-        variableStates.push(new State(variableStates.peek().outputState));
+        variableStates.push(new State(new State.OutputState()));
         methodParameterBits.push(argumentBits);
         nodeValueState = nodeValueStates.get(currentCallPath);
     }

@@ -13,6 +13,7 @@ import swp.util.Pair;
 
 import static nildumu.CallGraph.CallNode;
 import static nildumu.Context.*;
+import static nildumu.Lattices.B.S;
 import static nildumu.Lattices.B.U;
 import static nildumu.Lattices.*;
 import static nildumu.Parser.*;
@@ -246,10 +247,13 @@ public abstract class MethodInvocationHandler {
                 for (int i = 0; i < arguments.size(); i++) {
                     c.setVariableValue(method.parameters.get(i).definition, arguments.get(i));
                 }
+                globals.forEach((v, a) -> {
+                    c.setVariableValue(method.globalDefs.get(v).first, a);
+                });
                 Processor.process(c, method.body);
                 Value ret = c.getReturnValue();
-                Map<String, AppendOnlyValue> globalVals = callSite.globalDefs.keySet().stream()
-                        .collect(Collectors.toMap(v -> v, v -> (AppendOnlyValue)c.getVariableValue(v)));
+                Map<String, AppendOnlyValue> globalVals = method.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
                 c.popMethodInvocationState();
                 methodCallCounter.put(method, methodCallCounter.get(method) - 1);
                 return new MethodReturnValue(ret, globalVals);
@@ -653,7 +657,8 @@ public abstract class MethodInvocationHandler {
                 }
                 DependencySet set = arguments.stream().flatMap(Value::stream).collect(DependencySet.collector());
                 Map<String, AppendOnlyValue> newGlobals = globals.entrySet().stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(new Value(bl.create(B.S, set)))));
+                        .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(IntStream.range(0, arguments.stream().mapToInt(Value::size).max().getAsInt())
+                                .mapToObj(i -> bl.create(S, set)).collect(Value.collector()))));
                 if (!callSite.definition.hasReturnValue()){
                     return new MethodReturnValue(vl.bot(), newGlobals);
                 }
@@ -700,7 +705,7 @@ public abstract class MethodInvocationHandler {
     public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals){
         DependencySet set = arguments.stream().flatMap(Value::stream).collect(DependencySet.collector());
         Map<String, AppendOnlyValue> newGlobals = globals.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(new Value(bl.create(B.S, set)))));
+                .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(new Value(bl.create(S, set)))));
         Value ret = analyze(c, callSite, arguments);
         return new MethodReturnValue(ret, newGlobals);
     }

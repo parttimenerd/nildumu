@@ -1413,6 +1413,14 @@ public class Lattices {
         public AppendOnlyValue asAppendOnly() {
             return new AppendOnlyValue(bits.toArray(new Bit[0]));
         }
+
+        static Value createEmpty(){
+            Value val = new Value();
+            for (int i = 0; i < vl.bitWidth; i++) {
+                val.add(new Bit(X));
+            }
+            return val;
+        }
     }
 
     /**

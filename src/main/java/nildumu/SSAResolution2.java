@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static nildumu.Parser.*;
+import static nildumu.util.Util.p;
 
 /**
  * Does the conversion of a non SSA to a SSA AST,
@@ -218,11 +219,18 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     public static void process(SSAResolution2 parent, MethodNode method) {
         SSAResolution2 resolution = new SSAResolution2(method);
-        resolution.appendOnlyVariables.addAll(parent.appendOnlyVariables);
         resolution.pushNewVariablesScope();
+        Map<String, String> pre = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, v -> {
+            resolution.appendValueVariables.add(v);
+            return resolution.create(v, true);
+        }));
         resolution.resolve(method.parameters);
-        resolution.resolve(method.body).forEach(v -> method.body.prependVariableDeclaration(v, false));
-        resolution.assignAppendOnlyVariables(method.body);
+        resolution.resolve(method.body).stream().filter(v -> !pre.values().contains(v))
+                .forEach(v -> method.body.prependVariableDeclaration(v, resolution.appendValueVariables.contains(resolution.resolveOrigin(v))));
+        Map<String, String> post = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, v -> {
+            return resolution.resolve(v);
+        }));
+        parent.appendOnlyVariables.forEach(v -> method.globals.globalVarSSAVars.put(v, p(pre.get(v), post.get(v))));
     }
 
     public static void process(ProgramNode program){
@@ -305,7 +313,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     private String create(String variable){
-        return create(variable, appendOnlyVariables.contains(resolveOrigin(variable)));
+        return create(variable, appendOnlyVariables.contains(resolveOrigin(variable)) || appendValueVariables.contains(resolveOrigin(variable)));
     }
 
     /**

@@ -250,7 +250,8 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
 
     @Override
     public MJNode visit(VariableDeclarationNode variableDeclaration){
-        VariableDeclarationNode node = new VariableDeclarationNode(variableDeclaration.location, variableDeclaration.variable, replace(variableDeclaration.expression));
+        VariableDeclarationNode node = new VariableDeclarationNode(variableDeclaration.location, variableDeclaration.variable, replace(variableDeclaration.expression),
+                variableDeclaration.hasAppendValue);
         node.definition = variableDeclaration.definition;
         return node;
     }

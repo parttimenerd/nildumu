@@ -33,7 +33,7 @@ import static nildumu.util.Util.p;
  */
 public class Parser implements Serializable {
 
-    private static final String L_PRINT_VAR = "__l_print";
+    static final String L_PRINT_VAR = "__l_print";
 
     /**
      * The terminals with the matching regular expression
@@ -133,7 +133,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8l9fff45ff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8l97fff45ff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 builder.addRule("program", "use_sec? bit_width? lines", asts -> {
                             SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>)asts.get(0)).get(0).wrapped;
@@ -216,6 +216,7 @@ public class Parser implements Serializable {
                             })).max().orElse(0) == 1){
                                 node.globalBlock.add(0,
                                         new AppendOnlyVariableDeclarationNode(new Location(0, 0), L_PRINT_VAR, secLattice.bot().toString()));
+                                node.context.addAppendOnlyVariable(secLattice.bot(), L_PRINT_VAR);
                             }
                             return node;
                         })
@@ -270,7 +271,14 @@ public class Parser implements Serializable {
                         .addRule("method", "INT IDENT LPAREN parameters RPAREN method_body", asts -> {
                             return new MethodNode(asts.get(0).getMatchedTokens().get(0).location,
                                     asts.get(1).getMatchedString(),
-                                    (ParametersNode)asts.get(3), (BlockNode)asts.get(5));
+                                    (ParametersNode)asts.get(3), (BlockNode)asts.get(5),
+                                    new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
+                        })
+                        .addRule("method", "INT IDENT globals LPAREN parameters RPAREN method_body", asts -> {
+                            return new MethodNode(asts.get(0).getMatchedTokens().get(0).location,
+                                    asts.get(1).getMatchedString(),
+                                    (ParametersNode)asts.get(4), (BlockNode)asts.get(6),
+                                    (GlobalVariablesNode)asts.get(2));
                         })
                         .addRule("parameters", "", asts -> new ParametersNode(new Location(0, 0), new ArrayList<>()))
                         .addRule("parameters", "parameter COMMA parameters", asts -> {
@@ -1088,17 +1096,20 @@ public class Parser implements Serializable {
         public final String name;
         public final ParametersNode parameters;
         public final BlockNode body;
+        public final GlobalVariablesNode globals;
+        Map<String, Pair<Variable, Variable>> globalDefs = null;
 
-        public MethodNode(Location location, String name, ParametersNode parameters, BlockNode body) {
+        public MethodNode(Location location, String name, ParametersNode parameters, BlockNode body, GlobalVariablesNode globals) {
             super(location);
             this.name = name;
             this.parameters = parameters;
             this.body = body;
+            this.globals = globals;
         }
 
         @Override
         public String toString() {
-            return String.format("int %s (%s)", name, parameters);
+            return String.format("int %s[%s](%s)", name, globals, parameters);
         }
 
         @Override
@@ -1137,7 +1148,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toPrettyString(String indent, String incr) {
-            return indent + String.format("int %s(%s){\n%s\n}\n", name, parameters, body.toPrettyString(indent + incr, incr));
+            return indent + String.format("int %s[%s](%s){\n%s\n}\n", name, globals, parameters, body.toPrettyString(indent + incr, incr));
         }
     }
 
@@ -1605,7 +1616,7 @@ public class Parser implements Serializable {
         final String secLevel;
 
         public AppendOnlyVariableDeclarationNode(Location location, String name, String secLevel) {
-            super(location, name, null);
+            super(location, name, null, true);
             this.secLevel = secLevel;
         }
 

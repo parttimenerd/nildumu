@@ -37,7 +37,7 @@ class State extends GenericState {
 
         public void add(Sec<?> lattice, String variable) {
             valuesPerSec.get(lattice).add(variable);
-            super.set(variable, new AppendOnlyValue());
+            super.set(variable, AppendOnlyValue.createEmpty());
         }
 
         @Override

@@ -1,5 +1,7 @@
 package nildumu;
 
+import swp.util.Pair;
+
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -227,6 +229,13 @@ public class Checks {
                 visitChildrenDiscardReturn(variableAssignment);
                 validVariables.add(variableAssignment.definition);
                 validExpressions.add(variableAssignment.expression);
+                return null;
+            }
+
+            @Override
+            public Object visit(MethodNode method) {
+                method.globalDefs.values().stream().forEach(p -> validVariables.add(p.first));
+                visitChildrenDiscardReturn(method);
                 return null;
             }
 

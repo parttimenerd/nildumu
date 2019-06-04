@@ -1,5 +1,8 @@
 package nildumu;
 
+import swp.util.Pair;
+
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -134,6 +137,15 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         SymbolTable oldSymbolTable = symbolTable;
         symbolTable = new SymbolTable();
         symbolTable.enterScope();
+        Map<String, Pair<Variable, Variable>> defs = new HashMap<>();
+        method.globals.globalVarSSAVars.forEach((v, p) -> {
+            Variable pre = new Variable(p.first, false, false, false, true);
+            symbolTable.insert(pre.name, pre);
+            Variable post = new Variable(p.second, false, false, false, true);
+            symbolTable.insert(post.name, post);
+            defs.put(v, p(pre, post));
+        });
+        method.globalDefs = defs;
         appendVariables.forEach(v -> symbolTable.insert(v.name, v));
         visitChildrenDiscardReturn(method);
         symbolTable.leaveScope();
