@@ -49,7 +49,7 @@ public class SSA2Tests {
 
     @Test
     public void append(){
-        toSSA("bit_width 3; l append int abc; abc = abc @ 3");
+        toSSA("bit_width 3; l append_only int abc; abc = abc @ 3");
     }
 
     /**

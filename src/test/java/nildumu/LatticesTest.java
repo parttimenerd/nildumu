@@ -98,4 +98,10 @@ public class LatticesTest {
     public void testBitValueLatticeSup(String first, String second, String expectedSupremum){
         assertEquals(bs.parse(expectedSupremum), bs.sup(bs.parse(first), bs.parse(second)));
     }
+
+    @ParameterizedTest
+    @CsvSource({"u, u, 1", "u, e, 0"})
+    public void testBitValueLatticeLowerEquals(String first, String second, int expectedResult){
+        assertEquals(expectedResult == 1, bs.lowerEqualsThan(bs.parse(first), bs.parse(second)));
+    }
 }

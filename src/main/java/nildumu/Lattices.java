@@ -512,7 +512,7 @@ public class Lattices {
 
         @Override
         public boolean lowerEqualsThan(B a, B b) {
-            return a.level < b.level || (a != b && a.level == b.level);
+            return a.level < b.level || (a == b && a.level == b.level);
         }
 
         @Override

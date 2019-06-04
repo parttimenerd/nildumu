@@ -43,8 +43,7 @@ public class Parser implements Serializable {
         INPUT("input"),
         OUTPUT("output"),
         APPEND_ONLY("append_only"),
-        INT("int"),
-        APPEND_INT("aint"),
+        INT("[a]?int"),
         RETURN("return"),
         IF("if"),
         WHILE("while"),
@@ -130,7 +129,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/i4fioio47s5f22", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8l9f45ff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 builder.addRule("program", "use_sec? bit_width? lines", asts -> {
                             SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>)asts.get(0)).get(0).wrapped;
@@ -308,19 +307,19 @@ public class Parser implements Serializable {
                         .addRule("block_statement", "while_statement")
                         .addRule("block_statement", "if_statement")
                         .addRule("block_statement", "expression_statement")
-                        .addRule("var_decl", "(INT|APPEND_INT) IDENT", asts -> {
+                        .addRule("var_decl", "INT IDENT", asts -> {
                             return new VariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(1).getMatchedString(),
                                     null,
-                                    asts.getMatchedTokens("APPEND_INT").size() > 0);
+                                    !asts.get(0).getMatchedString().equals("int"));
                         })
-                        .addRule("var_decl", "(INT|APPEND_INT) IDENT EQUAL_SIGN (phi|expression)", asts -> {
+                        .addRule("var_decl", "INT IDENT EQUAL_SIGN (phi|expression)", asts -> {
                             return new VariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(1).getMatchedString(),
                                     (ExpressionNode)asts.get(3),
-                                    asts.getMatchedTokens("APPEND_INT").size() > 0);
+                                    !asts.get(0).getMatchedString().equals("int"));
                         })
                         .addRule("local_variable_assignment_statement", "IDENT EQUAL_SIGN (phi|expression)", asts -> {
                             return new VariableAssignmentNode(
@@ -2267,6 +2266,7 @@ public class Parser implements Serializable {
         public String shortType() {
             return operator.representation.replace("\\", "");
         }
+
     }
 
     /**

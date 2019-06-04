@@ -717,7 +717,7 @@ public class Context {
                     isInputBit(cur) && sec(cur) != sl.bot()) {
                 anchors.add(cur);
             } else {
-                cur.deps().stream().filter(Bit::isUnknown).filter(b -> {
+                cur.deps().stream().filter(Bit::isAtLeastUnknown).filter(b -> {
                     if (alreadyVisitedBits.contains(b)) {
                         return false;
                     }

@@ -88,24 +88,24 @@ public class ContextMatcher {
 
     public class LeakageMatcher {
 
-        public LeakageMatcher leaks(Lattices.Sec<?> attackerSec, int leakage){
+        public LeakageMatcher leaks(Lattices.Sec<?> attackerSec, double leakage){
             builder.add(() -> {
                 MinCut.ComputationResult comp = MinCut.compute(context, attackerSec);
                 assertEquals(leakage, comp.maxFlow, () -> {
-                    return String.format("The calculated leakage for an attacker of level %s should be %d, leaking %s", attackerSec, leakage, comp.minCut.stream().map(Lattices.Bit::toString).collect(Collectors.joining(", ")));
+                    return String.format("The calculated leakage for an attacker of level %s should be %f, leaking %s", attackerSec, leakage, comp.minCut.stream().map(Lattices.Bit::toString).collect(Collectors.joining(", ")));
                 });
             });
             return this;
         }
 
-        public LeakageMatcher leaks(String attackerSec, int leakage){
+        public LeakageMatcher leaks(String attackerSec, double leakage){
             return leaks(context.sl.parse(attackerSec), leakage);
         }
 
-        public LeakageMatcher leaksAtLeast(Lattices.Sec sec, int leakage) {
+        public LeakageMatcher leaksAtLeast(Lattices.Sec sec, double leakage) {
             builder.add(() -> {
                 MinCut.ComputationResult comp = MinCut.compute(context, sec);
-                assertTrue(comp.maxFlow >= leakage, String.format("The calculated leakage for an attacker of level %s should be at least %d, leaking %d", sec, leakage, comp.maxFlow));
+                assertTrue(comp.maxFlow >= leakage, String.format("The calculated leakage for an attacker of level %s should be at least %f, leaking %f", sec, leakage, comp.maxFlow));
             });
             return this;
         }
