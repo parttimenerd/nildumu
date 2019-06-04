@@ -27,6 +27,9 @@ public class AlphabetLexer extends BaseLexer {
 	protected Token parseNextToken() {
 		try {
 			cur = inputStream.read();
+			if (cur != -1) {
+				source.appendCodePoint(cur);
+			}
 		} catch (IOException e) {
 			cur = -1;
 		}

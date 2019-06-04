@@ -25,4 +25,6 @@ public interface Lexer {
 	 * Returns the used terminal set, the end of input token (EOF) can't be ignored.
 	 */
 	TerminalSet getTerminalSet();
+
+	String getSource();
 }

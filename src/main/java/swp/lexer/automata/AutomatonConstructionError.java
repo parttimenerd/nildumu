@@ -1,12 +1,13 @@
 package swp.lexer.automata;
 
+import swp.SWPException;
 import swp.lexer.LexerError;
 
 /**
  * Created by parttimenerd on 03.08.16.
  */
-public class AutomatonConstructionError extends LexerError {
+public class AutomatonConstructionError extends SWPException {
 	public AutomatonConstructionError(String message) {
-		super(null, message);
+		super(message);
 	}
 }

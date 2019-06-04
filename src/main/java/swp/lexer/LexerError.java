@@ -10,11 +10,11 @@ import swp.util.Utils;
  */
 public class LexerError extends LocatedSWPException {
 
-	public LexerError(Token errorToken, String message) {
-		super(errorToken, message);
+	public LexerError(Token errorToken, String message, String source) {
+		super(errorToken, message, source);
 	}
 
-	public static LexerError create(Token errorToken, Collection<Integer> expectedTokens){
+	public static LexerError create(Token errorToken, Collection<Integer> expectedTokens, String source){
 		StringBuilder builder = new StringBuilder();
 		List<Integer> list = new ArrayList<>();
 		list.addAll(expectedTokens);
@@ -25,6 +25,6 @@ public class LexerError extends LocatedSWPException {
 		} else {
 			errorTokenStr = "<unsupported character " + Character.toString((char)(errorToken.type + Utils.MIN_CHAR)) + ">";
 		}
-		return new LexerError(errorToken, String.format("Expected one of %s but got %s at %s", builder.toString(), errorTokenStr, errorToken.location));
+		return new LexerError(errorToken, String.format("Expected one of %s but got %s at %s", builder.toString(), errorTokenStr, errorToken.location), source);
 	}
 }

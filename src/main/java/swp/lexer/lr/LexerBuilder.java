@@ -72,7 +72,7 @@ public class LexerBuilder {
 		List<Token> tokens = list.getMatchedTokens();
 		Token token = tokens.get(tokens.size() - 1);
 		tokens.set(tokens.size() - 1, new Token(0, stringTerminals, "", token.location));
-		return new ListLexer(stringTerminals, ignoredTokenTypes, tokens);
+		return new ListLexer(stringTerminals, ignoredTokenTypes, tokens, input);
 	}
 
 	private class TokenNode extends BaseAST {

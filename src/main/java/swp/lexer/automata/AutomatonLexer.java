@@ -102,7 +102,7 @@ public class AutomatonLexer implements Lexer {
 						}
 					}
 				}
-				throw LexerError.create(readTokens.get(rtPosition - 1), expected);
+				throw LexerError.create(readTokens.get(rtPosition - 1), expected, getSource());
 			}
 			if (table.finalTypes[currentState] != -1){
 				lastRtPosition = rtPosition;
@@ -138,5 +138,10 @@ public class AutomatonLexer implements Lexer {
 	@Override
 	public TerminalSet getTerminalSet() {
 		return table.terminalSet;
+	}
+
+	@Override
+	public String getSource() {
+		return alphabetLexer.getSource();
 	}
 }

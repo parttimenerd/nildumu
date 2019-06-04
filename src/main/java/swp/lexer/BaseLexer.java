@@ -9,6 +9,7 @@ public abstract class BaseLexer implements Lexer {
 	protected TerminalSet terminalSet;
 	private Set<Integer> ignoredTypes = new HashSet<>();
 	protected InputStream inputStream;
+	protected StringBuffer source;
 
 	public BaseLexer(TerminalSet terminalSet, String input, int[] ignoredTokenTypes){
 		this(terminalSet, new ByteArrayInputStream(input.getBytes()), ignoredTokenTypes);
@@ -20,6 +21,7 @@ public abstract class BaseLexer implements Lexer {
 		for (int type : ignoredTokenTypes){
 			ignore(type);
 		}
+		this.source = new StringBuffer();
 	}
 
 	public BaseLexer(TerminalSet terminalSet, int[] ignoredTokenTypes){
@@ -59,4 +61,8 @@ public abstract class BaseLexer implements Lexer {
 		return terminalSet;
 	}
 
+	@Override
+	public String getSource() {
+		return source.toString();
+	}
 }

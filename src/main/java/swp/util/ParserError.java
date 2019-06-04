@@ -8,7 +8,7 @@ import swp.lexer.Token;
  */
 public class ParserError extends LocatedSWPException {
 
-    public ParserError(Token errorToken, String message) {
-        super(errorToken, String.format("Error at %s: %s", errorToken.location, message));
+    public ParserError(Token errorToken, String message, String source) {
+        super(errorToken, String.format("Error at %s: %s", errorToken.location, message), source);
     }
 }

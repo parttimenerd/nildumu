@@ -54,7 +54,7 @@ public class LRParser {
 					hadError = true;
 					System.err.println(errorMsg);
 				} else {
-					throw new ParserError(lexer.cur(), errorMsg);
+					throw new ParserError(lexer.cur(), errorMsg, lexer.getSource());
 				}
 			}
 			LRParserTable.Action action = row.get(tokenId);
@@ -82,7 +82,7 @@ public class LRParser {
 							astStack.add(grammar.reduce(prodId, reducedASTs));
 						} catch (SWPException ex){
 							String newErrorMsg = String.format("Error around %s: %s", lexer.cur(), ex.getMessage());
-							SWPException newEx = new ParserError(lexer.cur(), newErrorMsg);
+							SWPException newEx = new ParserError(lexer.cur(), newErrorMsg, lexer.getSource());
 							newEx.setStackTrace(ex.getStackTrace());
 							throw newEx;
 						}
