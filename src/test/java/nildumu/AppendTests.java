@@ -33,7 +33,7 @@ public class AppendTests {
 
     @Test
     public void testSimpleMethod(){
-        parse("bit_width 3; l append_only int abc; int print(){ abc = abc @ 3 } print()").val("abc", "0b011").run();
+        parse("bit_width 3; l append_only int abc; int print_(){ abc = abc @ 3 } print_()").val("abc", "0b011").run();
     }
 
     @Test
@@ -44,5 +44,10 @@ public class AppendTests {
     @Test
     public void testBasicLeakage(){
         parse("bit_width 2; l append_only int abc; h input int h = 0buu; if (h){abc = 1}").leaks(1).run();
+    }
+
+    @Test
+    public void testPrint(){
+        parse("bit_width 2; h input int h = 0buu; if (h){print()}").leaks(1).run();
     }
 }

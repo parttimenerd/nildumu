@@ -325,6 +325,10 @@ public class Context {
         variableStates.peek().outputState.add(sec, variable);
     }
 
+    public State.OutputState getOutputState(){
+        return variableStates.peek().outputState;
+    }
+
     public Value addOutputValue(Sec<?> sec, Value value){
         output.add(sec, value);
         return value;

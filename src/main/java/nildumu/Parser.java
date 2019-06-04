@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.*;
 
+import nildumu.util.Util;
 import swp.SWPException;
 import swp.lexer.*;
 import swp.parser.lr.*;
@@ -32,6 +33,8 @@ import static nildumu.util.Util.p;
  */
 public class Parser implements Serializable {
 
+    private static final String L_PRINT_VAR = "__l_print";
+
     /**
      * The terminals with the matching regular expression
      */
@@ -50,6 +53,7 @@ public class Parser implements Serializable {
         ELSE("else"),
         TRUE("true"),
         FALSE("false"),
+        PRINT("print"),
         VOID("void"),
         USE_SEC("use_sec"),
         BIT_WIDTH("bit_width"),
@@ -129,7 +133,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8l9f45ff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8l9fff45ff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 builder.addRule("program", "use_sec? bit_width? lines", asts -> {
                             SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>)asts.get(0)).get(0).wrapped;
@@ -193,6 +197,26 @@ public class Parser implements Serializable {
                                 }
                             };
                             asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped.forEach(n -> n.accept(visitor));
+                            if (asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
+
+                                @Override
+                                public Integer visit(MJNode node) {
+                                    return visitChildren(node).stream().max(Comparator.naturalOrder()).orElse(0);
+                                }
+
+                                @Override
+                                public Integer visit(VariableAssignmentNode assignment) {
+                                    return assignment.variable.equals(L_PRINT_VAR) ? 1 : 0;
+                                }
+
+                                @Override
+                                public Integer visit(VariableDeclarationNode variableDeclaration) {
+                                    return variableDeclaration.variable.equals(L_PRINT_VAR) ? 2 : 0;
+                                }
+                            })).max().orElse(0) == 1){
+                                node.globalBlock.add(0,
+                                        new AppendOnlyVariableDeclarationNode(new Location(0, 0), L_PRINT_VAR, secLattice.bot().toString()));
+                            }
                             return node;
                         })
                         .addRule("use_sec", "USE_SEC IDENT SEMICOLON", asts -> {
@@ -301,12 +325,14 @@ public class Parser implements Serializable {
                         .addRule("block_statement_w_semi", "while_statement")
                         .addRule("block_statement_w_semi", "if_statement")
                         .addRule("block_statement_w_semi", "expression_statement SEMICOLON", asts -> asts.get(0))
+                        .addRule("block_statement_w_semi", "print_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement", "statement", asts -> asts.get(0))
                         .addRule("block_statement", "var_decl", asts -> asts.get(0))
                         .addRule("block_statement", "local_variable_assignment_statement", asts -> asts.get(0))
                         .addRule("block_statement", "while_statement")
                         .addRule("block_statement", "if_statement")
                         .addRule("block_statement", "expression_statement")
+                        .addRule("block_statement", "print_statement", asts -> asts.get(0))
                         .addRule("var_decl", "INT IDENT", asts -> {
                             return new VariableDeclarationNode(
                                     asts.getStartLocation(),
@@ -366,12 +392,28 @@ public class Parser implements Serializable {
                         .addRule("return_statement", "RETURN expression", asts -> {
                             return new ReturnStatementNode((ExpressionNode)asts.get(1));
                         })
+                        .addRule("print_statement", "PRINT LPAREN expression RPAREN", asts -> {
+                            Location loc = asts.getStartLocation();
+                            return new VariableAssignmentNode(loc, L_PRINT_VAR,
+                                    new BinaryOperatorNode(
+                                            new VariableAccessNode(loc, L_PRINT_VAR),
+                                                                   (ExpressionNode)asts.get(2),
+                                            APPEND));
+                        })
+                        .addRule("print_statement", "PRINT LPAREN RPAREN", asts -> {
+                            Location loc = asts.getStartLocation();
+                            return new VariableAssignmentNode(loc, L_PRINT_VAR,
+                                    new BinaryOperatorNode(
+                                            new VariableAccessNode(loc, L_PRINT_VAR),
+                                            new IntegerLiteralNode(loc, vl.parse(0)),
+                                            APPEND));
+                        })
                         .addOperators("expression", "postfix_expression", operators -> {
                             operators.defaultBinaryAction((asts, op) -> {
-                                        return new BinaryOperatorNode((ExpressionNode)asts.get(0), (ExpressionNode)asts.get(2), LexerTerminal.valueOf(op));
+                                        return new BinaryOperatorNode((ExpressionNode)asts.get(0), (ExpressionNode)asts.get(2), valueOf(op));
                                     })
                                     .defaultUnaryAction((asts, opStr) -> {
-                                        LexerTerminal op = LexerTerminal.valueOf(opStr);
+                                        LexerTerminal op = valueOf(opStr);
                                         ExpressionNode child = null;
                                         Token opToken = null;
                                         boolean exprIsLeft = false;
