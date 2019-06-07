@@ -1122,7 +1122,7 @@ public class Lattices {
 
         @Override
         public Value bot() {
-            return parse("0bxxxxxxxxxxxxxx");
+            return parse("0bxx");
         }
 
         /**
@@ -1171,11 +1171,14 @@ public class Lattices {
         }
 
         public <R> List<R> mapBits(Value a, Value b, BiFunction<Bit, Bit, R> transformer) {
-            return mapBits(a, b, transformer, Math.min(Math.max(a.size(), b.size()), bitWidth));
+            int width = Math.max(a.size(), b.size());
+            if (!a.hasArbitraryWidth() && !b.hasArbitraryWidth()){
+                width = Math.min(width, bitWidth);
+            }
+            return mapBits(a, b, transformer, width);
         }
 
         public <R> List<R> mapBits(Value a, Value b, BiFunction<Bit, Bit, R> transformer, int width) {
-            assert width <= bitWidth;
             List<R> res = new ArrayList<>();
             for (int i = 1; i <= width; i++){
                 res.add(transformer.apply(a.get(i), b.get(i)));
@@ -1208,7 +1211,7 @@ public class Lattices {
 
     public static class Value implements LatticeElement<Value, ValueLattice>, Iterable<Bit> {
 
-        private final List<Bit> bits;
+        final List<Bit> bits;
 
         private String description = "";
         private Parser.MJNode node = null;
@@ -1421,6 +1424,14 @@ public class Lattices {
             }
             return val;
         }
+
+        public boolean hasArbitraryWidth() {
+            return false;
+        }
+
+        public boolean bitValEquals(Value other) {
+            return vl.mapBits(this, other, (a, b) -> a.val() == b.val()).stream().allMatch(Boolean::booleanValue);
+        }
     }
 
     /**
@@ -1428,8 +1439,11 @@ public class Lattices {
      */
     static class AppendOnlyValue extends Value {
 
+        private final int sizeWithoutEs;
+
         public AppendOnlyValue(Bit... bits) {
-            super(bits);
+            super(Arrays.stream(bits).map(b -> b.val == X ? bl.create(E) : b).toArray(Bit[]::new));
+            this.sizeWithoutEs = (int)Stream.of(bits).filter(b -> b.val != E).count();
         }
 
         @Override
@@ -1463,6 +1477,31 @@ public class Lattices {
         @Override
         public AppendOnlyValue asAppendOnly() {
             return this;
+        }
+
+        @Override
+        public boolean hasArbitraryWidth() {
+            return true;
+        }
+
+        /**
+         * Assumes that the shorter value is a substring of the longer
+         *
+         * @param other other value
+         * @return bits that one value has and the other has not
+         */
+        public AppendOnlyValue difference(AppendOnlyValue other) {
+            if (other.sizeWithoutEs() < this.sizeWithoutEs()){
+                return other.difference(this);
+            }
+            if (other.sizeWithoutEs() == this.sizeWithoutEs()){
+                return new AppendOnlyValue();
+            }
+            return new AppendOnlyValue(other.bits.subList(sizeWithoutEs(), other.sizeWithoutEs()).toArray(new Bit[0]));
+        }
+
+        int sizeWithoutEs(){
+            return sizeWithoutEs;
         }
     }
 }

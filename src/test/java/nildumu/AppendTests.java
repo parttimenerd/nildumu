@@ -5,8 +5,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.time.Duration;
+
+import static java.time.Duration.ofSeconds;
 import static nildumu.FunctionTests.parse;
 import static nildumu.SSA2Tests.toSSA;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 public class AppendTests {
 
@@ -58,7 +63,9 @@ public class AppendTests {
             "'while (h == 0) { print(h) }', 3"
     })
     public void testBasicPrintLoop(String program, double leakage){
-        parse("bit_width 3; h input int h = 0buuu; " + program).leaks(leakage).run();
+        assertTimeoutPreemptively(ofSeconds(1), () -> {
+            parse("bit_width 3; h input int h = 0buuu; " + program).leaks(leakage).run();
+        });
     }
 
     @ParameterizedTest
@@ -67,7 +74,9 @@ public class AppendTests {
             "'int i = 0; while (h != i) { print(i); i = i + 1 }', 2"
     })
     public void testComplexPrintLoop(String program, double leakage){
-        parse("bit_width 2; h input int h = 0bu; " + program).leaks(leakage).run();
+        assertTimeoutPreemptively(ofSeconds(1), () -> {
+            parse("bit_width 2; h input int h = 0bu; " + program).leaks(leakage).run();
+        });
     }
 
     @ParameterizedTest
@@ -77,6 +86,21 @@ public class AppendTests {
             "'int func(int a){ if (a > 0){print(); func(a - 1)}} func(h)', basic, '0bss', 2"
     })
     public void testPrintInFunction(String program, String handler, String expectedPrintValue, double leakage){
+        String runProgram = "bit_width 2; h input int h = 0buu; " + program;
+        System.out.println(toSSA(runProgram, false).toPrettyString());
+        parse(runProgram, handler).leaks(leakage).val(Parser.L_PRINT_VAR, expectedPrintValue).run();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'int func() {print(1)} func()', summary, '0b0" +
+                    "1', 0",
+            "'int func(int a) {print(a)} func(h)', summary, '0buu', 2",
+            "'int func(int a, int b) {print(a + b)} func(h, 0)', summary, '0buu', 2",
+            "'int func(int a){ if (a > 0){print(); func(a - 1)}} func(h)', summary, '0bssnn', 2",
+            "'int func(int a){ print(); func(a - 1) } func(h)', summary, '0bss00', 0"
+    })
+    public void testPrintInFunctionWithSummaryHandler(String program, String handler, String expectedPrintValue, double leakage){
         String runProgram = "bit_width 2; h input int h = 0buu; " + program;
         System.out.println(toSSA(runProgram, false).toPrettyString());
         parse(runProgram, handler).leaks(leakage).val(Parser.L_PRINT_VAR, expectedPrintValue).run();

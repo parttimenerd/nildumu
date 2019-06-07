@@ -222,6 +222,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         resolution.pushNewVariablesScope();
         Map<String, String> pre = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, v -> {
             resolution.appendValueVariables.add(v);
+            resolution.appendOnlyVariables.add(v);
             return resolution.create(v, true);
         }));
         resolution.resolve(method.parameters);

@@ -167,6 +167,15 @@ public class CallGraph {
         return worklist(mainNode, action, bot, next, loopDepths::get, state);
     }
 
+    public <T> Map<CallNode, T> worklist(
+            BiFunction<CallNode, Map<CallNode, T>, T> action,
+            Function<CallNode, T> bot,
+            Function<CallNode, Set<CallNode>> next,
+            Map<CallNode, T> state,
+            BiPredicate<T, T> changed) {
+        return worklist(mainNode, action, bot, next, loopDepths::get, state, changed);
+    }
+
     public Set<MethodNode> dominators(MethodNode method){
         return dominators.get(methodToNode.get(method)).stream().map(CallNode::getMethod).collect(Collectors.toSet());
     }
@@ -271,6 +280,29 @@ public class CallGraph {
             Function<CallNode, Set<CallNode>> next,
             Function<CallNode, Integer> priority,
             Map<CallNode, T> state) {
+        return worklist(mainNode, action, bot, next, priority, state, (f, s) -> !f.equals(s));
+    }
+
+    /**
+     * Basic extendable worklist algorithm implementation
+     *
+     * @param mainNode node to start (only methods that this node transitively calls, are considered)
+     * @param action transfer function
+     * @param bot start element creator
+     * @param next next nodes for current node
+     * @param priority priority of each node, usable for an inner loop optimization of the iteration
+     *     order
+     * @param <T> type of the data calculated for each node
+     * @return the calculated values
+     */
+    public static <T> Map<CallNode, T> worklist(
+            CallNode mainNode,
+            BiFunction<CallNode, Map<CallNode, T>, T> action,
+            Function<CallNode, T> bot,
+            Function<CallNode, Set<CallNode>> next,
+            Function<CallNode, Integer> priority,
+            Map<CallNode, T> state,
+            BiPredicate<T, T> changed) {
         PriorityQueue<CallNode> queue =
                 new PriorityQueue<>(new TreeSet<>(Comparator.comparingInt(priority::apply)));
         queue.addAll(mainNode.calledCallNodesAndSelfInPostOrder());
@@ -279,8 +311,9 @@ public class CallGraph {
         while (queue.size() > 0) {
             CallNode cur = queue.poll();
             T newRes = action.apply(cur, state);
-            if (!state.get(cur).equals(newRes)) {
-                state.put(cur, newRes);
+            T prevRes = state.get(cur);
+            state.put(cur, newRes);
+            if (changed.test(prevRes, newRes)) {
                 queue.addAll(next.apply(cur));
             }
         }

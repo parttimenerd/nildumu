@@ -110,7 +110,8 @@ public class MinCutTest implements MinimalCounterexampleHook {
             Set<Bit> bitsWoSources = new HashSet<>(bits);
             bitsWoSources.removeAll(sources);
             Set<Bit> sinks = IntStream.range(0, sinkNum).mapToObj(i -> random.choose(bitsWoSources)).collect(Collectors.toSet());
-            return new BitGraphWrapper(new BitGraph(con, Collections.singletonList(new Value(new ArrayList<>(sinks))), new Value(new ArrayList<>(sources))), bitNum, depCount, bits);
+            return new BitGraphWrapper(new BitGraph(con, Collections.singletonList(new Value(new ArrayList<>(sinks))),
+                    new MethodInvocationHandler.MethodReturnValue(new Value(new ArrayList<>(sources)), new HashMap<>())), bitNum, depCount, bits);
         }
 
         BitGraphWrapper cloneWithout(SourceOfRandomness random, BitGraphWrapper graph, float deletedDepfraction) {
@@ -142,7 +143,8 @@ public class MinCutTest implements MinimalCounterexampleHook {
                 }, b -> false, alreadyVisited);
             }
             return new BitGraphWrapper(new BitGraph(con, Collections.singletonList(new Value(newSinks)),
-                    new Value(newSources)), bitCount.val, depCount.val, alreadyVisited);
+                    new MethodInvocationHandler.MethodReturnValue(new Value(newSources), new HashMap<>())),
+                    bitCount.val, depCount.val, alreadyVisited);
         }
 
         BitGraphWrapper cloneWithoutBit(SourceOfRandomness random, BitGraphWrapper graph, Bit rem) {
@@ -191,7 +193,8 @@ public class MinCutTest implements MinimalCounterexampleHook {
                 con.weight(random.choose(alreadyVisited), 1);
             }
             return new BitGraphWrapper(new BitGraph(con, Collections.singletonList(new Value(newSinks)),
-                    new Value(newSources)), bitCount.val, depCount.val, alreadyVisited);
+                    new MethodInvocationHandler.MethodReturnValue(new Value(newSources), new HashMap<>())),
+                    bitCount.val, depCount.val, alreadyVisited);
         }
 
         @Override

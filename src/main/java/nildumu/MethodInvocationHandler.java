@@ -272,14 +272,16 @@ public abstract class MethodInvocationHandler {
          */
         private final Map<Bit, Pair<Integer, Integer>> bitInfo;
 
+        final MethodReturnValue methodReturnValue;
         final Value returnValue;
 
         final List<Integer> paramBitsPerReturnValue;
 
-        BitGraph(Context context, List<Value> parameters, Value returnValue) {
+        BitGraph(Context context, List<Value> parameters, MethodReturnValue methodReturnValue) {
             this.context = context;
             this.parameters = parameters;
             this.parameterBits = parameters.stream().flatMap(Value::stream).collect(Collectors.toSet());
+            this.methodReturnValue = methodReturnValue;
             this.bitInfo = new HashMap<>();
             for (int i = 0; i < parameters.size(); i++) {
                 Value param = parameters.get(i);
@@ -287,7 +289,7 @@ public abstract class MethodInvocationHandler {
                     bitInfo.put(param.get(j), p(i, j));
                 }
             }
-            this.returnValue = returnValue;
+            this.returnValue = methodReturnValue.value;
             assertThatAllBitsAreNotNull();
             paramBitsPerReturnValue = returnValue.stream().map(b -> calcReachableParamBits(b).size()).collect(Collectors.toList());
         }
@@ -306,8 +308,8 @@ public abstract class MethodInvocationHandler {
 
         public static Bit cloneBit(Context context, Bit bit, DependencySet deps){
             Bit clone;
-            if (bit.isUnknown()) {
-                clone = bl.create(U, deps);
+            if (bit.isAtLeastUnknown()) {
+                clone = bl.create(bit.val(), deps);
             } else {
                 clone = bl.create(v(bit));
             }
@@ -315,11 +317,11 @@ public abstract class MethodInvocationHandler {
             return clone;
         }
 
-        public Value applyToArgs(Context context, List<Value> arguments){
+        public MethodReturnValue applyToArgs(Context context, List<Value> arguments, Map<String, AppendOnlyValue> globals){
             List<Value> extendedArguments = arguments;
             Map<Bit, Bit> newBits = new HashMap<>();
             // populate
-            vl.walkBits(returnValue, bit -> {
+            vl.walkBits(methodReturnValue.getCombinedValue(), bit -> {
                 if (parameterBits.contains(bit)){
                     Pair<Integer, Integer> loc = bitInfo.get(bit);
                     Bit argBit = extendedArguments.get(loc.first).get(loc.second);
@@ -350,7 +352,11 @@ public abstract class MethodInvocationHandler {
                 }
                 //b.value(old.value());
             });
-            return returnValue.map(newBits::get);
+            Map<String, AppendOnlyValue> globs = new HashMap<>(globals);
+            globs.putAll(methodReturnValue.globals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                    e -> globals.getOrDefault(e.getKey(), AppendOnlyValue.createEmpty())
+                            .append(methodReturnValue.globals.get(e.getKey()).map(newBits::get)))));
+            return new MethodReturnValue(returnValue.map(newBits::get), globs);
         }
 
         /**
@@ -400,11 +406,25 @@ public abstract class MethodInvocationHandler {
             }
         }
 
+        /**
+         * Used only for the fix point iteration
+         * @param obj
+         * @return
+         */
         @Override
         public boolean equals(Object obj) {
             if (obj instanceof BitGraph){
                 //assert ((BitGraph)obj).parameterBits == this.parameterBits;
-                return paramBitsPerReturnValue.equals(((BitGraph)obj).paramBitsPerReturnValue);
+                BitGraph other = (BitGraph)obj;
+                if (!paramBitsPerReturnValue.equals(((BitGraph)obj).paramBitsPerReturnValue)){
+                    return false;
+                }
+                if (methodReturnValue.globals.size() != other.methodReturnValue.globals.size()){
+                    return false;
+                }
+                return methodReturnValue.globals.keySet().stream()
+                        .allMatch(k -> methodReturnValue.globals.get(k).sizeWithoutEs() ==
+                                other.methodReturnValue.globals.get(k).sizeWithoutEs());
             }
             return false;
         }
@@ -499,16 +519,18 @@ public abstract class MethodInvocationHandler {
                 callSite.definition = method;
                 return callSite;
             });
-            Map<CallNode, BitGraph> state = new HashMap<>();
-            MethodInvocationHandler handler = createHandler(m -> state.get(callGraph.callNode(m)));
+            Map<CallNode, ReduceResult<BitGraph>> state = new HashMap<>();
+            // bitGraph.parameters do not change
+            MethodInvocationHandler handler = createHandler(m -> state.get(callGraph.callNode(m)).value);
             Util.Box<Integer> iteration = new Util.Box<>(0);
+            Map<CallNode, HistoryPerMethodEntry> history = new HashMap<>();
             methodGraphs = callGraph.worklist((node, s) -> {
                 if (node.isMainNode || iteration.val > maxIterations){
                     return s.get(node);
                 }
-                Context.log(() -> String.format("Setup: Analyse %s", node.method.name));
+                log(() -> String.format("Setup: Analyse %s", node.method.name));
                 iteration.val += 1;
-                BitGraph graph = methodIteration(program.context, callSites.get(node.method), handler, s.get(node).parameters);
+                BitGraph graph = methodIteration(program.context, callSites.get(node.method), handler, s.get(node).value.parameters);
                 String name = String.format("%3d %s", iteration.val, node.method.name);
                 if (dotFolder != null){
                     graph.writeDotGraph(dotFolder, name, true);
@@ -516,12 +538,16 @@ public abstract class MethodInvocationHandler {
                 DotRegistry.get().store("summary", name,
                         () -> () -> graph.createDotGraph("", true));
                 BitGraph reducedGraph = reduce(c, graph);
+                HistoryPerMethodEntry newHist = HistoryPerMethodEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty(), node.getMethod());
+                ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist);
+                history.put(node, HistoryPerMethodEntry.create(furtherReducedGraph.value, newHist.prev, node.getMethod()));
+                        System.out.println("-------------------------#-> " + furtherReducedGraph.value.methodReturnValue);
                 if (dotFolder != null){
                     graph.writeDotGraph(dotFolder, name + " [reduced]", false);
                 }
                 DotRegistry.get().store("summary",  name + " [reduced]",
-                        () -> () -> reducedGraph.createDotGraph("", false));
-                return reducedGraph;
+                        () -> () -> furtherReducedGraph.value.createDotGraph("", false));
+                return furtherReducedGraph;
             }, node ->  {
                 BitGraph graph = bot(program, node.method, callSites, usedMode);
                 String name = String.format("%3d %s", iteration.val, node.method.name);
@@ -530,20 +556,138 @@ public abstract class MethodInvocationHandler {
                 }
                 DotRegistry.get().store("summary", name,
                         () -> () -> graph.createDotGraph("", false));
-                return graph;
+                return new ReduceResult<>(graph);
             }
             , node -> node.getCallers().stream().filter(n -> !n.isMainNode).collect(Collectors.toSet()),
-            state).entrySet().stream().collect(Collectors.toMap(e -> e.getKey().method, Map.Entry::getValue));
+            state, (f, s) -> {
+                return !s.addedAStarBit && !f.value.equals(s.value);
+            }).entrySet().stream().collect(Collectors.toMap(e -> e.getKey().method, e -> e.getValue().value));
             Context.log(() -> "Finish setup");
         }
+
+        /**
+         * Reduce the append only globals
+         *
+         * @param node
+         * @param reducedGraph
+         * @param history history, including the one to be analysed (the current)
+         * @return
+         */
+        private ReduceResult<BitGraph> reduceGlobals(CallNode node, BitGraph reducedGraph, HistoryPerMethodEntry history) {
+            ReduceResult<Map<String, AppendOnlyValue>> result =
+                    ReduceResult.create(reducedGraph.methodReturnValue.globals.keySet().stream()
+                            .collect(Collectors.toMap(v -> v, v -> reduceAppendOnly(history.map.get(v)))));
+            return new ReduceResult<>(new BitGraph(reducedGraph.context, reducedGraph.parameters,
+                    new MethodReturnValue(reducedGraph.methodReturnValue.value, result.value)), result.addedAStarBit);
+        }
+
+        static class HistoryPerMethodEntry {
+            final Optional<HistoryPerMethodEntry> prev;
+            final Map<String, HistoryPerMethodAndGlobalEntry> map;
+
+            HistoryPerMethodEntry(Optional<HistoryPerMethodEntry> prev, Map<String, HistoryPerMethodAndGlobalEntry> map) {
+                this.prev = prev;
+                this.map = map;
+            }
+
+            static HistoryPerMethodEntry create(BitGraph graph, Optional<HistoryPerMethodEntry> prev, MethodNode method){
+                return new HistoryPerMethodEntry(prev, graph.methodReturnValue.globals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> new HistoryPerMethodAndGlobalEntry(prev.map(p -> p.map.get(e.getKey())), method, graph, e.getKey()))));
+            }
+        }
+
+        static class HistoryPerMethodAndGlobalEntry {
+
+            final Optional<HistoryPerMethodAndGlobalEntry> prev;
+            final MethodNode method;
+            final BitGraph graph;
+            final String name;
+            final AppendOnlyValue value;
+            final long reachableParameterBitNum;
+            final long reachableParameterBitNumForDiff;
+            final AppendOnlyValue difference;
+
+            HistoryPerMethodAndGlobalEntry(Optional<HistoryPerMethodAndGlobalEntry> prev, MethodNode method, BitGraph graph, String name) {
+                this.prev = prev;
+                this.method = method;
+                this.graph = graph;
+                this.name = name;
+                this.value = graph.methodReturnValue.globals.get(name);
+                this.reachableParameterBitNum = value.stream().map(graph::calcReachableParamBits).flatMap(Set::stream).distinct().count();
+                this.difference = prev.map(h -> value.difference(h.value)).orElse(value);
+                this.reachableParameterBitNumForDiff = difference.stream().map(graph::calcReachableParamBits).flatMap(Set::stream).distinct().count();
+            }
+        }
+
+        static class ReduceResult<T> {
+            final T value;
+            final boolean addedAStarBit;
+
+            ReduceResult(T value, boolean addedAStarBit) {
+                this.value = value;
+                this.addedAStarBit = addedAStarBit;
+            }
+
+            ReduceResult(T value){
+                this(value, false);
+            }
+
+            static ReduceResult<Map<String, AppendOnlyValue>> create(Map<String, ReduceResult<AppendOnlyValue>> val){
+                return new ReduceResult<>((val.entrySet().stream().collect(Collectors.toMap(
+                        e -> e.getKey(),
+                        e -> e.getValue().value
+                ))), val.values().stream().map(v -> v.addedAStarBit).reduce((f, s) -> f && s).orElse(false));
+            }
+        }
+
+        private ReduceResult<AppendOnlyValue> reduceAppendOnly(HistoryPerMethodAndGlobalEntry history){
+            HistoryPerMethodAndGlobalEntry currentHist = history;
+            ReduceResult<AppendOnlyValue> current = new ReduceResult<>(currentHist.value, false);
+            if (!history.prev.isPresent()){ // its the first round
+                return current;
+            }
+            if (history.value.sizeWithoutEs() == 0){
+                return current;
+            }
+            HistoryPerMethodAndGlobalEntry previousHist = history.prev.get();
+            // if the previous and the current are the same length, nothing changed too
+            if (previousHist.value.sizeWithoutEs() == currentHist.value.sizeWithoutEs()) {
+                return current;
+            }
+            // if it got longer and added new dependencies, then we don't have anything to do either
+            if (currentHist.reachableParameterBitNum != previousHist.reachableParameterBitNum){
+                return current;
+            }
+            // if it got longer and added parameter dependencies compared to the last version,
+            // then we can ignore it too
+            if (currentHist.reachableParameterBitNumForDiff > previousHist.reachableParameterBitNumForDiff){
+                return current;
+            }
+            // same for the size
+            if (currentHist.difference.sizeWithoutEs() > previousHist.difference.sizeWithoutEs()){
+                return current;
+            }
+            // and if the bit values changed
+            if (!currentHist.difference.bitValEquals(previousHist.difference)){
+                return current;
+            }
+            // last case: it got longer exactly the same as before and did not add any new dependencies
+            // => merging
+            // TODO: improve
+            // Idea: end this recursion by using an "s" bit that depends to all bits that the difference depends on
+            Bit s = bl.create(B.S, currentHist.difference.bits.stream().collect(DependencySet.collector()));
+            // the resulting output bits all only depend on the "s" bit
+            return new ReduceResult<>(previousHist.value.append(currentHist.difference.map(b -> s).asAppendOnly()), true);
+        }
+
 
         BitGraph bot(ProgramNode program, MethodNode method, Map<MethodNode, MethodInvocationNode> callSites, Mode usedMode){
             List<Value> parameters = generateParameters(program, method);
             if (usedMode == Mode.COINDUCTION) {
-                Value returnValue = botHandler.analyze(program.context, callSites.get(method), parameters);
+                MethodReturnValue returnValue = botHandler.analyze(program.context, callSites.get(method), parameters, new HashMap<>());
                 return new BitGraph(program.context, parameters, returnValue);
             }
-            return new BitGraph(program.context, parameters, createUnknownValue(program));
+            return new BitGraph(program.context, parameters, new MethodReturnValue(createUnknownValue(program), new HashMap<>()));
         }
 
         List<Value> generateParameters(ProgramNode program, MethodNode method){
@@ -565,16 +709,20 @@ public abstract class MethodInvocationHandler {
             c.forceMethodInvocationHandler(handler);
             Processor.process(c, callSite.definition.body);
             Value ret = c.getReturnValue();
+            Map<String, AppendOnlyValue> globalVals = callSite.definition.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                    e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
             c.popMethodInvocationState();
             c.forceMethodInvocationHandler(this);
-            return new BitGraph(c, parameters, ret);
+            MethodReturnValue retValue = new MethodReturnValue(ret, globalVals);
+            System.out.println("--------------------------> " + retValue);
+            return new BitGraph(c, parameters, retValue);
         }
 
         MethodInvocationHandler createHandler(Function<MethodNode, BitGraph> curVersion){
             MethodInvocationHandler handler = new MethodInvocationHandler() {
                 @Override
-                public Value analyze(Context c, MethodInvocationNode callSite, List<Value> arguments) {
-                    return curVersion.apply(callSite.definition).applyToArgs(c, arguments);
+                public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals) {
+                    return curVersion.apply(callSite.definition).applyToArgs(c, arguments, globals);
                 }
             };
             if (callStringMaxRec > 0){
@@ -600,18 +748,19 @@ public abstract class MethodInvocationHandler {
             DefaultMap<Bit, Bit> newBits = new DefaultMap<Bit, Bit>((map, bit) -> {
                 return BitGraph.cloneBit(context, bit, ds.create(bitGraph.calcReachableParamBits(bit)));
             });
-            Value ret = bitGraph.returnValue.map(newBits::get);
-            ret.node(bitGraph.returnValue.node());
-            return new BitGraph(context, bitGraph.parameters, ret);
+            MethodReturnValue newRetValue = bitGraph.methodReturnValue.map(newBits::get);
+            bitGraph.returnValue.node(bitGraph.returnValue.node());
+            return new BitGraph(context, bitGraph.parameters, newRetValue);
         }
 
         BitGraph minCutReduce(Context context, BitGraph bitGraph) {
             Set<Bit> anchorBits = new HashSet<>(bitGraph.parameterBits);
-            Set<Bit> minCutBits = bitGraph.minCutBits(bitGraph.returnValue.bitSet(), bitGraph.parameterBits, INFTY);
+            Set<Bit> minCutBits = bitGraph.minCutBits(bitGraph.methodReturnValue.getCombinedValue().bitSet(),
+                    bitGraph.parameterBits, INFTY);
             anchorBits.addAll(minCutBits);
             Map<Bit, Bit> newBits = new HashMap<>();
             // create the new bits
-            Stream.concat(bitGraph.returnValue.stream(), minCutBits.stream()).forEach(b -> {
+            Stream.concat(bitGraph.methodReturnValue.getCombinedValue().stream(), minCutBits.stream()).forEach(b -> {
                 Set<Bit> reachable = bitGraph.calcReachableBits(b, anchorBits);
                 if (!b.deps().contains(b)){
                     reachable.remove(b);
@@ -625,16 +774,16 @@ public abstract class MethodInvocationHandler {
             newBits.forEach((o, b) -> {
                 b.alterDependencies(newBits::get);
             });
-            Value ret = bitGraph.returnValue.map(newBits::get);
-            ret.node(bitGraph.returnValue.node());
+            MethodReturnValue ret = bitGraph.methodReturnValue.map(newBits::get);
+            ret.value.node(bitGraph.returnValue.node());
             BitGraph newGraph = new BitGraph(context, bitGraph.parameters, ret);
             //assert !isReachable || newGraph.calcReachableBits(newGraph.returnValue.get(1), newGraph.parameters.get(0).bitSet()).size() > 0;
             return newGraph;
         }
 
         @Override
-        public Value analyze(Context c, MethodInvocationNode callSite, List<Value> arguments) {
-             return methodGraphs.get(callSite.definition).applyToArgs(c, arguments);
+        public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals) {
+             return methodGraphs.get(callSite.definition).applyToArgs(c, arguments, globals);
         }
     }
 
@@ -645,6 +794,20 @@ public abstract class MethodInvocationHandler {
         MethodReturnValue(Value value, Map<String, AppendOnlyValue> globals) {
             this.value = value;
             this.globals = globals;
+        }
+
+        Value getCombinedValue(){
+            return Stream.concat(Stream.of(value), globals.values().stream()).flatMap(Value::stream).collect(Value.collector());
+        }
+
+        MethodReturnValue map(Function<Bit, Bit> transformer){
+            return new MethodReturnValue(value.map(transformer), globals.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().map(transformer).asAppendOnly())));
+        }
+
+        @Override
+        public String toString() {
+            return value + " " + globals.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.joining(", "));
         }
     }
 
