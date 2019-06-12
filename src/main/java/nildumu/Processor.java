@@ -64,7 +64,7 @@ public class Processor {
 
             final Stack<Long> nodeValueUpdatesAtCondition = new Stack<>();
 
-            final Map<WhileStatementNode, MethodInvocationHandler.SummaryHandler.HistoryEntry> historyPerWhile = new HashMap<>();
+            final Map<WhileStatementNode, PrintHistory.HistoryEntry> historyPerWhile = new HashMap<>();
 
             final Map<MJNode, Long> lastUpdateCounts = new DefaultMap<>(new HashMap<>(), new DefaultMap.Extension<MJNode, Long>() {
                 @Override
@@ -177,8 +177,8 @@ public class Processor {
                 } else {
                     statementNodesToOmitOneTime.add(whileStatement.body);
                 }
-                MethodInvocationHandler.SummaryHandler.HistoryEntry newHist = createHistoryEntryForWhileStmt(whileStatement);
-                MethodInvocationHandler.SummaryHandler.ReduceResult<Map<String, AppendOnlyValue>> reduceResult = reduceAppendOnlyVariables(newHist);
+                PrintHistory.HistoryEntry newHist = createHistoryEntryForWhileStmt(whileStatement);
+                PrintHistory.ReduceResult<Map<String, AppendOnlyValue>> reduceResult = reduceAppendOnlyVariables(newHist);
 
                 // assumes that the first argument of the phi is the inner loop end SSA variable
                 whileStatement.getPreCondVarAss().stream()
@@ -186,7 +186,7 @@ public class Processor {
                         .forEach(a -> Stream.of(a.definition, ((PhiNode)a.expression).joinedVariables.get(0).definition)
                                             .forEach(v -> context.setVariableValue(v, reduceResult.value.get(a.definition.name))));
 
-                historyPerWhile.put(whileStatement, MethodInvocationHandler.SummaryHandler.HistoryEntry.create(reduceResult.value, newHist.prev, newHist));
+                historyPerWhile.put(whileStatement, PrintHistory.HistoryEntry.create(reduceResult.value, newHist.prev, newHist));
                 if (lastUpdateCounts.get(whileStatement) == context.getNodeVersionUpdateCount()) {
                     return false; // that is the common case without prints
                 } else {
@@ -204,7 +204,7 @@ public class Processor {
                 }
             }
 
-            private MethodInvocationHandler.SummaryHandler.HistoryEntry createHistoryEntryForWhileStmt(WhileStatementNode whileStatement){
+            private PrintHistory.HistoryEntry createHistoryEntryForWhileStmt(WhileStatementNode whileStatement){
                 Set<String> outerVars = node.accept(new NodeVisitor<Set<String>>() {
                     @Override
                     public Set<String> visit(MJNode node) {
@@ -228,16 +228,16 @@ public class Processor {
                 });
                 Set<Bit> outsideBits = outerVars.stream()
                         .flatMap(v -> context.getVariableValue(v).stream()).collect(Collectors.toSet());
-                return MethodInvocationHandler.SummaryHandler.HistoryEntry.create(whileStatement.getPreCondVarAss().stream()
+                return PrintHistory.HistoryEntry.create(whileStatement.getPreCondVarAss().stream()
                                 .filter(a -> a.definition.hasAppendValue)
                                 .collect(Collectors.toMap(a -> a.variable, a -> context.getVariableValue(a.variable).asAppendOnly())),
                         historyPerWhile.containsKey(whileStatement) ? Optional.of(historyPerWhile.get(whileStatement)) : Optional.empty(),
                         v -> bl.reachableBits(v.bits, outsideBits));
             }
 
-            private MethodInvocationHandler.SummaryHandler.ReduceResult<Map<String, AppendOnlyValue>>
-                reduceAppendOnlyVariables(MethodInvocationHandler.SummaryHandler.HistoryEntry history) {
-                return MethodInvocationHandler.SummaryHandler.ReduceResult.create(
+            private PrintHistory.ReduceResult<Map<String, AppendOnlyValue>>
+                reduceAppendOnlyVariables(PrintHistory.HistoryEntry history) {
+                return PrintHistory.ReduceResult.create(
                                 history.map.keySet().stream().collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly())));
             }
 

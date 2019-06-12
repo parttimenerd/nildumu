@@ -40,6 +40,11 @@ public abstract class MethodInvocationHandler {
         registry.put(name, p(scheme, creator));
     }
 
+    public static enum Reduction {
+        BASIC,
+        MINCUT;
+    }
+
     public static class PropertiesParser {
 
         public final static int EOF = -1;
@@ -464,11 +469,6 @@ public abstract class MethodInvocationHandler {
             AUTO
         }
 
-        public static enum Reduction {
-            BASIC,
-            MINCUT;
-        }
-
         final int maxIterations;
 
         final Mode mode;
@@ -519,11 +519,11 @@ public abstract class MethodInvocationHandler {
                 callSite.definition = method;
                 return callSite;
             });
-            Map<CallNode, ReduceResult<BitGraph>> state = new HashMap<>();
+            Map<CallNode, PrintHistory.ReduceResult<BitGraph>> state = new HashMap<>();
             // bitGraph.parameters do not change
             MethodInvocationHandler handler = createHandler(m -> state.get(callGraph.callNode(m)).value);
             Util.Box<Integer> iteration = new Util.Box<>(0);
-            Map<CallNode, HistoryEntry> history = new HashMap<>();
+            Map<CallNode, PrintHistory.HistoryEntry> history = new HashMap<>();
             methodGraphs = callGraph.worklist((node, s) -> {
                 if (node.isMainNode || iteration.val > maxIterations){
                     return s.get(node);
@@ -538,9 +538,9 @@ public abstract class MethodInvocationHandler {
                 DotRegistry.get().store("summary", name,
                         () -> () -> graph.createDotGraph("", true));
                 BitGraph reducedGraph = reduce(c, graph);
-                HistoryEntry newHist = HistoryEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty());
-                ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist);
-                history.put(node, HistoryEntry.create(furtherReducedGraph.value, newHist.prev));
+                PrintHistory.HistoryEntry newHist = PrintHistory.HistoryEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty());
+                PrintHistory.ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist);
+                history.put(node, PrintHistory.HistoryEntry.create(furtherReducedGraph.value, newHist.prev));
                         System.out.println("-------------------------#-> " + furtherReducedGraph.value.methodReturnValue);
                 if (dotFolder != null){
                     graph.writeDotGraph(dotFolder, name + " [reduced]", false);
@@ -556,7 +556,7 @@ public abstract class MethodInvocationHandler {
                 }
                 DotRegistry.get().store("summary", name,
                         () -> () -> graph.createDotGraph("", false));
-                return new ReduceResult<>(graph);
+                return new PrintHistory.ReduceResult<>(graph);
             }
             , node -> node.getCallers().stream().filter(n -> !n.isMainNode).collect(Collectors.toSet()),
             state, (f, s) -> {
@@ -573,141 +573,12 @@ public abstract class MethodInvocationHandler {
          * @param history history, including the one to be analysed (the current)
          * @return
          */
-        private ReduceResult<BitGraph> reduceGlobals(CallNode node, BitGraph reducedGraph, HistoryEntry history) {
-            ReduceResult<Map<String, AppendOnlyValue>> result =
-                    ReduceResult.create(reducedGraph.methodReturnValue.globals.keySet().stream()
+        private PrintHistory.ReduceResult<BitGraph> reduceGlobals(CallNode node, BitGraph reducedGraph, PrintHistory.HistoryEntry history) {
+            PrintHistory.ReduceResult<Map<String, AppendOnlyValue>> result =
+                    PrintHistory.ReduceResult.create(reducedGraph.methodReturnValue.globals.keySet().stream()
                             .collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly())));
-            return new ReduceResult<>(new BitGraph(reducedGraph.context, reducedGraph.parameters,
+            return new PrintHistory.ReduceResult<>(new BitGraph(reducedGraph.context, reducedGraph.parameters,
                     new MethodReturnValue(reducedGraph.methodReturnValue.value, result.value)), result.addedAStarBit);
-        }
-
-        static class HistoryEntry {
-            final Optional<HistoryEntry> prev;
-            final Map<String, HistoryPerGlobalEntry> map;
-
-            HistoryEntry(Optional<HistoryEntry> prev, Map<String, HistoryPerGlobalEntry> map) {
-                this.prev = prev;
-                this.map = map;
-            }
-
-            static HistoryEntry create(BitGraph graph, Optional<HistoryEntry> prev){
-                return create(graph.methodReturnValue.globals, prev, val -> val.stream()
-                        .flatMap(b -> graph.calcReachableParamBits(b).stream()).collect(Collectors.toSet()));
-            }
-
-
-            static HistoryEntry create(Map<String, AppendOnlyValue> map, Optional<HistoryEntry> prev, Function<Value, Set<Bit>> reachabilityCalculator){
-                return new HistoryEntry(prev, map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                        e -> new HistoryPerGlobalEntry(prev.map(p -> p.map.get(e.getKey())), e.getKey(), e.getValue(), reachabilityCalculator))));
-            }
-            static HistoryEntry create(Map<String, AppendOnlyValue> map, Optional<HistoryEntry> prev, HistoryEntry base){
-                return new HistoryEntry(prev, map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                        e -> new HistoryPerGlobalEntry(prev.map(p -> p.map.get(e.getKey())), e.getKey(), e.getValue(),
-                                base.map.get(e.getKey()).reachableBitNum,
-                                base.map.get(e.getKey()).reachableBitsForDiff))));
-            }
-
-        }
-
-        static class HistoryPerGlobalEntry {
-
-            final Optional<HistoryPerGlobalEntry> prev;
-            final String name;
-            final AppendOnlyValue value;
-            final AppendOnlyValue difference;
-
-
-            final long reachableBitNum;
-            final long reachableBitNumForDiff;
-            final Set<Bit> reachableBitsForDiff;
-
-            HistoryPerGlobalEntry(Optional<HistoryPerGlobalEntry> prev, String name, AppendOnlyValue value, long reachableBitNum, Set<Bit> reachableBitsForDiff) {
-                this.prev = prev;
-                this.name = name;
-                this.value = value;
-                this.difference = prev.map(h -> value.difference(h.value)).orElse(value);
-                this.reachableBitNum = reachableBitNum;
-                this.reachableBitNumForDiff = reachableBitsForDiff.size();
-                this.reachableBitsForDiff = reachableBitsForDiff;
-            }
-
-            HistoryPerGlobalEntry(Optional<HistoryPerGlobalEntry> prev, String name, AppendOnlyValue value, Function<Value, Set<Bit>> reachabilityCalculator) {
-                this.prev = prev;
-                this.name = name;
-                this.value = value;
-                this.difference = prev.map(h -> value.difference(h.value)).orElse(value);
-                this.reachableBitNum = reachabilityCalculator.apply(value).size();
-                this.reachableBitsForDiff = reachabilityCalculator.apply(difference);
-                this.reachableBitNumForDiff = reachableBitsForDiff.size();
-            }
-
-            ReduceResult<AppendOnlyValue> reduceAppendOnly(){
-                HistoryPerGlobalEntry currentHist = this;
-                ReduceResult<AppendOnlyValue> current = new ReduceResult<>(currentHist.value.clone(), false);
-                if (!prev.isPresent()){ // its the first round
-                    return current;
-                }
-                if (value.sizeWithoutEs() == 0){
-                    return current;
-                }
-                HistoryPerGlobalEntry previousHist = prev.get();
-                // if the previous and the current are the same length, nothing changed too
-                if (previousHist.value.sizeWithoutEs() == currentHist.value.sizeWithoutEs()) {
-                    return current;
-                }
-                // if it got longer and added new dependencies, then we don't have anything to do either
-                if (currentHist.reachableBitNum != previousHist.reachableBitNum){
-                    return current;
-                }
-                // if it got longer and added parameter dependencies compared to the last version,
-                // then we can ignore it too
-                if (currentHist.reachableBitNumForDiff > previousHist.reachableBitNumForDiff){
-                    return current;
-                }
-                // same for the size
-                if (currentHist.difference.sizeWithoutEs() > previousHist.difference.sizeWithoutEs()){
-                    return current;
-                }
-                // and if the bit values changed to higher levels
-                if (vl.mapBits(previousHist.difference, currentHist.difference,
-                        (a, b) -> !bs.greaterEqualsThan(a.val(), b.val())).stream().anyMatch(Boolean::booleanValue)){
-                    return current;
-                }
-                // Idea: end this recursion by using an "s" bit that depends to all bits that the difference depends on
-                Bit s = bl.create(B.S, ds.create(currentHist.reachableBitsForDiff));
-                // if the previous value did already ends with the star bits that we want to add
-                // return the previous value
-                System.out.println(previousHist.difference);
-                if (previousHist.difference.get(previousHist.difference.size()).valueEquals(s)){
-                    return new ReduceResult<>(previousHist.value.clone(), true);
-                }
-                // last case: it got longer exactly the same as before and did not add any new dependencies
-                // => merging
-                // TODO: improve
-                // the resulting output bits all only depend on the "s" bit
-                return new ReduceResult<>(currentHist.value.append(new Value(s)), true);
-            }
-        }
-
-        static class ReduceResult<T> {
-            final T value;
-            final boolean addedAStarBit;
-
-            ReduceResult(T value, boolean addedAStarBit) {
-                this.value = value;
-                this.addedAStarBit = addedAStarBit;
-            }
-
-            ReduceResult(T value){
-                this(value, false);
-            }
-
-            static ReduceResult<Map<String, AppendOnlyValue>> create(Map<String, ReduceResult<AppendOnlyValue>> val){
-                return new ReduceResult<>((val.entrySet().stream().collect(Collectors.toMap(
-                        e -> e.getKey(),
-                        e -> e.getValue().value
-                ))), val.values().stream().map(v -> v.addedAStarBit).reduce((f, s) -> f && s).orElse(false));
-            }
         }
 
 
@@ -877,7 +748,7 @@ public abstract class MethodInvocationHandler {
             Path dotFolder = ps.getProperty("dot").equals("") ? null : Paths.get(ps.getProperty("dot"));
             return new SummaryHandler(ps.getProperty("mode").equals("coind") ? Integer.parseInt(ps.getProperty("maxiter")) : Integer.MAX_VALUE,
                     ps.getProperty("mode").equals("ind") ? SummaryHandler.Mode.INDUCTION : (ps.getProperty("mode").equals("auto") ? SummaryHandler.Mode.AUTO : SummaryHandler.Mode.COINDUCTION),
-                    parse(ps.getProperty("bot")), dotFolder, SummaryHandler.Reduction.valueOf(ps.getProperty("reduction").toUpperCase()), Integer.parseInt(ps.getProperty("csmaxrec")));
+                    parse(ps.getProperty("bot")), dotFolder, Reduction.valueOf(ps.getProperty("reduction").toUpperCase()), Integer.parseInt(ps.getProperty("csmaxrec")));
         });
         examplePropLines.add("handler=summary;bot=basic;reduction=basic");
         examplePropLines.add("handler=summary;bot=basic;reduction=mincut");
