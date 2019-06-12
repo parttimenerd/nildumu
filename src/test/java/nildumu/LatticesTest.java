@@ -94,7 +94,7 @@ public class LatticesTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"u, u, u", "u, e, n"})
+    @CsvSource({"u, u, u", "u, e, n", "s, e, s", "s, n, s", "s, u, s"})
     public void testBitValueLatticeSup(String first, String second, String expectedSupremum){
         assertEquals(bs.parse(expectedSupremum), bs.sup(bs.parse(first), bs.parse(second)));
     }

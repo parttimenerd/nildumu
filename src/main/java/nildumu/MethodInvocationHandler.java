@@ -523,7 +523,7 @@ public abstract class MethodInvocationHandler {
             // bitGraph.parameters do not change
             MethodInvocationHandler handler = createHandler(m -> state.get(callGraph.callNode(m)).value);
             Util.Box<Integer> iteration = new Util.Box<>(0);
-            Map<CallNode, HistoryPerMethodEntry> history = new HashMap<>();
+            Map<CallNode, HistoryEntry> history = new HashMap<>();
             methodGraphs = callGraph.worklist((node, s) -> {
                 if (node.isMainNode || iteration.val > maxIterations){
                     return s.get(node);
@@ -538,9 +538,9 @@ public abstract class MethodInvocationHandler {
                 DotRegistry.get().store("summary", name,
                         () -> () -> graph.createDotGraph("", true));
                 BitGraph reducedGraph = reduce(c, graph);
-                HistoryPerMethodEntry newHist = HistoryPerMethodEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty(), node.getMethod());
+                HistoryEntry newHist = HistoryEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty());
                 ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist);
-                history.put(node, HistoryPerMethodEntry.create(furtherReducedGraph.value, newHist.prev, node.getMethod()));
+                history.put(node, HistoryEntry.create(furtherReducedGraph.value, newHist.prev));
                         System.out.println("-------------------------#-> " + furtherReducedGraph.value.methodReturnValue);
                 if (dotFolder != null){
                     graph.writeDotGraph(dotFolder, name + " [reduced]", false);
@@ -573,49 +573,119 @@ public abstract class MethodInvocationHandler {
          * @param history history, including the one to be analysed (the current)
          * @return
          */
-        private ReduceResult<BitGraph> reduceGlobals(CallNode node, BitGraph reducedGraph, HistoryPerMethodEntry history) {
+        private ReduceResult<BitGraph> reduceGlobals(CallNode node, BitGraph reducedGraph, HistoryEntry history) {
             ReduceResult<Map<String, AppendOnlyValue>> result =
                     ReduceResult.create(reducedGraph.methodReturnValue.globals.keySet().stream()
-                            .collect(Collectors.toMap(v -> v, v -> reduceAppendOnly(history.map.get(v)))));
+                            .collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly())));
             return new ReduceResult<>(new BitGraph(reducedGraph.context, reducedGraph.parameters,
                     new MethodReturnValue(reducedGraph.methodReturnValue.value, result.value)), result.addedAStarBit);
         }
 
-        static class HistoryPerMethodEntry {
-            final Optional<HistoryPerMethodEntry> prev;
-            final Map<String, HistoryPerMethodAndGlobalEntry> map;
+        static class HistoryEntry {
+            final Optional<HistoryEntry> prev;
+            final Map<String, HistoryPerGlobalEntry> map;
 
-            HistoryPerMethodEntry(Optional<HistoryPerMethodEntry> prev, Map<String, HistoryPerMethodAndGlobalEntry> map) {
+            HistoryEntry(Optional<HistoryEntry> prev, Map<String, HistoryPerGlobalEntry> map) {
                 this.prev = prev;
                 this.map = map;
             }
 
-            static HistoryPerMethodEntry create(BitGraph graph, Optional<HistoryPerMethodEntry> prev, MethodNode method){
-                return new HistoryPerMethodEntry(prev, graph.methodReturnValue.globals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                        e -> new HistoryPerMethodAndGlobalEntry(prev.map(p -> p.map.get(e.getKey())), method, graph, e.getKey()))));
+            static HistoryEntry create(BitGraph graph, Optional<HistoryEntry> prev){
+                return create(graph.methodReturnValue.globals, prev, val -> val.stream()
+                        .flatMap(b -> graph.calcReachableParamBits(b).stream()).collect(Collectors.toSet()));
             }
+
+
+            static HistoryEntry create(Map<String, AppendOnlyValue> map, Optional<HistoryEntry> prev, Function<Value, Set<Bit>> reachabilityCalculator){
+                return new HistoryEntry(prev, map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> new HistoryPerGlobalEntry(prev.map(p -> p.map.get(e.getKey())), e.getKey(), e.getValue(), reachabilityCalculator))));
+            }
+            static HistoryEntry create(Map<String, AppendOnlyValue> map, Optional<HistoryEntry> prev, HistoryEntry base){
+                return new HistoryEntry(prev, map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> new HistoryPerGlobalEntry(prev.map(p -> p.map.get(e.getKey())), e.getKey(), e.getValue(),
+                                base.map.get(e.getKey()).reachableBitNum,
+                                base.map.get(e.getKey()).reachableBitsForDiff))));
+            }
+
         }
 
-        static class HistoryPerMethodAndGlobalEntry {
+        static class HistoryPerGlobalEntry {
 
-            final Optional<HistoryPerMethodAndGlobalEntry> prev;
-            final MethodNode method;
-            final BitGraph graph;
+            final Optional<HistoryPerGlobalEntry> prev;
             final String name;
             final AppendOnlyValue value;
-            final long reachableParameterBitNum;
-            final long reachableParameterBitNumForDiff;
             final AppendOnlyValue difference;
 
-            HistoryPerMethodAndGlobalEntry(Optional<HistoryPerMethodAndGlobalEntry> prev, MethodNode method, BitGraph graph, String name) {
+
+            final long reachableBitNum;
+            final long reachableBitNumForDiff;
+            final Set<Bit> reachableBitsForDiff;
+
+            HistoryPerGlobalEntry(Optional<HistoryPerGlobalEntry> prev, String name, AppendOnlyValue value, long reachableBitNum, Set<Bit> reachableBitsForDiff) {
                 this.prev = prev;
-                this.method = method;
-                this.graph = graph;
                 this.name = name;
-                this.value = graph.methodReturnValue.globals.get(name);
-                this.reachableParameterBitNum = value.stream().map(graph::calcReachableParamBits).flatMap(Set::stream).distinct().count();
+                this.value = value;
                 this.difference = prev.map(h -> value.difference(h.value)).orElse(value);
-                this.reachableParameterBitNumForDiff = difference.stream().map(graph::calcReachableParamBits).flatMap(Set::stream).distinct().count();
+                this.reachableBitNum = reachableBitNum;
+                this.reachableBitNumForDiff = reachableBitsForDiff.size();
+                this.reachableBitsForDiff = reachableBitsForDiff;
+            }
+
+            HistoryPerGlobalEntry(Optional<HistoryPerGlobalEntry> prev, String name, AppendOnlyValue value, Function<Value, Set<Bit>> reachabilityCalculator) {
+                this.prev = prev;
+                this.name = name;
+                this.value = value;
+                this.difference = prev.map(h -> value.difference(h.value)).orElse(value);
+                this.reachableBitNum = reachabilityCalculator.apply(value).size();
+                this.reachableBitsForDiff = reachabilityCalculator.apply(difference);
+                this.reachableBitNumForDiff = reachableBitsForDiff.size();
+            }
+
+            ReduceResult<AppendOnlyValue> reduceAppendOnly(){
+                HistoryPerGlobalEntry currentHist = this;
+                ReduceResult<AppendOnlyValue> current = new ReduceResult<>(currentHist.value.clone(), false);
+                if (!prev.isPresent()){ // its the first round
+                    return current;
+                }
+                if (value.sizeWithoutEs() == 0){
+                    return current;
+                }
+                HistoryPerGlobalEntry previousHist = prev.get();
+                // if the previous and the current are the same length, nothing changed too
+                if (previousHist.value.sizeWithoutEs() == currentHist.value.sizeWithoutEs()) {
+                    return current;
+                }
+                // if it got longer and added new dependencies, then we don't have anything to do either
+                if (currentHist.reachableBitNum != previousHist.reachableBitNum){
+                    return current;
+                }
+                // if it got longer and added parameter dependencies compared to the last version,
+                // then we can ignore it too
+                if (currentHist.reachableBitNumForDiff > previousHist.reachableBitNumForDiff){
+                    return current;
+                }
+                // same for the size
+                if (currentHist.difference.sizeWithoutEs() > previousHist.difference.sizeWithoutEs()){
+                    return current;
+                }
+                // and if the bit values changed to higher levels
+                if (vl.mapBits(previousHist.difference, currentHist.difference,
+                        (a, b) -> !bs.greaterEqualsThan(a.val(), b.val())).stream().anyMatch(Boolean::booleanValue)){
+                    return current;
+                }
+                // Idea: end this recursion by using an "s" bit that depends to all bits that the difference depends on
+                Bit s = bl.create(B.S, ds.create(currentHist.reachableBitsForDiff));
+                // if the previous value did already ends with the star bits that we want to add
+                // return the previous value
+                System.out.println(previousHist.difference);
+                if (previousHist.difference.get(previousHist.difference.size()).valueEquals(s)){
+                    return new ReduceResult<>(previousHist.value.clone(), true);
+                }
+                // last case: it got longer exactly the same as before and did not add any new dependencies
+                // => merging
+                // TODO: improve
+                // the resulting output bits all only depend on the "s" bit
+                return new ReduceResult<>(currentHist.value.append(new Value(s)), true);
             }
         }
 
@@ -638,46 +708,6 @@ public abstract class MethodInvocationHandler {
                         e -> e.getValue().value
                 ))), val.values().stream().map(v -> v.addedAStarBit).reduce((f, s) -> f && s).orElse(false));
             }
-        }
-
-        private ReduceResult<AppendOnlyValue> reduceAppendOnly(HistoryPerMethodAndGlobalEntry history){
-            HistoryPerMethodAndGlobalEntry currentHist = history;
-            ReduceResult<AppendOnlyValue> current = new ReduceResult<>(currentHist.value, false);
-            if (!history.prev.isPresent()){ // its the first round
-                return current;
-            }
-            if (history.value.sizeWithoutEs() == 0){
-                return current;
-            }
-            HistoryPerMethodAndGlobalEntry previousHist = history.prev.get();
-            // if the previous and the current are the same length, nothing changed too
-            if (previousHist.value.sizeWithoutEs() == currentHist.value.sizeWithoutEs()) {
-                return current;
-            }
-            // if it got longer and added new dependencies, then we don't have anything to do either
-            if (currentHist.reachableParameterBitNum != previousHist.reachableParameterBitNum){
-                return current;
-            }
-            // if it got longer and added parameter dependencies compared to the last version,
-            // then we can ignore it too
-            if (currentHist.reachableParameterBitNumForDiff > previousHist.reachableParameterBitNumForDiff){
-                return current;
-            }
-            // same for the size
-            if (currentHist.difference.sizeWithoutEs() > previousHist.difference.sizeWithoutEs()){
-                return current;
-            }
-            // and if the bit values changed
-            if (!currentHist.difference.bitValEquals(previousHist.difference)){
-                return current;
-            }
-            // last case: it got longer exactly the same as before and did not add any new dependencies
-            // => merging
-            // TODO: improve
-            // Idea: end this recursion by using an "s" bit that depends to all bits that the difference depends on
-            Bit s = bl.create(B.S, currentHist.difference.bits.stream().collect(DependencySet.collector()));
-            // the resulting output bits all only depend on the "s" bit
-            return new ReduceResult<>(previousHist.value.append(currentHist.difference.map(b -> s).asAppendOnly()), true);
         }
 
 

@@ -194,11 +194,19 @@ public class Context {
 
         long nodeVersionUpdateCount = 0;
 
+        /**
+         * Does not include the nodes that are updated with append only values (aka print variables)
+         */
+        long nodeVersionWOAppendValuedUpdateCount = 0;
+
         final DefaultMap<MJNode, Integer> nodeVersionMap = new DefaultMap<>(new LinkedHashMap<>(), new DefaultMap.Extension<MJNode, Integer>() {
 
             @Override
             public void handleValueUpdate(DefaultMap<MJNode, Integer> map, MJNode key, Integer value) {
                 if (!map.get(key).equals(value)){
+                    if (!(nodeValueMap.get(key) instanceof AppendOnlyValue)){
+                        nodeVersionWOAppendValuedUpdateCount++;
+                    }
                     nodeVersionUpdateCount++;
                 }
             }
@@ -364,7 +372,11 @@ public class Context {
             return getVariableValue(((ParameterAccessNode) node).definition);
         } else if (node instanceof VariableAccessNode){
             if (((VariableAccessNode) node).definingExpression != null) {
-                return nodeValue(((VariableAccessNode) node).definingExpression);
+                Value val = nodeValue(((VariableAccessNode) node).definingExpression);
+                if (((VariableAccessNode) node).definition.hasAppendValue){
+                    return val.asAppendOnly();
+                }
+                return val;
             }
             //return getVariableValue(((VariableAccessNode) node).definition);
         } else if (node instanceof WrapperNode){
@@ -814,6 +826,11 @@ public class Context {
     public long getNodeVersionUpdateCount(){
         return nodeValueState.nodeVersionUpdateCount;
     }
+
+    public long getNodeVersionWOAppendValuedUpdateCount(){
+        return nodeValueState.nodeVersionWOAppendValuedUpdateCount;
+    }
+
 
     /*-------------------------- methods -------------------------------*/
 

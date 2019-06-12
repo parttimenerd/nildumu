@@ -1150,6 +1150,24 @@ public class Parser implements Serializable {
         public String toPrettyString(String indent, String incr) {
             return indent + String.format("int %s[%s](%s){\n%s\n}\n", name, globals, parameters, body.toPrettyString(indent + incr, incr));
         }
+
+        /**
+         * Returns the variables that are defined in this statement
+         */
+        public Set<String> getDefinedVariables(){
+            Set<String> set = new HashSet<>(body.getDefinedVariables());
+            parameters.parameterNodes.forEach(p -> set.add(p.name));
+            return set;
+        }
+
+        /**
+         * DefinedVariables[this] \ DefinedVariables[inner]
+         */
+        public Set<String> getVariablesDefinedOutside(StatementNode inner){
+            Set<String> set = new HashSet<>(getDefinedVariables());
+            set.removeAll(inner.getDefinedVariables());
+            return set;
+        }
     }
 
     /**
@@ -1353,6 +1371,22 @@ public class Parser implements Serializable {
         public Operator getOperator() {
             throw new UnsupportedOperationException();
         }
+
+        /**
+         * Returns the variables that are defined in this statement
+         */
+        public Set<String> getDefinedVariables(){
+            return Collections.emptySet();
+        }
+
+        /**
+         * DefinedVariables[this] \ DefinedVariables[inner]
+         */
+        public Set<String> getVariablesDefinedOutside(StatementNode inner){
+            Set<String> set = new HashSet<>(getDefinedVariables());
+            set.removeAll(inner.getDefinedVariables());
+            return set;
+        }
     }
 
     /**
@@ -1361,6 +1395,7 @@ public class Parser implements Serializable {
     public static class BlockNode extends StatementNode {
         public final List<StatementNode> statementNodes;
         private ConditionalStatementNode lastCondStatement = null;
+        private Set<String> definedVariables;
 
         public BlockNode(Location location, List<StatementNode> statementNodes) {
             this(location, statementNodes, true);
@@ -1381,6 +1416,7 @@ public class Parser implements Serializable {
                     }
                 }
             }
+            definedVariables = statementNodes.stream().flatMap(s -> s.getDefinedVariables().stream()).collect(Collectors.toSet());
         }
 
         public void add(StatementNode statementNode){
@@ -1392,6 +1428,7 @@ public class Parser implements Serializable {
             if (statementNode instanceof ConditionalStatementNode){
                 lastCondStatement = (ConditionalStatementNode)statementNode;
             }
+            definedVariables.addAll(statementNode.getDefinedVariables());
         }
 
         public void addAll(Collection<StatementNode> statementNodes){
@@ -1470,10 +1507,12 @@ public class Parser implements Serializable {
 
         public void prependVariableDeclaration(String variable, boolean hasAppendValue){
             statementNodes.add(0, new VariableDeclarationNode(location, variable, null, hasAppendValue));
+            definedVariables.add(variable);
         }
 
         public void addAll(int i, List<StatementNode> statements) {
             statementNodes.addAll(i, statements);
+            definedVariables.addAll(statements.stream().flatMap(s -> s.getDefinedVariables().stream()).collect(Collectors.toSet()));
             lastCondStatement = null;
             for (StatementNode statement : statements) {
                 if (statements instanceof ConditionalStatementNode){
@@ -1487,6 +1526,11 @@ public class Parser implements Serializable {
 
         public void add(int i, VariableDeclarationNode variableDeclarationNode) {
             addAll(i, Collections.singletonList(variableDeclarationNode));
+        }
+
+        @Override
+        public Set<String> getDefinedVariables() {
+            return definedVariables;
         }
     }
 
@@ -1570,6 +1614,11 @@ public class Parser implements Serializable {
         @Override
         public String toPrettyString(String indent, String incr) {
             return indent + toString();
+        }
+
+        @Override
+        public Set<String> getDefinedVariables() {
+            return Collections.singleton(variable);
         }
     }
 
@@ -1754,6 +1803,11 @@ public class Parser implements Serializable {
         public String toPrettyString(String indent, String incr) {
             return indent + toString();
         }
+
+        @Override
+        public Set<String> getDefinedVariables() {
+            return Collections.emptySet();
+        }
     }
 
     /**
@@ -1798,6 +1852,11 @@ public class Parser implements Serializable {
         @Override
         public String toPrettyString(String indent, String incr) {
             return indent;
+        }
+
+        @Override
+        public Set<String> getDefinedVariables() {
+            return Collections.emptySet();
         }
     }
 
@@ -1877,6 +1936,11 @@ public class Parser implements Serializable {
 
         public void addPreCondVarAss(List<VariableAssignmentNode> asList) {
             preCondVarAss.addAll(asList);
+        }
+
+        @Override
+        public Set<String> getDefinedVariables() {
+            return Stream.concat(preCondVarAss.stream().map(a -> a.variable), body.getDefinedVariables().stream()).collect(Collectors.toSet());
         }
     }
 
@@ -1991,6 +2055,13 @@ public class Parser implements Serializable {
         @Override
         public <R> R accept(StatementVisitor<R> visitor) {
             return visitor.visit(this);
+        }
+
+        @Override
+        public Set<String> getDefinedVariables() {
+            Set<String> set = new HashSet<>(ifBlock.getDefinedVariables());
+            set.addAll(elseBlock.getDefinedVariables());
+            return set;
         }
 
         @Override

@@ -500,7 +500,7 @@ public class Lattices {
             if (a != b && a.isConstant() && b.isConstant()){
                 return U;
             }
-            if ((lowerEqualsThan(a, U) || lowerEqualsThan(b, U)) && (a.isE() || b.isE())){
+            if ((lowerEqualsThan(a, U) || lowerEqualsThan(b, U)) && (a.isE() || b.isE()) && Math.max(a.level, b.level) <= N.level){
                 return N;
             }
             return lowerEqualsThan(a, b) ? b : a;
@@ -834,6 +834,29 @@ public class Lattices {
                 }
                 alreadyVisitedBits.add(cur);
             }
+        }
+
+        /**
+         * Doesn't look into the interdependencies of the end bits
+         */
+        public Set<Bit> reachableBits(Collection<Bit> startBits, Set<Bit> endBits){
+            Set<Bit> reachable = new HashSet<>();
+            Set<Bit> alreadyVisitedBits = new HashSet<>();
+            Stack<Bit> bitsToVisit = new Stack<>();
+            bitsToVisit.addAll(startBits);
+            while (!bitsToVisit.isEmpty()){
+                Bit cur = bitsToVisit.pop();
+                if (endBits.contains(cur)){
+                    reachable.add(cur);
+                    continue;
+                }
+                if (alreadyVisitedBits.contains(cur)){
+                    continue;
+                }
+                bitsToVisit.addAll(cur.deps);
+                alreadyVisitedBits.add(cur);
+            }
+            return reachable;
         }
 
         public void walkBits(Bit startBit, Consumer<Bit> consumer, Predicate<Bit> ignoreBit, Set<Bit> alreadyVisitedBits, Function<Bit, Collection<Bit>> next){
@@ -1432,6 +1455,10 @@ public class Lattices {
         public boolean bitValEquals(Value other) {
             return vl.mapBits(this, other, (a, b) -> a.val() == b.val()).stream().allMatch(Boolean::booleanValue);
         }
+
+        public boolean endsWithStar(){
+            return get(size()).val == S;
+        }
     }
 
     /**
@@ -1439,11 +1466,8 @@ public class Lattices {
      */
     static class AppendOnlyValue extends Value {
 
-        private final int sizeWithoutEs;
-
         public AppendOnlyValue(Bit... bits) {
             super(Arrays.stream(bits).map(b -> b.val == X ? bl.create(E) : b).toArray(Bit[]::new));
-            this.sizeWithoutEs = (int)Stream.of(bits).filter(b -> b.val != E).count();
         }
 
         @Override
@@ -1500,8 +1524,19 @@ public class Lattices {
             return new AppendOnlyValue(other.bits.subList(sizeWithoutEs(), other.sizeWithoutEs()).toArray(new Bit[0]));
         }
 
+        @Override
+        public void add(Bit bit) {
+            super.add(bit);
+        }
+
         int sizeWithoutEs(){
-            return sizeWithoutEs;
+            // TODO: improve
+            return (int) bits.stream().filter(b -> b.val != E).count();
+        }
+
+        @Override
+        public AppendOnlyValue clone(){
+            return new AppendOnlyValue(bits.toArray(new Bit[0]));
         }
     }
 }

@@ -38,7 +38,7 @@ public class GenericState {
 
     @Override
     public String toString() {
-        return map.entrySet().stream().map(e -> String.format("%s => %s",e.getKey(), e.getValue().repr())).collect(Collectors.joining("\n"));
+        return map.entrySet().stream().map(e -> String.format("%s => %s", e.getKey(), e.getValue().repr())).collect(Collectors.joining("\n"));
     }
 
     public Set<String> variableNames(){
@@ -48,4 +48,5 @@ public class GenericState {
     public boolean has(String variable){
         return map.containsKey(variable);
     }
+
 }

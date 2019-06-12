@@ -2,6 +2,7 @@ package nildumu;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import nildumu.util.DefaultMap;
 import swp.util.Pair;
@@ -63,7 +64,16 @@ public class Processor {
 
             final Stack<Long> nodeValueUpdatesAtCondition = new Stack<>();
 
+            final Map<WhileStatementNode, MethodInvocationHandler.SummaryHandler.HistoryEntry> historyPerWhile = new HashMap<>();
+
             final Map<MJNode, Long> lastUpdateCounts = new DefaultMap<>(new HashMap<>(), new DefaultMap.Extension<MJNode, Long>() {
+                @Override
+                public Long defaultValue(Map<MJNode, Long> map, MJNode key) {
+                    return 0l;
+                }
+            });
+
+            final Map<MJNode, Long> lastUpdateWOAppendValuedCounts = new DefaultMap<>(new HashMap<>(), new DefaultMap.Extension<MJNode, Long>() {
                 @Override
                 public Long defaultValue(Map<MJNode, Long> map, MJNode key) {
                     return 0l;
@@ -140,12 +150,12 @@ public class Processor {
                     Context.Branch branch = branchOfBlock.get(block);
                     context.pushBranch(branch);
                     context.initModsForBranch(branch);
-                    nodeValueUpdatesAtCondition.push(context.getNodeVersionUpdateCount());
+                    nodeValueUpdatesAtCondition.push(context.getNodeVersionWOAppendValuedUpdateCount());
                 }
-                if (lastUpdateCounts.get(block) == context.getNodeVersionUpdateCount()) {
+                if (lastUpdateCounts.get(block) == context.getNodeVersionWOAppendValuedUpdateCount()) {
                     return false;
                 }
-                lastUpdateCounts.put(block, context.getNodeVersionUpdateCount());
+                lastUpdateCounts.put(block, context.getNodeVersionWOAppendValuedUpdateCount());
                 return true;
             }
 
@@ -154,6 +164,7 @@ public class Processor {
                 if (!context.inLoopMode()){
                     throw new NildumuError("while-statements are only supported in modes starting at loop mode");
                 }
+                System.out.println("###########" + context.getNodeVersionUpdateCount() + "  " + context.getNodeVersionWOAppendValuedUpdateCount());
                 Value cond = context.nodeValue(whileStatement.conditionalExpression);
                 Bit condBit = cond.get(1);
                 Lattices.B condVal = condBit.val();
@@ -166,26 +177,82 @@ public class Processor {
                 } else {
                     statementNodesToOmitOneTime.add(whileStatement.body);
                 }
+                MethodInvocationHandler.SummaryHandler.HistoryEntry newHist = createHistoryEntryForWhileStmt(whileStatement);
+                MethodInvocationHandler.SummaryHandler.ReduceResult<Map<String, AppendOnlyValue>> reduceResult = reduceAppendOnlyVariables(newHist);
+
+                // assumes that the first argument of the phi is the inner loop end SSA variable
+                whileStatement.getPreCondVarAss().stream()
+                        .filter(a -> a.definition.hasAppendValue)
+                        .forEach(a -> Stream.of(a.definition, ((PhiNode)a.expression).joinedVariables.get(0).definition)
+                                            .forEach(v -> context.setVariableValue(v, reduceResult.value.get(a.definition.name))));
+
+                historyPerWhile.put(whileStatement, MethodInvocationHandler.SummaryHandler.HistoryEntry.create(reduceResult.value, newHist.prev, newHist));
                 if (lastUpdateCounts.get(whileStatement) == context.getNodeVersionUpdateCount()) {
-                    return false;
+                    return false; // that is the common case without prints
                 } else {
-                    nodeValueUpdatesAtCondition.push(context.getNodeVersionUpdateCount());
+                    if (lastUpdateWOAppendValuedCounts.get(whileStatement) == context.getNodeVersionWOAppendValuedUpdateCount()){
+                        // this is the case if nothing else changes, except the append only variables
+                        // basic idea: just create a star as for summary graphs
+                        // TODO improve
+
+                        return false;
+                    }
+                    nodeValueUpdatesAtCondition.push(context.getNodeVersionWOAppendValuedUpdateCount());
                     lastUpdateCounts.put(whileStatement, context.getNodeVersionUpdateCount());
+                    lastUpdateWOAppendValuedCounts.put(whileStatement, context.getNodeVersionWOAppendValuedUpdateCount());
                     return true;
                 }
             }
 
+            private MethodInvocationHandler.SummaryHandler.HistoryEntry createHistoryEntryForWhileStmt(WhileStatementNode whileStatement){
+                Set<String> outerVars = node.accept(new NodeVisitor<Set<String>>() {
+                    @Override
+                    public Set<String> visit(MJNode node) {
+                        return null;
+                    }
+
+                    @Override
+                    public Set<String> visit(MethodNode method) {
+                        return method.getVariablesDefinedOutside(whileStatement);
+                    }
+
+                    @Override
+                    public Set<String> visit(BlockNode block) {
+                        return block.getVariablesDefinedOutside(whileStatement);
+                    }
+
+                    @Override
+                    public Set<String> visit(ProgramNode program) {
+                        return visit(program.globalBlock);
+                    }
+                });
+                Set<Bit> outsideBits = outerVars.stream()
+                        .flatMap(v -> context.getVariableValue(v).stream()).collect(Collectors.toSet());
+                return MethodInvocationHandler.SummaryHandler.HistoryEntry.create(whileStatement.getPreCondVarAss().stream()
+                                .filter(a -> a.definition.hasAppendValue)
+                                .collect(Collectors.toMap(a -> a.variable, a -> context.getVariableValue(a.variable).asAppendOnly())),
+                        historyPerWhile.containsKey(whileStatement) ? Optional.of(historyPerWhile.get(whileStatement)) : Optional.empty(),
+                        v -> bl.reachableBits(v.bits, outsideBits));
+            }
+
+            private MethodInvocationHandler.SummaryHandler.ReduceResult<Map<String, AppendOnlyValue>>
+                reduceAppendOnlyVariables(MethodInvocationHandler.SummaryHandler.HistoryEntry history) {
+                return MethodInvocationHandler.SummaryHandler.ReduceResult.create(
+                                history.map.keySet().stream().collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly())));
+            }
+
+
             @Override
             public Boolean visit(IfStatementEndNode ifEndStatement) {
                 context.popBranch();
-                return nodeValueUpdatesAtCondition.pop() != context.getNodeVersionUpdateCount();
+                return nodeValueUpdatesAtCondition.pop() != context.getNodeVersionWOAppendValuedUpdateCount();
             }
 
             @Override
             public Boolean visit(WhileStatementEndNode whileEndStatement) {
                 unfinishedLoopIterations--;
                 context.popBranch();
-                return nodeValueUpdatesAtCondition.pop() != context.getNodeVersionUpdateCount();
+                return nodeValueUpdatesAtCondition.pop() != context.getNodeVersionWOAppendValuedUpdateCount();
             }
 
             @Override

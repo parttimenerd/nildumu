@@ -172,6 +172,11 @@ public class ContextMatcher {
             builder.add(() -> assertEquals(val, value.get(i).val(), String.format("The %dth bit of %s should have the bit val %s", i, value, val)));
             return this;
         }
+
+        public ValueMatcher lastBit(Lattices.B val){
+            builder.add(() -> assertEquals(val, value.get(value.size()).val(), String.format("The last bit of %s should have the bit val %s", value, val)));
+            return this;
+        }
     }
 
     public void run(){

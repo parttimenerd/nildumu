@@ -121,7 +121,7 @@ public interface Operator {
             checkArguments(arguments);
             currentNode = node;
             if (arguments.get(0) instanceof AppendOnlyValue || arguments.get(1) instanceof AppendOnlyValue){
-                return compute(c, arguments.get(0).asAppendOnly(), arguments.get(1).asAppendOnly());
+                return compute(c, arguments.get(0).asAppendOnly(), arguments.get(1).asAppendOnly()).asAppendOnly();
             }
             return compute(c, arguments.get(0), arguments.get(1));
         }
