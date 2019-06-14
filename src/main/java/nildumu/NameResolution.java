@@ -180,4 +180,28 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
                     symbolTable.lookup(e.getValue().second))));
         return null;
     }
+
+    @Override
+    public Object visit(WhileStatementNode whileStatement) {
+        whileStatement.getPreCondVarAss().forEach(this::visit);
+        whileStatement.conditionalExpression.accept(this);
+        visitChildrenDiscardReturn(whileStatement.body);
+        return null;
+    }
+
+    @Override
+    public Object visit(IfStatementNode ifStatement) {
+        ifStatement.conditionalExpression.accept(this);
+        ifStatement.ifBlock.accept(this);
+        ifStatement.elseBlock.accept(this);
+        return null;
+    }
+
+    @Override
+    public Object visit(PhiNode phi) {
+        phi.controlDeps.forEach(e -> e.accept(this));
+        phi.joinedVariables.forEach(e -> e.accept(this));
+        visit((ExpressionNode)phi);
+        return null;
+    }
 }

@@ -266,10 +266,10 @@ public class Checks {
             }
 
             void check(ExpressionNode expression){
-                if (!validExpressions.contains(expression)
+                if (expression == null || (!validExpressions.contains(expression)
                 && (curMethod == null || !(expression instanceof VariableAccessNode) ||
                         !curMethod.parameters.parameterNodes.stream()
-                                .anyMatch(p -> p.definition == ((VariableAccessNode) expression).definition))){
+                                .anyMatch(p -> p.definition == ((VariableAccessNode) expression).definition)))){
                     error("Not evaluated expression %s", expression);
                 }
             }
@@ -279,7 +279,9 @@ public class Checks {
                 return process(assignment, () -> {
                     visitChildrenDiscardReturn(assignment);
                     check(assignment.definition);
-                    check(assignment.expression);
+                    if (!(assignment instanceof VariableDeclarationNode)) {
+                        check(assignment.expression);
+                    }
                 });
             }
 
@@ -294,7 +296,7 @@ public class Checks {
                     phi.controlDeps.forEach(this::check);
                     phi.joinedVariables.forEach(v -> {
                         check(v.definition);
-                        check(v.definingExpression);
+                        //check(v.definingExpression);
                     });
                     check(phi.controlDepStatement.conditionalExpression);
                 });

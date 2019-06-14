@@ -51,6 +51,11 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     private Stack<Map<String, String>> newVariables;
 
     /**
+     * Defined variables
+     */
+    private Stack<Set<String>> definedVariables;
+
+    /**
      * Maps newly introduced variables to their origins
      */
     private Map<String, String> reverseMapping;
@@ -78,6 +83,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         versionCount = new HashMap<>();
         directPredecessor = new HashMap<>();
         newVariables = new Stack<>();
+        definedVariables = new Stack<>();
         this.currentMethod = Optional.ofNullable(method);
         this.introducedVariables = new ArrayList<>();
         appendOnlyVariables = new HashSet<>();
@@ -89,12 +95,19 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         return introducedVariables;
     }
 
+    public List<String> resolveGlobalBlock(BlockNode node){
+        visit(node, true);
+        return introducedVariables;
+    }
+
     void pushNewVariablesScope(){
         newVariables.push(new HashMap<>());
+        definedVariables.push(new HashSet<>());
     }
 
     void popNewVariablesScope(){
         newVariables.pop();
+        definedVariables.pop();
     }
 
     @Override
@@ -115,11 +128,13 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     public VisRet visit(AppendOnlyVariableDeclarationNode appendDecl) {
         appendOnlyVariables.add(appendDecl.variable);
         appendValueVariables.add(appendDecl.variable);
+        definedVariables.peek().add(appendDecl.variable);
         return new VisRet(true, appendDecl, new VariableAssignmentNode(appendDecl.location, create(appendDecl.variable, true), new IntegerLiteralNode(appendDecl.location, new Lattices.AppendOnlyValue().createEmpty())));
     }
 
     @Override
     public VisRet visit(VariableDeclarationNode declaration) {
+        definedVariables.peek().add(declaration.variable);
         return visit((MJNode)declaration);
     }
 
@@ -138,6 +153,10 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     @Override
     public VisRet visit(BlockNode block) {
+        return visit(block, false);
+    }
+
+    public VisRet visit(BlockNode block, boolean assignGlobalVariables) {
         List<StatementNode> blockPartNodes = new ArrayList<>();
         for (StatementNode child : block.statementNodes){
             VisRet ret = child.accept(this);
@@ -149,6 +168,22 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         }
         block.statementNodes.clear();
         block.addAll(blockPartNodes);
+        if (assignGlobalVariables){
+            this.assignAppendOnlyVariables(block);
+        }
+        Map<String, String> filtered = new HashMap<>();
+        newVariables.peek().forEach((o, n) -> {
+            if (definedVariables.peek().contains(o)){
+                block.prependVariableDeclaration(n, appendValueVariables.contains(o));
+                reverseMapping.remove(n);
+                directPredecessor.remove(n);
+                introducedVariables.remove(n);
+            } else {
+                filtered.put(o, n);
+            }
+        });
+        newVariables.pop();
+        newVariables.push(filtered);
         return VisRet.DEFAULT;
     }
 
@@ -237,9 +272,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     public static void process(ProgramNode program){
         SSAResolution2 resolution = new SSAResolution2(null);
         resolution.pushNewVariablesScope();
-        resolution.resolve(program.globalBlock)
+        resolution.resolveGlobalBlock(program.globalBlock)
                 .forEach(v -> program.globalBlock.prependVariableDeclaration(v, resolution.appendValueVariables.contains(v)));
-        resolution.assignAppendOnlyVariables(program.globalBlock);
         program.methods().forEach(m -> SSAResolution2.process(resolution, m));
     }
 

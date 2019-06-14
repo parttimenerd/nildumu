@@ -568,6 +568,7 @@ public class Parser implements Serializable {
         Lattices.Bit.resetNumberOfCreatedBits();
         Parser.ProgramNode programNode = (Parser.ProgramNode) generator.parse(input);
         SSAResolution2.process(programNode);
+        System.out.println(programNode.toPrettyString());
         Parser.ProgramNode resolvedProgram = (Parser.ProgramNode)Parser.generator.parse(programNode.toPrettyString());
         new NameResolution(resolvedProgram).resolve();
         //checkAndThrow(resolvedProgram);

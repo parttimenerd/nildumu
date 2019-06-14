@@ -168,6 +168,15 @@ public class BasicTests {
         Parser.generator.parse(program);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "while (1) {int a; a = a + 1;}",
+            "int a; while (1) {int a; a = a + 1;}"
+    })
+    public void testNameResolution(String program){
+        Parser.generator.parse(program);
+    }
+
     public ContextMatcher parse(String program){
         return new ContextMatcher(process(program));
     }
