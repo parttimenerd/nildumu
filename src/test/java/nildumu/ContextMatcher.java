@@ -124,6 +124,13 @@ public class ContextMatcher {
         return leakage(l -> l.leaks(context.sl.bot(), leakage));
     }
 
+    /**
+     * Supports "inf"
+     */
+    public ContextMatcher leaks(String leakage){
+        return leakage(l -> l.leaks(context.sl.bot(), leakage.equals("inf") ? Context.INFTY : Double.parseDouble(leakage)));
+    }
+
     public ContextMatcher leaksAtLeast(int leakage){
         return leakage(l -> l.leaksAtLeast(context.sl.bot(), leakage));
     }

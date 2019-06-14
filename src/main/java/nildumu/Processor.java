@@ -119,6 +119,13 @@ public class Processor {
             }
 
             @Override
+            public Boolean visit(TmpInputVariableDeclarationNode inputDecl) {
+                visit((VariableAssignmentNode)inputDecl);
+                context.addInputValue(context.sl.parse(inputDecl.secLevel), ((IntegerLiteralNode)inputDecl.expression).value);
+                return false;
+            }
+
+            @Override
             public Boolean visit(IfStatementNode ifStatement) {
                 Value cond = context.nodeValue(ifStatement.conditionalExpression);
                 Bit condBit = cond.get(1);

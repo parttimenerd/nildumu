@@ -1,7 +1,6 @@
 package nildumu;
 
 import java.io.Serializable;
-import java.sql.Statement;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.*;
@@ -34,6 +33,7 @@ import static nildumu.util.Util.p;
 public class Parser implements Serializable {
 
     static final String L_PRINT_VAR = "__l_print";
+    static final String H_INPUT_VAR = "__h_input";
 
     /**
      * The terminals with the matching regular expression
@@ -44,6 +44,7 @@ public class Parser implements Serializable {
         WS("[\\s\\t]"),
         LBRK("[\\r\\n][\\r\\n]+"),
         INPUT("input"),
+        TMP_INPUT("tmp_input"),
         OUTPUT("output"),
         APPEND_ONLY("append_only"),
         INT("[a]?int"),
@@ -57,6 +58,7 @@ public class Parser implements Serializable {
         VOID("void"),
         USE_SEC("use_sec"),
         BIT_WIDTH("bit_width"),
+        INPUT_PRINTS("input_prints"),
         PHI("phi"),
         TILDE("~"),
 
@@ -133,15 +135,18 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8l97fff45ff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8ldd9r57fff45fff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
-                builder.addRule("program", "use_sec? bit_width? lines", asts -> {
+                Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
+                Util.Box<Boolean> inputPrints = new Util.Box<>(false);
+                builder.addRule("program", "use_sec? bit_width? input_prints? lines", asts -> {
                             SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>)asts.get(0)).get(0).wrapped;
                             int declaredBitWidth = asts.get(1).children().isEmpty() ? -1 : ((ListAST<WrapperNode<Integer>>)asts.get(1)).get(0).wrapped;
                             /*
                              * Calc bit width
                              */
-                            int lowerBitWidthBound = asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
+                            List<MJNode> topLevelNodes = asts.get(3).<WrapperNode<List<MJNode>>>as().wrapped;
+                            int lowerBitWidthBound = topLevelNodes.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
 
                                 @Override
                                 public Integer visit(MJNode node) {
@@ -196,8 +201,8 @@ public class Parser implements Serializable {
                                     return null;
                                 }
                             };
-                            asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped.forEach(n -> n.accept(visitor));
-                            if (asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
+                            topLevelNodes.forEach(n -> n.accept(visitor));
+                            switch (topLevelNodes.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
 
                                 @Override
                                 public Integer visit(MJNode node) {
@@ -206,25 +211,51 @@ public class Parser implements Serializable {
 
                                 @Override
                                 public Integer visit(VariableAssignmentNode assignment) {
-                                    return assignment.variable.equals(L_PRINT_VAR) ? 1 : 0;
+                                    switch (assignment.variable){
+                                        case H_INPUT_VAR:
+                                            return 2;
+                                        case L_PRINT_VAR:
+                                            return 1;
+                                        default:
+                                            return 0;
+                                    }
                                 }
 
                                 @Override
                                 public Integer visit(VariableDeclarationNode variableDeclaration) {
-                                    return variableDeclaration.variable.equals(L_PRINT_VAR) ? 2 : 0;
+                                    switch (variableDeclaration.variable){
+                                        case H_INPUT_VAR:
+                                            return 3;
+                                        case L_PRINT_VAR:
+                                            return 4;
+                                        default:
+                                            return 0;
+                                    }
                                 }
-                            })).max().orElse(0) == 1){
-                                node.globalBlock.add(0,
-                                        new AppendOnlyVariableDeclarationNode(new Location(0, 0), L_PRINT_VAR, secLattice.bot().toString()));
-                                node.context.addAppendOnlyVariable(secLattice.bot(), L_PRINT_VAR);
+                            })).max().orElse(0)){
+                                case 2:
+                                    node.globalBlock.add(0,
+                                            new AppendOnlyVariableDeclarationNode(new Location(0, 0), H_INPUT_VAR, secLattice.top().toString()));
+                                    node.context.addAppendOnlyVariable(secLattice.top(), H_INPUT_VAR);
+                                case 1:
+                                    node.globalBlock.add(0,
+                                            new AppendOnlyVariableDeclarationNode(new Location(0, 0), L_PRINT_VAR, secLattice.bot().toString()));
+                                    node.context.addAppendOnlyVariable(secLattice.bot(), L_PRINT_VAR);
                             }
+                            inputPrints.val = false;
+                            statedBitWidth.val = 2;
                             return node;
                         })
                         .addRule("use_sec", "USE_SEC IDENT SEMICOLON", asts -> {
                             return new WrapperNode<>(asts.getStartLocation(), SecurityLattice.forName(asts.get(1).getMatchedString()));
                         })
                         .addRule("bit_width", "BIT_WIDTH INTEGER_LITERAL SEMICOLON", asts -> {
-                            return new WrapperNode<>(asts.getStartLocation(), Integer.parseInt(asts.get(1).getMatchedString()));
+                            statedBitWidth.val = Integer.parseInt(asts.get(1).getMatchedString());
+                            return new WrapperNode<>(asts.getStartLocation(), statedBitWidth.val);
+                        })
+                        .addRule("input_prints", "INPUT_PRINTS SEMICOLON", asts -> {
+                            inputPrints.val = true;
+                            return asts;
                         })
                         .addRule("lines", "line_w_semi lines", asts -> {
                             WrapperNode<List<MJNode>> left = (WrapperNode<List<MJNode>>) asts.get(1);
@@ -262,11 +293,25 @@ public class Parser implements Serializable {
                                     (IntegerLiteralNode)asts.get(5),
                                     asts.get(0).getMatchedString());
                         })
+                        .addRule("tmp_input_decl_statement", "IDENT TMP_INPUT INT IDENT EQUAL_SIGN input_literal", asts -> {
+                            return new TmpInputVariableDeclarationNode(
+                                    asts.getStartLocation(),
+                                    asts.get(3).getMatchedString(),
+                                    (IntegerLiteralNode)asts.get(5),
+                                    asts.get(0).getMatchedString());
+                        })
                         .addRule("append_decl_statement", "IDENT APPEND_ONLY INT IDENT", asts -> {
                             return new AppendOnlyVariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(3).getMatchedString(),
                                     asts.get(0).getMatchedString());
+                        })
+                        .addRule("append_decl_statement", "IDENT APPEND_ONLY INPUT INT IDENT", asts -> {
+                            return new AppendOnlyVariableDeclarationNode(
+                                    asts.getStartLocation(),
+                                    asts.get(4).getMatchedString(),
+                                    asts.get(0).getMatchedString(),
+                                    true);
                         })
                         .addRule("method", "INT IDENT LPAREN parameters RPAREN method_body", asts -> {
                             return new MethodNode(asts.get(0).getMatchedTokens().get(0).location,
@@ -334,6 +379,8 @@ public class Parser implements Serializable {
                         .addRule("block_statement_w_semi", "if_statement")
                         .addRule("block_statement_w_semi", "expression_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "print_statement SEMICOLON", asts -> asts.get(0))
+                        .addRule("block_statement_w_semi", "input_statement SEMICOLON", asts -> asts.get(0))
+                        .addRule("block_statement_w_semi", "tmp_input_decl_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement", "statement", asts -> asts.get(0))
                         .addRule("block_statement", "var_decl", asts -> asts.get(0))
                         .addRule("block_statement", "local_variable_assignment_statement", asts -> asts.get(0))
@@ -341,6 +388,8 @@ public class Parser implements Serializable {
                         .addRule("block_statement", "if_statement")
                         .addRule("block_statement", "expression_statement")
                         .addRule("block_statement", "print_statement", asts -> asts.get(0))
+                        .addRule("block_statement", "input_statement")
+                        .addRule("block_statement", "tmp_input_decl_statement")
                         .addRule("var_decl", "INT IDENT", asts -> {
                             return new VariableDeclarationNode(
                                     asts.getStartLocation(),
@@ -415,6 +464,25 @@ public class Parser implements Serializable {
                                             new VariableAccessNode(loc, L_PRINT_VAR),
                                             new IntegerLiteralNode(loc, vl.parse(0)),
                                             APPEND));
+                        })
+                        .addRule("input_statement", "IDENT EQUAL_SIGN INPUT LPAREN RPAREN", asts -> {
+                            Location loc = asts.getStartLocation();
+                            String var = "__tmp__" + loc.column + "_" + loc.line;
+                            BlockNode block = new BlockNode(loc, new ArrayList<>(Arrays.asList(
+                                    new TmpInputVariableDeclarationNode(loc, var,
+                                            new IntegerLiteralNode(loc, IntStream.range(0, statedBitWidth.val).mapToObj(i -> bl.create(Lattices.B.U)).collect(Lattices.Value.collector())),
+                                            "h"),
+                                    new VariableAssignmentNode(loc, H_INPUT_VAR, new BinaryOperatorNode(new VariableAccessNode(loc, H_INPUT_VAR), new VariableAccessNode(loc, var), APPEND)),
+                                    new VariableAssignmentNode(loc, asts.get(0).getMatchedString(), new VariableAccessNode(loc, var))
+                                    )));
+                            if (inputPrints.val){
+                                block.add(new VariableAssignmentNode(loc, L_PRINT_VAR,
+                                        new BinaryOperatorNode(
+                                                new VariableAccessNode(loc, L_PRINT_VAR),
+                                                new IntegerLiteralNode(loc, vl.parse(0)),
+                                                APPEND)));
+                            }
+                            return block;
                         })
                         .addOperators("expression", "postfix_expression", operators -> {
                             operators.defaultBinaryAction((asts, op) -> {
@@ -493,7 +561,9 @@ public class Parser implements Serializable {
                         .addRule("primary_expression", "FALSE", asts -> new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(0)))
                         .addRule("primary_expression", "TRUE", asts -> new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(1)))
                         .addRule("primary_expression", "INTEGER_LITERAL", asts -> {
-                            return new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(asts.getMatchedString()));
+                            Value val = ValueLattice.get().parse(asts.getMatchedString());
+                            statedBitWidth.val = Math.max(statedBitWidth.val, val.size());
+                            return new IntegerLiteralNode(asts.getStartLocation(), val);
                         })
                         .addRule("primary_expression", "var_access")
                         .addRule("var_access", "IDENT", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
@@ -504,7 +574,9 @@ public class Parser implements Serializable {
                             /*List<Bit> rev = asts.get(0).<ListAST<?>>as().stream().map(s -> new Bit(B.U.parse(s.getMatchedString().substring(1)))).collect(Collectors.toList());
                             Collections.reverse(rev);
                             return new IntegerLiteralNode(new Value(rev));*/
-                            return new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(asts.getMatchedString()));
+                            Value val = ValueLattice.get().parse(asts.getMatchedString());
+                            statedBitWidth.val = Math.max(statedBitWidth.val, val.size());
+                            return new IntegerLiteralNode(asts.getStartLocation(), val);
                         })
                         .addRule("globals", "", asts -> new GlobalVariablesNode(new Location(0, 0), new HashMap<>()))
                         .addRule("globals", "LBRACKET globals_ RBRACKET", asts -> asts.get(1))
@@ -640,6 +712,10 @@ public class Parser implements Serializable {
             return visit((VariableDeclarationNode) inputDecl);
         }
 
+        default R visit(TmpInputVariableDeclarationNode inputDecl){
+            return visit((VariableDeclarationNode) inputDecl);
+        }
+
         default R visit(BlockNode block){
             return visit((StatementNode)block);
         }
@@ -750,6 +826,10 @@ public class Parser implements Serializable {
         }
 
         default R visit(InputVariableDeclarationNode inputDecl){
+            return visit((VariableDeclarationNode) inputDecl);
+        }
+
+        default R visit(TmpInputVariableDeclarationNode inputDecl){
             return visit((VariableDeclarationNode) inputDecl);
         }
 
@@ -1664,15 +1744,21 @@ public class Parser implements Serializable {
 
     public static class AppendOnlyVariableDeclarationNode extends VariableDeclarationNode {
         final String secLevel;
+        final boolean isInput;
 
-        public AppendOnlyVariableDeclarationNode(Location location, String name, String secLevel) {
+        public AppendOnlyVariableDeclarationNode(Location location, String name, String secLevel, boolean isInput) {
             super(location, name, null, true);
             this.secLevel = secLevel;
+            this.isInput = isInput;
+        }
+
+        public AppendOnlyVariableDeclarationNode(Location location, String name, String secLevel) {
+            this(location, name, secLevel, false);
         }
 
         @Override
         public String toString() {
-            return String.format("%s append_only %s", secLevel, super.toString());
+            return String.format("%s append_only %s%s", secLevel, isInput ? "input " : "", super.toString());
         }
 
         @Override
@@ -1732,6 +1818,40 @@ public class Parser implements Serializable {
         @Override
         public String toString() {
             return String.format("%s input %s", secLevel, super.toString());
+        }
+    }
+
+    public static class TmpInputVariableDeclarationNode extends VariableDeclarationNode {
+        public final String secLevel;
+
+        public TmpInputVariableDeclarationNode(Location location, String name, IntegerLiteralNode initExpression, String secLevel) {
+            super(location, name, initExpression);
+            this.secLevel = secLevel;
+        }
+
+        @Override
+        public String type() {
+            return "tmp_input_decl";
+        }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R> R accept(StatementVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public String shortType() {
+            return "tdi";
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s tmp_input %s", secLevel, super.toString());
         }
     }
 

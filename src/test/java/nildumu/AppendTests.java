@@ -117,4 +117,62 @@ public class AppendTests {
         }
         matcher.run();
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'bit_width 2; int a; a = input(); print(a)', 2",
+            "'bit_width 2; input_prints; int a; a = input(); print(a)', 2"
+    })
+    public void basicInputTest(String program, double leakage){
+        parse(program).leaks(leakage).run();
+    }
+
+    @Test
+    public void testBasicInputIf(){
+        String program = "bit_width 3; l input int l = 0buuu; int a = 0; if (l == 3){ a = input(); a = a | 0b001 } print(a)";
+        System.out.println(toSSA(program, false));
+        parse(program).leaks(2).run();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'', 0",
+            "'input_prints;', 1"
+    })
+    public void testBasicInputIfAndInputPrints(String insertAfterBitWidth, double leakage){
+        String program = String.format("bit_width 3; %s h input int h = 0buuu; int a = 0; " +
+                "if (h == 3){ a = input(); } ", insertAfterBitWidth);
+        System.out.println(toSSA(program, false));
+        parse(program).leaks(leakage).run();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'int a; a = input(); print(a); a = input(); print(a)', 6",
+            "'int a; a = input(); print(a); int i = 0; while (a != i) { print(i); i = i + 1 }', 3"
+    })
+    public void testMoreComplexInputs(String program, double leakage){
+        String runProgram = "bit_width 3; l input int l = 0buuu; " + program;
+        parse(runProgram).leaks(leakage).run();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'int a = 0; while (l){ a = input(); }', 0",
+            "'int a = 0; while (l){ a = input(); } print(a)', 3"
+    })
+    public void testLoopWithInputs(String program, String leakage){
+        String runProgram = "bit_width 3; l input int l = 0buuu; " + program;
+        parse(runProgram).leaks(leakage).run();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "while (l){ int a; a = input(); print(a) }"
+    })
+    public void testInfiniteLeakage(String program){
+        String runProgram = "bit_width 3; l input int l = 0buuu; " + program;
+        System.out.println(toSSA(runProgram, false));
+        parse(runProgram).leaks("inf").run();
+    }
 }

@@ -3,10 +3,14 @@ package nildumu;
 import java.util.*;
 import java.util.function.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import nildumu.util.DefaultMap;
+import swp.lexer.Location;
 import swp.util.Pair;
 
+import static nildumu.Lattices.bl;
+import static nildumu.Lattices.vl;
 import static nildumu.Parser.*;
 import static nildumu.Parser.LexerTerminal.*;
 import static nildumu.util.Util.p;
@@ -54,7 +58,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
             }
 
             ExpressionNode wrap(ExpressionNode expr){
-                return new BinaryOperatorNode(new SingleUnaryOperatorNode(expr, SELECT_OP, 1), new IntegerLiteralNode(expr.location, Lattices.vl.parse(1)), EQUALS);
+                return new BinaryOperatorNode(new SingleUnaryOperatorNode(expr, SELECT_OP, 1), new IntegerLiteralNode(expr.location, vl.parse(1)), EQUALS);
             }
         });
         replacedMap.put(expression, repl(tmpExpr));
@@ -271,8 +275,15 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     }
 
     @Override
+    public MJNode visit(TmpInputVariableDeclarationNode decl){
+        TmpInputVariableDeclarationNode node = new TmpInputVariableDeclarationNode(decl.location, decl.variable, (IntegerLiteralNode) replace(decl.expression), decl.secLevel);
+        node.definition = decl.definition;
+        return node;
+    }
+
+    @Override
     public MJNode visit(AppendOnlyVariableDeclarationNode decl){
-        AppendOnlyVariableDeclarationNode node = new AppendOnlyVariableDeclarationNode(decl.location, decl.variable, decl.secLevel);
+        AppendOnlyVariableDeclarationNode node = new AppendOnlyVariableDeclarationNode(decl.location, decl.variable, decl.secLevel, decl.isInput);
         node.definition = decl.definition;
         return node;
     }

@@ -1,5 +1,6 @@
 package nildumu.util;
 
+import java.io.Serializable;
 import java.time.temporal.ValueRange;
 import java.util.*;
 import java.util.stream.*;
@@ -38,7 +39,7 @@ public class Util {
     /**
      * Allows to modify values in lambdas
      */
-    public static class Box<T> {
+    public static class Box<T> implements Serializable {
 
         public T val;
 
