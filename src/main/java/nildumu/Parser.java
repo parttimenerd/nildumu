@@ -135,7 +135,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8ldd9r57fff45fff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8ldd9r5g7fff45fff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
                 Util.Box<Boolean> inputPrints = new Util.Box<>(false);
@@ -381,6 +381,7 @@ public class Parser implements Serializable {
                         .addRule("block_statement_w_semi", "print_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "input_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "tmp_input_decl_statement SEMICOLON", asts -> asts.get(0))
+                        .addRule("block_statement_w_semi", "block")
                         .addRule("block_statement", "statement", asts -> asts.get(0))
                         .addRule("block_statement", "var_decl", asts -> asts.get(0))
                         .addRule("block_statement", "local_variable_assignment_statement", asts -> asts.get(0))
@@ -390,6 +391,7 @@ public class Parser implements Serializable {
                         .addRule("block_statement", "print_statement", asts -> asts.get(0))
                         .addRule("block_statement", "input_statement")
                         .addRule("block_statement", "tmp_input_decl_statement")
+                        .addRule("block_statement", "block")
                         .addRule("var_decl", "INT IDENT", asts -> {
                             return new VariableDeclarationNode(
                                     asts.getStartLocation(),
@@ -1162,7 +1164,7 @@ public class Parser implements Serializable {
         public String toPrettyString(String indent, String incr) {
             return String.format("use_sec %s;\nbit_width %d;", context.sl.latticeName(), context.maxBitWidth) + "\n" +
                     methods().stream().map(m -> m.toPrettyString(indent, incr)).collect(Collectors.joining("\n")) +
-                    globalBlock.toPrettyString(indent, incr);
+                    globalBlock.toPrettyString(indent, incr, false);
         }
 
         public Collection<MethodNode> methods(){
@@ -1229,7 +1231,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toPrettyString(String indent, String incr) {
-            return indent + String.format("int %s[%s](%s){\n%s\n}\n", name, globals, parameters, body.toPrettyString(indent + incr, incr));
+            return indent + String.format("int %s[%s](%s){\n%s\n}\n", name, globals, parameters, body.toPrettyString(indent + incr, incr, false));
         }
 
         /**
@@ -1560,16 +1562,20 @@ public class Parser implements Serializable {
 
         @Override
         public String toPrettyString(String indent, String incr) {
+            return toPrettyString(indent, incr, true);
+        }
+
+        public String toPrettyString(String indent, String incr, boolean showCurleyBrackets) {
             Pair<List<VariableDeclarationNode>, List<StatementNode>> partition = splitIntoDeclsAndRest();
-            String res = "";
+            String res = showCurleyBrackets ? (indent + "{\n") : "";
             if (partition.first.size() > 0){
-                res = indent + partition.first.stream().map(s -> s.toPrettyString()).collect(Collectors.joining(" "))
+                res += indent + partition.first.stream().map(s -> s.toPrettyString()).collect(Collectors.joining(" "))
                         + "\n";
             }
             res += partition.second.stream()
-                    .map(s -> s.toPrettyString(indent, incr))
+                    .map(s -> s.toPrettyString(showCurleyBrackets ? (indent + incr) : indent, incr))
                     .filter(s -> s.trim().length() != 0)
-                    .collect(Collectors.joining("\n"));
+                    .collect(Collectors.joining("\n")) + (showCurleyBrackets ? ("\n" + indent + "}") : "");
             return res;
         }
 
