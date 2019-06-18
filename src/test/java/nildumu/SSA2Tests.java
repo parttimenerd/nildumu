@@ -179,6 +179,11 @@ public class SSA2Tests {
         toSSA(program);
     }
 
+    @Test
+    public void testVariableNotDefinedOutsideOfWhile(){
+        toSSA("while (1) {int a = 0; a = a + 1; }");
+    }
+
     public static Parser.ProgramNode toSSA(String program){
         return toSSA(program, true);
     }

@@ -172,7 +172,7 @@ public class AppendTests {
     })
     public void testInfiniteLeakage(String program){
         String runProgram = "bit_width 3; l input int l = 0buuu; " + program;
-        System.out.println(toSSA(runProgram, false));
+        System.out.println(toSSA(runProgram, true));
         parse(runProgram).leaks("inf").run();
     }
 }

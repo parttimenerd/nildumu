@@ -57,6 +57,12 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
          */
         final Set<String> definedVariables = new HashSet<>();
         final Map<String, String> newVariablesLocated = new HashMap<>();
+
+        Map<String, String> getNewWithoutDefined(){
+            return newVariables.entrySet().stream()
+                    .filter(e -> !definedVariables.contains(e.getKey()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        }
     }
 
     /**
@@ -64,7 +70,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
      */
     private final Stack<Scope> scopes;
 
-    private final Stack<Map<String, String>> conditionalNewVars;
+    private final Stack<Scope> conditionalScopes;
 
     /**
      * Maps newly introduced variables to their origins
@@ -101,8 +107,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         this.introducedVariables = new ArrayList<>();
         appendOnlyVariables = new HashSet<>();
         appendValueVariables = new HashSet<>();
-        conditionalNewVars = new Stack<>();
-        conditionalNewVars.push(new HashMap<>());
+        conditionalScopes = new Stack<>();
+        conditionalScopes.push(new Scope());
     }
 
     public List<String> resolve(MJNode node){
@@ -139,6 +145,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     private void defineVariable(String variable){
         scopes.peek().definedVariables.add(variable);
+        conditionalScopes.peek().definedVariables.add(variable);
     }
 
     @Override
@@ -219,19 +226,21 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         visitChildrenDiscardReturn(statement.conditionalExpression);
 
         pushNewVariablesScope();
-        conditionalNewVars.push(new HashMap<>());
+        conditionalScopes.push(new Scope());
         VisRet toAppend = ifBlock.accept(this);
         ifBlock.addAll(0, toAppend.statementsToPrepend);
         ifBlock.addAll(toAppend.statementsToAdd);
-        Map<String, String> ifRedefines = conditionalNewVars.pop();
+        Scope condIfScope = conditionalScopes.pop();
+        Map<String, String> ifRedefines = condIfScope.getNewWithoutDefined();
         popNewVariablesScope();
 
         pushNewVariablesScope();
-        conditionalNewVars.push(new HashMap<>());
+        conditionalScopes.push(new Scope());
         toAppend = elseBlock.accept(this);
         elseBlock.addAll(0, toAppend.statementsToPrepend);
         elseBlock.addAll(toAppend.statementsToAdd);
-        Map<String, String> elseRedefines = conditionalNewVars.pop();
+        Scope condElseScope = conditionalScopes.pop();
+        Map<String, String> elseRedefines = condElseScope.getNewWithoutDefined();
         popNewVariablesScope();
 
         Set<String> redefinedVariables = new HashSet<>();
@@ -413,7 +422,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         reverseMapping.put(newVariable, origin);
         definingScope(origin).newVariablesLocated.put(origin, newVariable);
         scopes.peek().newVariables.put(origin, newVariable);
-        conditionalNewVars.peek().put(origin, newVariable);
+        conditionalScopes.peek().newVariables.put(origin, newVariable);
         introducedVariables.add(newVariable);
         if (hasAppendValue) {
             appendValueVariables.add(newVariable);
