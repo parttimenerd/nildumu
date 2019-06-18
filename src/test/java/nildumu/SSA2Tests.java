@@ -1,5 +1,6 @@
 package nildumu;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -11,6 +12,7 @@ import static nildumu.Checks.checkAndThrow;
 import static nildumu.Parser.generator;
 import static nildumu.Processor.transformPlus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests to check especially the SSA generation
@@ -127,6 +129,11 @@ public class SSA2Tests {
                 "        r = 1;\n" +
                 "     }" +
                 "     int a = r").globalBlock.getLastStatementOrNull().toPrettyString());
+    }
+
+    @Test
+    public void testNestedBlocks(){
+        assertTrue(toSSA("int a = 0; if (1 == 2){ { a = 1}} int b = a").globalBlock.toPrettyString().contains("phi("));
     }
 
    /* @Test

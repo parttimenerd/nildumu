@@ -64,6 +64,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
      */
     private final Stack<Scope> scopes;
 
+    private final Stack<Map<String, String>> conditionalNewVars;
+
     /**
      * Maps newly introduced variables to their origins
      */
@@ -99,6 +101,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         this.introducedVariables = new ArrayList<>();
         appendOnlyVariables = new HashSet<>();
         appendValueVariables = new HashSet<>();
+        conditionalNewVars = new Stack<>();
+        conditionalNewVars.push(new HashMap<>());
     }
 
     public List<String> resolve(MJNode node){
@@ -215,17 +219,20 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         visitChildrenDiscardReturn(statement.conditionalExpression);
 
         pushNewVariablesScope();
-
+        conditionalNewVars.push(new HashMap<>());
         VisRet toAppend = ifBlock.accept(this);
         ifBlock.addAll(0, toAppend.statementsToPrepend);
         ifBlock.addAll(toAppend.statementsToAdd);
-        Map<String, String> ifRedefines = scopes.pop().newVariables;
+        Map<String, String> ifRedefines = conditionalNewVars.pop();
+        popNewVariablesScope();
 
         pushNewVariablesScope();
+        conditionalNewVars.push(new HashMap<>());
         toAppend = elseBlock.accept(this);
         elseBlock.addAll(0, toAppend.statementsToPrepend);
         elseBlock.addAll(toAppend.statementsToAdd);
-        Map<String, String> elseRedefines = scopes.pop().newVariables;
+        Map<String, String> elseRedefines = conditionalNewVars.pop();
+        popNewVariablesScope();
 
         Set<String> redefinedVariables = new HashSet<>();
         redefinedVariables.addAll(ifRedefines.keySet());
@@ -406,6 +413,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         reverseMapping.put(newVariable, origin);
         definingScope(origin).newVariablesLocated.put(origin, newVariable);
         scopes.peek().newVariables.put(origin, newVariable);
+        conditionalNewVars.peek().put(origin, newVariable);
         introducedVariables.add(newVariable);
         if (hasAppendValue) {
             appendValueVariables.add(newVariable);
