@@ -478,15 +478,21 @@ public class Context {
         }
         Value newValue = op(node, args);
         boolean somethingChanged = false;
+        boolean gt = false;
         if (inLoopMode() && !nodeValue(node).isBot()) {
             Value oldValue = nodeValue(node);
-            somethingChanged = !oldValue.valueEquals(newValue) | merge(oldValue, newValue);
-            nodeValue(node, oldValue);
+            somethingChanged = false;
+            if (!oldValue.valueEquals(newValue)){
+                somethingChanged = true;
+                gt = oldValue.valueGreaterEquals(newValue);
+                merge(oldValue, newValue);
+                nodeValue(node, oldValue);
+            }
         } else {
             somethingChanged = nodeValue(node).isBot();
             nodeValue(node, newValue);
         }
-        if (somethingChanged){
+        if (somethingChanged && !gt){
             nodeValueState.nodeVersionMap.put(node, nodeValueState.nodeVersionMap.get(node) + 1);
             nodeValueState.nodeVersionUpdateCount++;
         }

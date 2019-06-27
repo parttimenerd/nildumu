@@ -563,6 +563,18 @@ public class MinCut {
             super(sourceNodes, sinkNodes, weights);
         }
 
+        private double infty(){
+            return Math.max(nonInfWeightSum(sourceNodes), nonInfWeightSum(sinkNodes));
+        }
+
+        private double nonInfWeightSum(Set<Bit> bits){
+            return bits.stream().mapToDouble(weights::apply).filter(w -> w != INFTY).sum();
+        }
+
+        private double weightSum(Set<Bit> bits){
+            return bits.stream().mapToDouble(weights::apply).sum();
+        }
+
         @Override
         public ComputationResult compute() {
             SimpleDirectedWeightedGraph<Vertex, DefaultWeightedEdge> graph =
@@ -571,7 +583,7 @@ public class MinCut {
             Vertex sink = new Vertex(bl.forceCreateXBit(), true);
             graph.addVertex(source);
             graph.addVertex(sink);
-            double infty = Bit.getNumberOfCreatedBits() * 2;
+            double infty = (infty() + Bit.getNumberOfCreatedBits() * 2) * 4;
             Map<Bit, Pair<Vertex, Vertex>> bitToNodes =
                     new DefaultMap<>((map, bit) -> {
                         Vertex start = new Vertex(bit, true);
@@ -597,7 +609,12 @@ public class MinCut {
             PushRelabelMFImpl<Vertex, DefaultWeightedEdge> pp = new PushRelabelMFImpl<Vertex, DefaultWeightedEdge>(graph, 0.5);
             double maxFlow = pp.calculateMinCut(source, sink);
             Set<Bit> minCut = pp.getCutEdges().stream().map(e -> graph.getEdgeSource(e).bit).collect(Collectors.toSet());
-            return new ComputationResult(minCut, Math.min(Math.round(maxFlow), Math.min(sourceNodes.size(), sinkNodes.size())));
+            // Problem: if soome of the sink nodes or source nodes have weight different than 1, then this should be noted
+            double flow = Math.min(Math.round(maxFlow), Math.min(weightSum(sourceNodes), weightSum(sinkNodes)));
+            if (flow > infty / 2){
+                flow = Double.POSITIVE_INFINITY;
+            }
+            return new ComputationResult(minCut, flow);
         }
     }
 

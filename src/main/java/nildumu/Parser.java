@@ -1180,7 +1180,8 @@ public class Parser implements Serializable {
         public final ParametersNode parameters;
         public final BlockNode body;
         public final GlobalVariablesNode globals;
-        Map<String, Pair<Variable, Variable>> globalDefs = null;
+        Map<String, Pair<Variable, Variable>> globalStringDefs = null;
+        Map<Variable, Pair<Variable, Variable>> globalDefs = null;
 
         public MethodNode(Location location, String name, ParametersNode parameters, BlockNode body, GlobalVariablesNode globals) {
             super(location);
@@ -1705,7 +1706,7 @@ public class Parser implements Serializable {
 
         @Override
         public Set<String> getDefinedVariables() {
-            return Collections.singleton(variable);
+            return hasInitExpression() ? Collections.singleton(variable) : Collections.emptySet();
         }
     }
 
@@ -1933,7 +1934,7 @@ public class Parser implements Serializable {
 
         @Override
         public Set<String> getDefinedVariables() {
-            return Collections.emptySet();
+            return expression != null ? Collections.singleton(variable) : Collections.emptySet();
         }
     }
 
@@ -2826,7 +2827,7 @@ public class Parser implements Serializable {
         public final String method;
         public final ArgumentsNode arguments;
         public final GlobalVariablesNode globals;
-        Map<String, Pair<Variable, Variable>> globalDefs = null;
+        Map<Variable, Pair<Variable, Variable>> globalDefs = null;
 
         public MethodInvocationNode(Location location, String method, ArgumentsNode arguments, GlobalVariablesNode globals) {
             super(location);

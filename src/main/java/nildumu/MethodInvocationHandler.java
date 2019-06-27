@@ -244,7 +244,7 @@ public abstract class MethodInvocationHandler {
         }
 
         @Override
-        public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals) {
+        public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<Variable, AppendOnlyValue> globals) {
             MethodNode method = callSite.definition;
             if (methodCallCounter.get(method) < maxRec) {
                 methodCallCounter.put(method, methodCallCounter.get(method) + 1);
@@ -257,7 +257,7 @@ public abstract class MethodInvocationHandler {
                 });
                 Processor.process(c, method.body);
                 Value ret = c.getReturnValue();
-                Map<String, AppendOnlyValue> globalVals = method.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                Map<Variable, AppendOnlyValue> globalVals = method.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                         e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
                 c.popMethodInvocationState();
                 methodCallCounter.put(method, methodCallCounter.get(method) - 1);
@@ -322,7 +322,7 @@ public abstract class MethodInvocationHandler {
             return clone;
         }
 
-        public MethodReturnValue applyToArgs(Context context, List<Value> arguments, Map<String, AppendOnlyValue> globals){
+        public MethodReturnValue applyToArgs(Context context, List<Value> arguments, Map<Variable, AppendOnlyValue> globals){
             List<Value> extendedArguments = arguments;
             Map<Bit, Bit> newBits = new HashMap<>();
             // populate
@@ -357,7 +357,7 @@ public abstract class MethodInvocationHandler {
                 }
                 //b.value(old.value());
             });
-            Map<String, AppendOnlyValue> globs = new HashMap<>(globals);
+            Map<Variable, AppendOnlyValue> globs = new HashMap<>(globals);
             globs.putAll(methodReturnValue.globals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                     e -> globals.getOrDefault(e.getKey(), AppendOnlyValue.createEmpty())
                             .append(methodReturnValue.globals.get(e.getKey()).map(newBits::get)))));
@@ -539,7 +539,7 @@ public abstract class MethodInvocationHandler {
                         () -> () -> graph.createDotGraph("", true));
                 BitGraph reducedGraph = reduce(c, graph);
                 PrintHistory.HistoryEntry newHist = PrintHistory.HistoryEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty());
-                PrintHistory.ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist);
+                PrintHistory.ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist, c);
                 history.put(node, PrintHistory.HistoryEntry.create(furtherReducedGraph.value, newHist.prev));
                         System.out.println("-------------------------#-> " + furtherReducedGraph.value.methodReturnValue);
                 if (dotFolder != null){
@@ -573,12 +573,12 @@ public abstract class MethodInvocationHandler {
          * @param history history, including the one to be analysed (the current)
          * @return
          */
-        private PrintHistory.ReduceResult<BitGraph> reduceGlobals(CallNode node, BitGraph reducedGraph, PrintHistory.HistoryEntry history) {
-            PrintHistory.ReduceResult<Map<String, AppendOnlyValue>> result =
+        private PrintHistory.ReduceResult<BitGraph> reduceGlobals(CallNode node, BitGraph reducedGraph, PrintHistory.HistoryEntry history, Context c) {
+            PrintHistory.ReduceResult<Map<Variable, AppendOnlyValue>> result =
                     PrintHistory.ReduceResult.create(reducedGraph.methodReturnValue.globals.keySet().stream()
-                            .collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly())));
+                            .collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly(c::weight))));
             return new PrintHistory.ReduceResult<>(new BitGraph(reducedGraph.context, reducedGraph.parameters,
-                    new MethodReturnValue(reducedGraph.methodReturnValue.value, result.value)), result.addedAStarBit);
+                    new MethodReturnValue(reducedGraph.methodReturnValue.value, result.value)), result.addedAStarBit, result.somethingChanged);
         }
 
 
@@ -610,7 +610,7 @@ public abstract class MethodInvocationHandler {
             c.forceMethodInvocationHandler(handler);
             Processor.process(c, callSite.definition.body);
             Value ret = c.getReturnValue();
-            Map<String, AppendOnlyValue> globalVals = callSite.definition.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+            Map<Variable, AppendOnlyValue> globalVals = callSite.definition.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                     e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
             c.popMethodInvocationState();
             c.forceMethodInvocationHandler(this);
@@ -622,7 +622,7 @@ public abstract class MethodInvocationHandler {
         MethodInvocationHandler createHandler(Function<MethodNode, BitGraph> curVersion){
             MethodInvocationHandler handler = new MethodInvocationHandler() {
                 @Override
-                public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals) {
+                public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<Variable, AppendOnlyValue> globals) {
                     return curVersion.apply(callSite.definition).applyToArgs(c, arguments, globals);
                 }
             };
@@ -683,16 +683,16 @@ public abstract class MethodInvocationHandler {
         }
 
         @Override
-        public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals) {
+        public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<Variable, AppendOnlyValue> globals) {
              return methodGraphs.get(callSite.definition).applyToArgs(c, arguments, globals);
         }
     }
 
     static class MethodReturnValue {
         final Value value;
-        final Map<String, AppendOnlyValue> globals;
+        final Map<Variable, AppendOnlyValue> globals;
 
-        MethodReturnValue(Value value, Map<String, AppendOnlyValue> globals) {
+        MethodReturnValue(Value value, Map<Variable, AppendOnlyValue> globals) {
             this.value = value;
             this.globals = globals;
         }
@@ -715,12 +715,12 @@ public abstract class MethodInvocationHandler {
     static {
         register("basic", s -> {}, ps -> new MethodInvocationHandler(){
             @Override
-            public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals) {
+            public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<Variable, AppendOnlyValue> globals) {
                 if (arguments.isEmpty()){
                     return new MethodReturnValue(vl.bot(), globals);
                 }
                 DependencySet set = arguments.stream().flatMap(Value::stream).collect(DependencySet.collector());
-                Map<String, AppendOnlyValue> newGlobals = globals.entrySet().stream()
+                Map<Variable, AppendOnlyValue> newGlobals = globals.entrySet().stream()
                         .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(IntStream.range(0, arguments.stream().mapToInt(Value::size).max().getAsInt())
                                 .mapToObj(i -> bl.create(S, set)).collect(Value.collector()))));
                 if (!callSite.definition.hasReturnValue()){
@@ -766,9 +766,9 @@ public abstract class MethodInvocationHandler {
     public void setup(ProgramNode program){
     }
 
-    public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<String, AppendOnlyValue> globals){
+    public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<Variable, AppendOnlyValue> globals){
         DependencySet set = arguments.stream().flatMap(Value::stream).collect(DependencySet.collector());
-        Map<String, AppendOnlyValue> newGlobals = globals.entrySet().stream()
+        Map<Variable, AppendOnlyValue> newGlobals = globals.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(new Value(bl.create(S, set)))));
         Value ret = analyze(c, callSite, arguments);
         return new MethodReturnValue(ret, newGlobals);

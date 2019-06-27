@@ -47,6 +47,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(ProgramNode program) {
+        Map<String, Variable> appendToVar = new HashMap<>();
         program.globalBlock.children().forEach(n -> ((MJNode)n).accept(new NodeVisitor<Object>() {
             @Override
             public Object visit(MJNode node) {
@@ -58,6 +59,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
                 Variable definition = new Variable(appendDecl.variable, false, false, true, true);
                 appendDecl.definition = definition;
                 appendVariables.add(definition);
+                appendToVar.put(definition.name, definition);
                 return null;
             }
         }));
@@ -83,6 +85,9 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
             }
         };
         program.globalBlock.children().forEach(n -> ((MJNode)n).accept(visitor));
+        program.methods().forEach(m -> {
+            m.globalDefs = m.globalStringDefs.entrySet().stream().collect(Collectors.toMap(e -> appendToVar.get(e.getKey()), e -> e.getValue()));
+        });
         return null;
     }
 
@@ -145,7 +150,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
             symbolTable.insert(post.name, post);
             defs.put(v, p(pre, post));
         });
-        method.globalDefs = defs;
+        method.globalStringDefs = defs;
         appendVariables.forEach(v -> symbolTable.insert(v.name, v));
         visitChildrenDiscardReturn(method);
         symbolTable.leaveScope();
@@ -176,7 +181,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
             throw new WrongNumberOfArgumentsError(methodInvocation, String.format("Expected %d arguments got %d", method.parameters.size(), methodInvocation.arguments.size()));
         }
         methodInvocation.globalDefs = methodInvocation.globals.globalVarSSAVars.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> p(symbolTable.lookup(e.getValue().first),
+                .collect(Collectors.toMap(e -> symbolTable.lookup(e.getKey()), e -> p(symbolTable.lookup(e.getValue().first),
                     symbolTable.lookup(e.getValue().second))));
         return null;
     }

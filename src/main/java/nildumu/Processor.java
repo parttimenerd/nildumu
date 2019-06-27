@@ -185,26 +185,33 @@ public class Processor {
                     statementNodesToOmitOneTime.add(whileStatement.body);
                 }
                 PrintHistory.HistoryEntry newHist = createHistoryEntryForWhileStmt(whileStatement);
-                PrintHistory.ReduceResult<Map<String, AppendOnlyValue>> reduceResult = reduceAppendOnlyVariables(newHist);
+                PrintHistory.ReduceResult<Map<Variable, AppendOnlyValue>> reduceResult = reduceAppendOnlyVariables(newHist);
 
                 // assumes that the first argument of the phi is the inner loop end SSA variable
                 whileStatement.getPreCondVarAss().stream()
                         .filter(a -> a.definition.hasAppendValue)
                         .forEach(a -> Stream.of(a.definition, ((PhiNode)a.expression).joinedVariables.get(0).definition)
-                                            .forEach(v -> context.setVariableValue(v, reduceResult.value.get(a.definition.name))));
+                                            .forEach(v -> {
+                                                Value val = reduceResult.value.get(a.definition).clone();
+                                                context.setVariableValue(v, val);
+                                                context.nodeValue(a.expression, val);
+                                            }));
 
                 historyPerWhile.put(whileStatement, PrintHistory.HistoryEntry.create(reduceResult.value, newHist.prev, newHist));
                 if (lastUpdateCounts.get(whileStatement) == context.getNodeVersionUpdateCount()) {
+                    System.out.println("-> Return bla");
                     return false; // that is the common case without prints
                 } else {
-                    if (lastUpdateWOAppendValuedCounts.get(whileStatement) == context.getNodeVersionWOAppendValuedUpdateCount()){
+                    if (lastUpdateWOAppendValuedCounts.get(whileStatement) == context.getNodeVersionWOAppendValuedUpdateCount()
+                    && reduceResult.finished()){
                         // this is the case if nothing else changes, except the append only variables
                         // basic idea: just create a star as for summary graphs
                         // TODO improve
-
+                        System.out.println("-> Return");
                         return false;
                     }
-                    nodeValueUpdatesAtCondition.push(context.getNodeVersionWOAppendValuedUpdateCount());
+                    System.out.println("-> Return bla2");
+                    nodeValueUpdatesAtCondition.push(context.getNodeVersionUpdateCount());
                     lastUpdateCounts.put(whileStatement, context.getNodeVersionUpdateCount());
                     lastUpdateWOAppendValuedCounts.put(whileStatement, context.getNodeVersionWOAppendValuedUpdateCount());
                     return true;
@@ -233,19 +240,35 @@ public class Processor {
                         return visit(program.globalBlock);
                     }
                 });
-                Set<Bit> outsideBits = outerVars.stream()
-                        .flatMap(v -> context.getVariableValue(v).stream()).collect(Collectors.toSet());
+                Set<Bit> outsideBits = outerVars.stream() // includes the input bits
+                        .flatMap(v -> context.getVariableValue(v).stream())
+                        .filter(Bit::isAtLeastUnknown).collect(Collectors.toSet());
+                outsideBits.addAll(innerLoopInputs(whileStatement));
                 return PrintHistory.HistoryEntry.create(whileStatement.getPreCondVarAss().stream()
                                 .filter(a -> a.definition.hasAppendValue)
-                                .collect(Collectors.toMap(a -> a.variable, a -> context.getVariableValue(a.variable).asAppendOnly())),
+                                .collect(Collectors.toMap(a -> a.definition, a -> context.getVariableValue(a.variable).asAppendOnly().clone())),
                         historyPerWhile.containsKey(whileStatement) ? Optional.of(historyPerWhile.get(whileStatement)) : Optional.empty(),
                         v -> bl.reachableBits(v.bits, outsideBits));
             }
 
-            private PrintHistory.ReduceResult<Map<String, AppendOnlyValue>>
+            private Set<Bit> innerLoopInputs(WhileStatementNode whileStatement){
+                return whileStatement.accept(new NodeVisitor<Set<Bit>>() {
+                    @Override
+                    public Set<Bit> visit(MJNode node) {
+                        return visitChildren(node).stream().flatMap(Set::stream).collect(Collectors.toSet());
+                    }
+
+                    @Override
+                    public Set<Bit> visit(TmpInputVariableDeclarationNode inputDecl) {
+                        return new HashSet<>(context.getVariableValue(inputDecl.definition).bits);
+                    }
+                });
+            }
+
+            private PrintHistory.ReduceResult<Map<Variable, AppendOnlyValue>>
                 reduceAppendOnlyVariables(PrintHistory.HistoryEntry history) {
                 return PrintHistory.ReduceResult.create(
-                                history.map.keySet().stream().collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly())));
+                                history.map.keySet().stream().collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly(context::weight))));
             }
 
 
@@ -259,7 +282,7 @@ public class Processor {
             public Boolean visit(WhileStatementEndNode whileEndStatement) {
                 unfinishedLoopIterations--;
                 context.popBranch();
-                return nodeValueUpdatesAtCondition.pop() != context.getNodeVersionWOAppendValuedUpdateCount();
+                return nodeValueUpdatesAtCondition.pop() != context.getNodeVersionUpdateCount();
             }
 
             @Override
@@ -282,7 +305,7 @@ public class Processor {
             }
 
             private void weightCondBit(Bit bit){
-                if (bit.isUnknown()){
+                if (bit.isAtLeastUnknown()){
                     context.weight(bit, Context.INFTY);
                 }
                 if (bit.value() != null && bit.value().node() != null){

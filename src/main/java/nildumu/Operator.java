@@ -727,7 +727,7 @@ public interface Operator {
 
         @Override
         public DependencySet computeDataDependencies(Bit x, Bit y, Lattices.B computedBitValue) {
-            return Stream.of(x, y).filter(Bit::isUnknown).collect(DependencySet.collector());
+            return Stream.of(x, y).filter(Bit::isAtLeastUnknown).collect(DependencySet.collector());
         }
 
         public DependencySet computeControlDeps(Context context, Parser.MJNode node, B computedBitValue, DependencySet computedDataDependencies) {
@@ -866,7 +866,7 @@ public interface Operator {
 
         @Override
         public Value compute(Context c, List<Value> arguments) {
-            Map<String, AppendOnlyValue> globals = callSite.globals.globalVarSSAVars.entrySet().stream()
+            Map<Variable, AppendOnlyValue> globals = callSite.globalDefs.entrySet().stream()
                     .collect(Collectors.toMap(e -> e.getKey(), e -> c.getVariableValue(e.getValue().first).asAppendOnly()));
             MethodInvocationHandler.MethodReturnValue ret = c.methodInvocationHandler().analyze(c, callSite, arguments, globals);
             callSite.globalDefs.forEach((v, p) -> {
@@ -967,7 +967,7 @@ public interface Operator {
 
     static Value createUnknownValue(Value... deps){
         int size = Stream.of(deps).mapToInt(Value::size).max().getAsInt();
-        DependencySet depBits = Stream.of(deps).flatMap(Value::stream).filter(Bit::isUnknown).collect(DependencySet.collector());
+        DependencySet depBits = Stream.of(deps).flatMap(Value::stream).filter(Bit::isAtLeastUnknown).collect(DependencySet.collector());
         return IntStream.range(0, size).mapToObj(i -> bl.create(U, depBits)).collect(Value.collector());
     }
 

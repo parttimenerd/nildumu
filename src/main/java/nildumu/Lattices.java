@@ -859,6 +859,29 @@ public class Lattices {
             return reachable;
         }
 
+        /**
+         * Doesn't look into the interdependencies of the end bits
+         */
+        public Set<Bit> reachableBitsIncludingInputBits(Collection<Bit> startBits, Set<Bit> endBits){
+            Set<Bit> reachable = new HashSet<>();
+            Set<Bit> alreadyVisitedBits = new HashSet<>();
+            Stack<Bit> bitsToVisit = new Stack<>();
+            bitsToVisit.addAll(startBits);
+            while (!bitsToVisit.isEmpty()){
+                Bit cur = bitsToVisit.pop();
+                if (endBits.contains(cur) || (cur.deps().isEmpty() && cur.isAtLeastUnknown())){
+                    reachable.add(cur);
+                    continue;
+                }
+                if (alreadyVisitedBits.contains(cur)){
+                    continue;
+                }
+                bitsToVisit.addAll(cur.deps);
+                alreadyVisitedBits.add(cur);
+            }
+            return reachable;
+        }
+
         public void walkBits(Bit startBit, Consumer<Bit> consumer, Predicate<Bit> ignoreBit, Set<Bit> alreadyVisitedBits, Function<Bit, Collection<Bit>> next){
             Stack<Bit> bitsToVisit = new Stack<>();
             if (ignoreBit.test(startBit)){
@@ -986,6 +1009,15 @@ public class Lattices {
          */
         public boolean valueEquals(Bit other){
             return val.equals(other.val) && deps.equals(other.deps);
+        }
+
+        /**
+         * Is this >= other
+         * @param other
+         * @return
+         */
+        public boolean valueGreaterEquals(Bit other){
+            return bs.greaterEqualsThan(val, other.val) && ds.greaterEqualsThan(deps(), other.deps());
         }
 
         public String repr() {
@@ -1281,7 +1313,7 @@ public class Lattices {
         public String toString() {
             List<Bit> reversedBits = new ArrayList<>(bits);
             Collections.reverse(reversedBits);
-            return reversedBits.stream().map(b -> b.val.toString()).collect(Collectors.joining(""));
+            return reversedBits.stream().map(b -> b.val.toString() + b.deps.size()).collect(Collectors.joining(""));
         }
 
         public String repr() {
@@ -1459,6 +1491,10 @@ public class Lattices {
         public boolean endsWithStar(){
             return get(size()).val == S;
         }
+
+        public boolean valueGreaterEquals(Value other) {
+            return vl.mapBits(this, other, (a, b) -> a.valueGreaterEquals(b)).stream().allMatch(Boolean::booleanValue);
+        }
     }
 
     /**
@@ -1483,6 +1519,7 @@ public class Lattices {
             AppendOnlyValue newValue = new AppendOnlyValue();
             stream().filter(b -> !b.val.isE() && b.val != X).forEach(newValue::add);
             value.stream().forEach(newValue::add);
+            System.out.println(value + " " + newValue + " " + this);
             return newValue;
         }
 
@@ -1537,6 +1574,17 @@ public class Lattices {
         @Override
         public AppendOnlyValue clone(){
             return new AppendOnlyValue(bits.toArray(new Bit[0]));
+        }
+
+        /**
+         * Clones also the bits of the value
+         */
+        public AppendOnlyValue deepClone(){
+            return new AppendOnlyValue(bits.stream().map(Bit::copy).toArray(Bit[]::new));
+        }
+
+        public AppendOnlyValue cloneWithoutEs(){
+            return new AppendOnlyValue(stream().filter(b -> b.val != E).toArray(Bit[]::new));
         }
     }
 }
