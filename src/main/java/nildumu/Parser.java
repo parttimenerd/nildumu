@@ -135,7 +135,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8ldd9r5g7fff45fff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8ldd9r5g7gfff45fff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
                 Util.Box<Boolean> inputPrints = new Util.Box<>(false);
@@ -590,10 +590,10 @@ public class Parser implements Serializable {
                             return new GlobalVariablesNode(new Location(0, 0), globs);
                         })
                         .addRule("globals_", "global COMMA globals_", asts -> {
-                            Map<String, Pair<String, String>> globals = asts.get(0).<WrapperNode<Map<String, Pair<String, String>>>>as().wrapped;
+                            Utils.Triple<String, String, String> glob = asts.get(0).<WrapperNode<Utils.Triple<String, String, String>>>as().wrapped;
                             GlobalVariablesNode globalNode = ((GlobalVariablesNode)asts.get(2));
-                            globals.putAll(globalNode.globalVarSSAVars);
-                            return new GlobalVariablesNode(asts.getStartLocation(), globals);
+                            globalNode.globalVarSSAVars.put(glob.first, p(glob.second, glob.third));
+                            return new GlobalVariablesNode(((WrapperNode<?>)asts.get(0)).location, globalNode.globalVarSSAVars);
                         })
                         .addRule("global", "IDENT ARROW IDENT ARROW IDENT", asts -> {
                             return new WrapperNode<>(asts.getStartLocation(),
@@ -1038,6 +1038,25 @@ public class Parser implements Serializable {
         @Override
         public String type() {
             return shortType();
+        }
+
+        public Set<Bit> getInnerTmpInputs(Context context){
+            return getTmpInputVariableDeclarations().stream().flatMap(t -> context.getVariableValue(t.variable).stream())
+                    .collect(Collectors.toSet());
+        }
+
+        public Set<TmpInputVariableDeclarationNode> getTmpInputVariableDeclarations(){
+            return this.accept(new NodeVisitor<Set<TmpInputVariableDeclarationNode>>() {
+                @Override
+                public Set<TmpInputVariableDeclarationNode> visit(MJNode node) {
+                    return visitChildren(node).stream().flatMap(Set::stream).collect(Collectors.toSet());
+                }
+
+                @Override
+                public Set<TmpInputVariableDeclarationNode> visit(TmpInputVariableDeclarationNode inputDecl) {
+                    return Collections.singleton(inputDecl);
+                }
+            });
         }
     }
 

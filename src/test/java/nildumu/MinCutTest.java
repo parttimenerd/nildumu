@@ -111,7 +111,7 @@ public class MinCutTest implements MinimalCounterexampleHook {
             bitsWoSources.removeAll(sources);
             Set<Bit> sinks = IntStream.range(0, sinkNum).mapToObj(i -> random.choose(bitsWoSources)).collect(Collectors.toSet());
             return new BitGraphWrapper(new BitGraph(con, Collections.singletonList(new Value(new ArrayList<>(sinks))),
-                    new MethodInvocationHandler.MethodReturnValue(new Value(new ArrayList<>(sources)), new HashMap<>())), bitNum, depCount, bits);
+                    new MethodInvocationHandler.MethodReturnValue(new Value(new ArrayList<>(sources)), new HashMap<>()), Optional.empty()), bitNum, depCount, bits);
         }
 
         BitGraphWrapper cloneWithout(SourceOfRandomness random, BitGraphWrapper graph, float deletedDepfraction) {
@@ -143,7 +143,7 @@ public class MinCutTest implements MinimalCounterexampleHook {
                 }, b -> false, alreadyVisited);
             }
             return new BitGraphWrapper(new BitGraph(con, Collections.singletonList(new Value(newSinks)),
-                    new MethodInvocationHandler.MethodReturnValue(new Value(newSources), new HashMap<>())),
+                    new MethodInvocationHandler.MethodReturnValue(new Value(newSources), new HashMap<>()), Optional.empty()),
                     bitCount.val, depCount.val, alreadyVisited);
         }
 
@@ -193,7 +193,8 @@ public class MinCutTest implements MinimalCounterexampleHook {
                 con.weight(random.choose(alreadyVisited), 1);
             }
             return new BitGraphWrapper(new BitGraph(con, Collections.singletonList(new Value(newSinks)),
-                    new MethodInvocationHandler.MethodReturnValue(new Value(newSources), new HashMap<>())),
+                    new MethodInvocationHandler.MethodReturnValue(new Value(newSources), new HashMap<>()),
+                    Optional.empty()),
                     bitCount.val, depCount.val, alreadyVisited);
         }
 

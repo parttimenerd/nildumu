@@ -243,26 +243,12 @@ public class Processor {
                 Set<Bit> outsideBits = outerVars.stream() // includes the input bits
                         .flatMap(v -> context.getVariableValue(v).stream())
                         .filter(Bit::isAtLeastUnknown).collect(Collectors.toSet());
-                outsideBits.addAll(innerLoopInputs(whileStatement));
+                outsideBits.addAll(whileStatement.getInnerTmpInputs(context));
                 return PrintHistory.HistoryEntry.create(whileStatement.getPreCondVarAss().stream()
                                 .filter(a -> a.definition.hasAppendValue)
                                 .collect(Collectors.toMap(a -> a.definition, a -> context.getVariableValue(a.variable).asAppendOnly().clone())),
                         historyPerWhile.containsKey(whileStatement) ? Optional.of(historyPerWhile.get(whileStatement)) : Optional.empty(),
                         v -> bl.reachableBits(v.bits, outsideBits));
-            }
-
-            private Set<Bit> innerLoopInputs(WhileStatementNode whileStatement){
-                return whileStatement.accept(new NodeVisitor<Set<Bit>>() {
-                    @Override
-                    public Set<Bit> visit(MJNode node) {
-                        return visitChildren(node).stream().flatMap(Set::stream).collect(Collectors.toSet());
-                    }
-
-                    @Override
-                    public Set<Bit> visit(TmpInputVariableDeclarationNode inputDecl) {
-                        return new HashSet<>(context.getVariableValue(inputDecl.definition).bits);
-                    }
-                });
             }
 
             private PrintHistory.ReduceResult<Map<Variable, AppendOnlyValue>>

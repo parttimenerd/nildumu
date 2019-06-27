@@ -7,6 +7,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static nildumu.Lattices.*;
 
@@ -26,7 +27,7 @@ public class PrintHistory {
 
         static HistoryEntry create(MethodInvocationHandler.BitGraph graph, Optional<HistoryEntry> prev){
             return create(graph.methodReturnValue.globals, prev, val -> val.stream()
-                    .flatMap(b -> graph.calcReachableParamBits(b).stream()).collect(Collectors.toSet()));
+                    .flatMap(b -> graph.calcReachableInputAndParameterBits(b).stream()).collect(Collectors.toSet()));
         }
 
 

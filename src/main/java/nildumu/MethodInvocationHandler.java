@@ -282,12 +282,21 @@ public abstract class MethodInvocationHandler {
 
         final List<Integer> paramBitsPerReturnValue;
 
-        BitGraph(Context context, List<Value> parameters, MethodReturnValue methodReturnValue) {
+        final Optional<MethodNode> methodNode;
+
+        BitGraph(Context context, List<Value> parameters, MethodReturnValue methodReturnValue,
+                 MethodNode methodNode) {
+            this(context, parameters, methodReturnValue, Optional.of(methodNode));
+        }
+
+        BitGraph(Context context, List<Value> parameters, MethodReturnValue methodReturnValue,
+                 Optional<MethodNode> methodNode) {
             this.context = context;
             this.parameters = parameters;
             this.parameterBits = parameters.stream().flatMap(Value::stream).collect(Collectors.toSet());
             this.methodReturnValue = methodReturnValue;
             this.bitInfo = new HashMap<>();
+            this.methodNode = methodNode;
             for (int i = 0; i < parameters.size(); i++) {
                 Value param = parameters.get(i);
                 for (int j = 1; j <= param.size(); j++) {
@@ -379,6 +388,12 @@ public abstract class MethodInvocationHandler {
 
         public Set<Bit> calcReachableParamBits(Bit bit){
             return calcReachableBits(bit, parameterBits);
+        }
+
+        public Set<Bit> calcReachableInputAndParameterBits(Bit bit){
+            Set<Bit> inputBits = methodNode.map(m -> m.getInnerTmpInputs(context)).orElse(new HashSet<>());
+            inputBits.addAll(parameterBits);
+            return bl.reachableBits(Collections.singleton(bit), inputBits);
         }
 
         public Set<Bit> minCutBits(){
@@ -578,7 +593,7 @@ public abstract class MethodInvocationHandler {
                     PrintHistory.ReduceResult.create(reducedGraph.methodReturnValue.globals.keySet().stream()
                             .collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly(c::weight))));
             return new PrintHistory.ReduceResult<>(new BitGraph(reducedGraph.context, reducedGraph.parameters,
-                    new MethodReturnValue(reducedGraph.methodReturnValue.value, result.value)), result.addedAStarBit, result.somethingChanged);
+                    new MethodReturnValue(reducedGraph.methodReturnValue.value, result.value), node.method), result.addedAStarBit, result.somethingChanged);
         }
 
 
@@ -586,9 +601,9 @@ public abstract class MethodInvocationHandler {
             List<Value> parameters = generateParameters(program, method);
             if (usedMode == Mode.COINDUCTION) {
                 MethodReturnValue returnValue = botHandler.analyze(program.context, callSites.get(method), parameters, new HashMap<>());
-                return new BitGraph(program.context, parameters, returnValue);
+                return new BitGraph(program.context, parameters, returnValue, method);
             }
-            return new BitGraph(program.context, parameters, new MethodReturnValue(createUnknownValue(program), new HashMap<>()));
+            return new BitGraph(program.context, parameters, new MethodReturnValue(createUnknownValue(program), new HashMap<>()), method);
         }
 
         List<Value> generateParameters(ProgramNode program, MethodNode method){
@@ -616,7 +631,7 @@ public abstract class MethodInvocationHandler {
             c.forceMethodInvocationHandler(this);
             MethodReturnValue retValue = new MethodReturnValue(ret, globalVals);
             System.out.println("--------------------------> " + retValue);
-            return new BitGraph(c, parameters, retValue);
+            return new BitGraph(c, parameters, retValue, callSite.definition);
         }
 
         MethodInvocationHandler createHandler(Function<MethodNode, BitGraph> curVersion){
@@ -651,7 +666,7 @@ public abstract class MethodInvocationHandler {
             });
             MethodReturnValue newRetValue = bitGraph.methodReturnValue.map(newBits::get);
             bitGraph.returnValue.node(bitGraph.returnValue.node());
-            return new BitGraph(context, bitGraph.parameters, newRetValue);
+            return new BitGraph(context, bitGraph.parameters, newRetValue, bitGraph.methodNode);
         }
 
         BitGraph minCutReduce(Context context, BitGraph bitGraph) {
@@ -677,7 +692,7 @@ public abstract class MethodInvocationHandler {
             });
             MethodReturnValue ret = bitGraph.methodReturnValue.map(newBits::get);
             ret.value.node(bitGraph.returnValue.node());
-            BitGraph newGraph = new BitGraph(context, bitGraph.parameters, ret);
+            BitGraph newGraph = new BitGraph(context, bitGraph.parameters, ret, bitGraph.methodNode);
             //assert !isReachable || newGraph.calcReachableBits(newGraph.returnValue.get(1), newGraph.parameters.get(0).bitSet()).size() > 0;
             return newGraph;
         }
@@ -716,13 +731,24 @@ public abstract class MethodInvocationHandler {
         register("basic", s -> {}, ps -> new MethodInvocationHandler(){
             @Override
             public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<Variable, AppendOnlyValue> globals) {
-                if (arguments.isEmpty()){
+                if (arguments.isEmpty() && callSite.definition.getTmpInputVariableDeclarations().isEmpty()){
                     return new MethodReturnValue(vl.bot(), globals);
                 }
+                Value inputVal = callSite.definition.getTmpInputVariableDeclarations().stream()
+                        .map(t -> {
+                            Bit b = bl.create(U);
+                            c.weight(b, INFTY);
+                            c.addInputValue(c.sl.parse(t.secLevel), new Value(b));
+                            return b;
+                        }).collect(Value.collector());
                 DependencySet set = arguments.stream().flatMap(Value::stream).collect(DependencySet.collector());
                 Map<Variable, AppendOnlyValue> newGlobals = globals.entrySet().stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(IntStream.range(0, arguments.stream().mapToInt(Value::size).max().getAsInt())
-                                .mapToObj(i -> bl.create(S, set)).collect(Value.collector()))));
+                        .collect(Collectors.toMap(Map.Entry::getKey,
+                                m -> m.getValue()
+                                        .append(IntStream.range(0, arguments.stream()
+                                                         .mapToInt(Value::size).max().orElse(0))
+                                                         .mapToObj(i -> bl.create(S, set)).collect(Value.collector())
+                                        ).append(inputVal)));
                 if (!callSite.definition.hasReturnValue()){
                     return new MethodReturnValue(vl.bot(), newGlobals);
                 }

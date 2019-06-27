@@ -175,4 +175,15 @@ public class AppendTests {
         System.out.println(toSSA(runProgram, true));
         parse(runProgram).leaks("inf").run();
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'int func() {int a; a = input(); print(a); func()} func()', basic",
+            "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', basic",
+    })
+    public void testPrintInFunctionWithSummaryHandler(String program, String handler){
+        String runProgram = "bit_width 2; h input int h = 0buu; " + program;
+        System.out.println(toSSA(runProgram, false).toPrettyString());
+        parse(runProgram, handler).leaks("inf").run();
+    }
 }
