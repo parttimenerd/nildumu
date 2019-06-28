@@ -1,5 +1,7 @@
 package nildumu;
 
+import org.junit.experimental.categories.Category;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -209,7 +211,7 @@ public class LoopTests {
                         "     l output int o = h;").leaks(1).run());
     }
 
-    @Test
+    /*@Test
     public void testElectronicPurse(){
         parse("h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
                 "int z = 0;\n" +
@@ -218,7 +220,7 @@ public class LoopTests {
                 "    z = z + 1;\n" +
                 "}\n" +
                 "l output int o = z;").leaks(32).run();
-    }
+    }*/
 
     @Test
     public void testElectronicPurseCondensed(){

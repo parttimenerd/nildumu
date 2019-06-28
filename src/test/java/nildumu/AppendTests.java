@@ -178,12 +178,22 @@ public class AppendTests {
 
     @ParameterizedTest
     @CsvSource({
-            "'int func() {int a; a = input(); print(a); func()} func()', basic",
-            "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', basic",
+            "'int func() {int a; a = input(); print(a); func()} func()', basic, inf",
+            "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', basic, inf",
+            "'int func() {int a; a = input(); print(a); func()} func()', inlining, inf",
+            "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', inlining, inf",
+            "'int func() {int a; a = input(); return a;} l output int o = func()', 'handler=summary', 2",
+            "'int func() {int a; a = input(); print(a);} func()', 'handler=summary', 2",
+            "'int func() {int a; a = input(); print(a); func()} func()', 'handler=summary', inf",
+            "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', summary, inf",
+            "'int func(int h) {int a; a = input(); print(a); func2(0)}" +
+              " int func2(int h) {int a; a = input(); print(a); func(0)} func(h)', summary, inf",
+            "'int func() {int a; a = input(); print(a); func()} func()', 'handler=summary;reduction=mincut', inf",
+            "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', 'handler=summary;reduction=mincut', inf",
     })
-    public void testPrintInFunctionWithSummaryHandler(String program, String handler){
+    public void testPrintInFunctionWithSummaryHandler(String program, String handler, String leakage){
         String runProgram = "bit_width 2; h input int h = 0buu; " + program;
         System.out.println(toSSA(runProgram, false).toPrettyString());
-        parse(runProgram, handler).leaks("inf").run();
+        parse(runProgram, handler).leaks(leakage).run();
     }
 }

@@ -255,6 +255,8 @@ public class Context {
 
     private NodeValueState nodeValueState = nodeValueStates.get(currentCallPath);
 
+    private Stack<InputBits> introducedInputsStack = new Stack<>();
+
     private Mode mode;
 
     /*-------------------------- extended mode specific -------------------------------*/
@@ -281,6 +283,7 @@ public class Context {
         this.sl = sl;
         this.maxBitWidth = maxBitWidth;
         this.variableStates.push(new State(outputState));
+        this.introducedInputsStack.push(new InputBits());
         ValueLattice.get().bitWidth = maxBitWidth;
     }
 
@@ -326,6 +329,7 @@ public class Context {
                 sec(bit, sec);
             }
         }
+        getNewlyIntroducedInputs().put(sec, value);
         return value;
     }
 
@@ -779,7 +783,6 @@ public class Context {
     }
 
     public void weight(Bit bit, double weight){
-        assert weight == 1 || weight == INFTY;
         if (weight == 1){
             weightMap.remove(bit, weight);
             return;
@@ -866,6 +869,7 @@ public class Context {
         variableStates.push(new State(new State.OutputState()));
         methodParameterBits.push(argumentBits);
         nodeValueState = nodeValueStates.get(currentCallPath);
+        introducedInputsStack.push(new InputBits());
     }
 
     public void popMethodInvocationState(){
@@ -873,6 +877,11 @@ public class Context {
         variableStates.pop();
         methodParameterBits.pop();
         nodeValueState = nodeValueStates.get(currentCallPath);
+        introducedInputsStack.pop();
+    }
+
+    public InputBits getNewlyIntroducedInputs(){
+        return introducedInputsStack.peek();
     }
 
     public CallPath callPath(){
@@ -910,7 +919,7 @@ public class Context {
                 .stream()
                 .map(s -> (Sec<?>) s)
                 .filter(s -> !((Lattice) sl).lowerEqualsThan(s, sec))
-                .flatMap(s -> input.getBits((Sec) s).stream())
+                .flatMap(s -> Stream.concat(input.getBits((Sec) s).stream(), getNewlyIntroducedInputs().get(s).stream()))
                 .collect(Collectors.toSet());
     }
 }

@@ -144,6 +144,9 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         symbolTable.enterScope();
         Map<String, Pair<Variable, Variable>> defs = new HashMap<>();
         method.globals.globalVarSSAVars.forEach((v, p) -> {
+            if (p.first.equals(p.second)){
+                return;
+            }
             Variable pre = new Variable(p.first, false, false, false, true);
             symbolTable.insert(pre.name, pre);
             Variable post = new Variable(p.second, false, false, false, true);

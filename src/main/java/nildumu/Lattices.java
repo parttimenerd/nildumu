@@ -644,7 +644,13 @@ public class Lattices {
         }
 
         public DependencySet map(Function<Bit, Bit> mapper){
-            return stream().map(mapper).collect(DependencySetImpl.collector());
+            return stream().map(b -> {
+                Bit c = mapper.apply(b);
+                if (c == null){
+                    throw new NullPointerException(b.toString());
+                }
+                return c;
+            }).collect(DependencySetImpl.collector());
         }
 
         @Override
@@ -1261,6 +1267,11 @@ public class Lattices {
         public void walkBits(List<Value> values, Consumer<Bit> consumer){
             Set<Bit> alreadyVisited = new HashSet<>();
             values.forEach(v -> v.forEach(b -> bl.walkBits(b, consumer, c -> false, alreadyVisited)));
+        }
+
+        public void walkBits(Collection<Bit> bits, Consumer<Bit> consumer){
+            Set<Bit> alreadyVisited = new HashSet<>();
+            bits.forEach(b -> bl.walkBits(b, consumer, c -> false, alreadyVisited));
         }
     }
 

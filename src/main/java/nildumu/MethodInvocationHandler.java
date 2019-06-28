@@ -259,9 +259,10 @@ public abstract class MethodInvocationHandler {
                 Value ret = c.getReturnValue();
                 Map<Variable, AppendOnlyValue> globalVals = method.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                         e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
+                InputBits inputBits = c.getNewlyIntroducedInputs();
                 c.popMethodInvocationState();
                 methodCallCounter.put(method, methodCallCounter.get(method) - 1);
-                return new MethodReturnValue(ret, globalVals);
+                return new MethodReturnValue(ret, globalVals, inputBits);
             }
             return botHandler.analyze(c, callSite, arguments, globals);
         }
@@ -284,13 +285,15 @@ public abstract class MethodInvocationHandler {
 
         final Optional<MethodNode> methodNode;
 
+        final InputBits inputBits;
+
         BitGraph(Context context, List<Value> parameters, MethodReturnValue methodReturnValue,
-                 MethodNode methodNode) {
-            this(context, parameters, methodReturnValue, Optional.of(methodNode));
+                 MethodNode methodNode, InputBits inputBits) {
+            this(context, parameters, methodReturnValue, Optional.of(methodNode), inputBits);
         }
 
         BitGraph(Context context, List<Value> parameters, MethodReturnValue methodReturnValue,
-                 Optional<MethodNode> methodNode) {
+                 Optional<MethodNode> methodNode, InputBits inputBits) {
             this.context = context;
             this.parameters = parameters;
             this.parameterBits = parameters.stream().flatMap(Value::stream).collect(Collectors.toSet());
@@ -303,6 +306,7 @@ public abstract class MethodInvocationHandler {
                     bitInfo.put(param.get(j), p(i, j));
                 }
             }
+            this.inputBits = inputBits;
             this.returnValue = methodReturnValue.value;
             assertThatAllBitsAreNotNull();
             paramBitsPerReturnValue = returnValue.stream().map(b -> calcReachableParamBits(b).size()).collect(Collectors.toList());
@@ -328,14 +332,19 @@ public abstract class MethodInvocationHandler {
                 clone = bl.create(v(bit));
             }
             context.repl(clone, context.repl(bit));
+            context.weight(clone, context.weight(bit));
             return clone;
         }
+
 
         public MethodReturnValue applyToArgs(Context context, List<Value> arguments, Map<Variable, AppendOnlyValue> globals){
             List<Value> extendedArguments = arguments;
             Map<Bit, Bit> newBits = new HashMap<>();
             // populate
-            vl.walkBits(methodReturnValue.getCombinedValue(), bit -> {
+            vl.walkBits(Stream.concat(inputBits.getBits().stream(), methodReturnValue.getCombinedValue().stream()).collect(Collectors.toSet()), bit -> {
+                if (newBits.containsKey(bit)) {
+                    return;
+                }
                 if (parameterBits.contains(bit)){
                     Pair<Integer, Integer> loc = bitInfo.get(bit);
                     Bit argBit = extendedArguments.get(loc.first).get(loc.second);
@@ -346,8 +355,8 @@ public abstract class MethodInvocationHandler {
                     newBits.put(bit, clone);
                 }
             });
-            DefaultMap<Value, Value> newValues = new DefaultMap<Value, Value>((map, value) -> {
-                if (parameters.contains(value)){
+            DefaultMap<Value, Value> newValues = new DefaultMap<>((map, value) -> {
+                if (parameters.contains(value)) {
                     return arguments.get(parameters.indexOf(value));
                 }
                 Value clone = value.map(b -> {
@@ -370,7 +379,7 @@ public abstract class MethodInvocationHandler {
             globs.putAll(methodReturnValue.globals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                     e -> globals.getOrDefault(e.getKey(), AppendOnlyValue.createEmpty())
                             .append(methodReturnValue.globals.get(e.getKey()).map(newBits::get)))));
-            return new MethodReturnValue(returnValue.map(newBits::get), globs);
+            return new MethodReturnValue(returnValue.map(newBits::get), globs, inputBits.map(newBits::get));
         }
 
         /**
@@ -391,7 +400,7 @@ public abstract class MethodInvocationHandler {
         }
 
         public Set<Bit> calcReachableInputAndParameterBits(Bit bit){
-            Set<Bit> inputBits = methodNode.map(m -> m.getInnerTmpInputs(context)).orElse(new HashSet<>());
+            Set<Bit> inputBits = this.inputBits.getBits();
             inputBits.addAll(parameterBits);
             return bl.reachableBits(Collections.singleton(bit), inputBits);
         }
@@ -409,8 +418,10 @@ public abstract class MethodInvocationHandler {
         }
 
         private Graph createDotGraph(String name, boolean withMinCut){
-            return DotRegistry.createDotGraph(context, name, IntStream.range(0, parameters.size())
-                    .mapToObj(i -> new DotRegistry.Anchor(String.format("param %d", i), parameters.get(i))
+            return DotRegistry.createDotGraph(context, name, Stream.concat(IntStream.range(0, parameters.size())
+                    .mapToObj(i -> new DotRegistry.Anchor(String.format("param %d", i), parameters.get(i))),
+                            this.methodReturnValue.globals.entrySet().stream().map(e ->
+                                    new DotRegistry.Anchor(e.getKey().name, e.getValue()))
                     ).collect(Collectors.toList()),
                     new DotRegistry.Anchor("return", returnValue),
                     withMinCut ? minCutBits(returnValue.bitSet(), parameterBits, INFTY) : Collections.emptySet());
@@ -420,7 +431,7 @@ public abstract class MethodInvocationHandler {
             Path path = folder.resolve(name + ".dot");
             try {
                 Files.createDirectories(folder);
-                Graphviz.fromGraph(createDotGraph(name, withMinCut)).render(Format.PLAIN).toFile(path.toFile());
+                Graphviz.fromGraph(createDotGraph(name, withMinCut)).render(Format.XDOT).toFile(path.toFile());
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -593,7 +604,8 @@ public abstract class MethodInvocationHandler {
                     PrintHistory.ReduceResult.create(reducedGraph.methodReturnValue.globals.keySet().stream()
                             .collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly(c::weight))));
             return new PrintHistory.ReduceResult<>(new BitGraph(reducedGraph.context, reducedGraph.parameters,
-                    new MethodReturnValue(reducedGraph.methodReturnValue.value, result.value), node.method), result.addedAStarBit, result.somethingChanged);
+                    new MethodReturnValue(reducedGraph.methodReturnValue.value, result.value, reducedGraph.inputBits), node.method, reducedGraph.inputBits),
+                    result.addedAStarBit, result.somethingChanged);
         }
 
 
@@ -601,9 +613,10 @@ public abstract class MethodInvocationHandler {
             List<Value> parameters = generateParameters(program, method);
             if (usedMode == Mode.COINDUCTION) {
                 MethodReturnValue returnValue = botHandler.analyze(program.context, callSites.get(method), parameters, new HashMap<>());
-                return new BitGraph(program.context, parameters, returnValue, method);
+                return new BitGraph(program.context, parameters, returnValue, method, new InputBits());
             }
-            return new BitGraph(program.context, parameters, new MethodReturnValue(createUnknownValue(program), new HashMap<>()), method);
+            // TODO: problem with input bits?
+            return new BitGraph(program.context, parameters, new MethodReturnValue(createUnknownValue(program), new HashMap<>(), new InputBits()), method, new InputBits());
         }
 
         List<Value> generateParameters(ProgramNode program, MethodNode method){
@@ -627,11 +640,12 @@ public abstract class MethodInvocationHandler {
             Value ret = c.getReturnValue();
             Map<Variable, AppendOnlyValue> globalVals = callSite.definition.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                     e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
+            InputBits inputBits = c.getNewlyIntroducedInputs();
             c.popMethodInvocationState();
             c.forceMethodInvocationHandler(this);
-            MethodReturnValue retValue = new MethodReturnValue(ret, globalVals);
+            MethodReturnValue retValue = new MethodReturnValue(ret, globalVals, inputBits);
             System.out.println("--------------------------> " + retValue);
-            return new BitGraph(c, parameters, retValue, callSite.definition);
+            return new BitGraph(c, parameters, retValue, callSite.definition, inputBits);
         }
 
         MethodInvocationHandler createHandler(Function<MethodNode, BitGraph> curVersion){
@@ -662,21 +676,24 @@ public abstract class MethodInvocationHandler {
          */
         BitGraph basicReduce(Context context, BitGraph bitGraph){
             DefaultMap<Bit, Bit> newBits = new DefaultMap<Bit, Bit>((map, bit) -> {
-                return BitGraph.cloneBit(context, bit, ds.create(bitGraph.calcReachableParamBits(bit)));
+                return BitGraph.cloneBit(context, bit, ds.create(bitGraph.calcReachableInputAndParameterBits(bit)).map(map::get));
             });
+            bitGraph.parameterBits.forEach(b -> newBits.put(b, b));
             MethodReturnValue newRetValue = bitGraph.methodReturnValue.map(newBits::get);
             bitGraph.returnValue.node(bitGraph.returnValue.node());
-            return new BitGraph(context, bitGraph.parameters, newRetValue, bitGraph.methodNode);
+            return new BitGraph(context, bitGraph.parameters, newRetValue, bitGraph.methodNode, bitGraph.inputBits.map(newBits::get));
         }
 
         BitGraph minCutReduce(Context context, BitGraph bitGraph) {
             Set<Bit> anchorBits = new HashSet<>(bitGraph.parameterBits);
+            Set<Bit> inputBits = bitGraph.inputBits.getBits();
+            anchorBits.addAll(inputBits);
             Set<Bit> minCutBits = bitGraph.minCutBits(bitGraph.methodReturnValue.getCombinedValue().bitSet(),
-                    bitGraph.parameterBits, INFTY);
+                    anchorBits, INFTY);
             anchorBits.addAll(minCutBits);
             Map<Bit, Bit> newBits = new HashMap<>();
             // create the new bits
-            Stream.concat(bitGraph.methodReturnValue.getCombinedValue().stream(), minCutBits.stream()).forEach(b -> {
+            Stream.concat(Stream.concat(bitGraph.inputBits.getBits().stream(), bitGraph.methodReturnValue.getCombinedValue().stream()), minCutBits.stream()).forEach(b -> {
                 Set<Bit> reachable = bitGraph.calcReachableBits(b, anchorBits);
                 if (!b.deps().contains(b)){
                     reachable.remove(b);
@@ -692,7 +709,7 @@ public abstract class MethodInvocationHandler {
             });
             MethodReturnValue ret = bitGraph.methodReturnValue.map(newBits::get);
             ret.value.node(bitGraph.returnValue.node());
-            BitGraph newGraph = new BitGraph(context, bitGraph.parameters, ret, bitGraph.methodNode);
+            BitGraph newGraph = new BitGraph(context, bitGraph.parameters, ret, bitGraph.methodNode, bitGraph.inputBits.map(newBits::get));
             //assert !isReachable || newGraph.calcReachableBits(newGraph.returnValue.get(1), newGraph.parameters.get(0).bitSet()).size() > 0;
             return newGraph;
         }
@@ -706,10 +723,12 @@ public abstract class MethodInvocationHandler {
     static class MethodReturnValue {
         final Value value;
         final Map<Variable, AppendOnlyValue> globals;
+        final InputBits inputBits;
 
-        MethodReturnValue(Value value, Map<Variable, AppendOnlyValue> globals) {
+        MethodReturnValue(Value value, Map<Variable, AppendOnlyValue> globals, InputBits inputBits) {
             this.value = value;
             this.globals = globals;
+            this.inputBits = inputBits;
         }
 
         Value getCombinedValue(){
@@ -718,7 +737,8 @@ public abstract class MethodInvocationHandler {
 
         MethodReturnValue map(Function<Bit, Bit> transformer){
             return new MethodReturnValue(value.map(transformer), globals.entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().map(transformer).asAppendOnly())));
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().map(transformer).asAppendOnly())),
+                            inputBits.map(transformer));
         }
 
         @Override
@@ -732,7 +752,7 @@ public abstract class MethodInvocationHandler {
             @Override
             public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<Variable, AppendOnlyValue> globals) {
                 if (arguments.isEmpty() && callSite.definition.getTmpInputVariableDeclarations().isEmpty()){
-                    return new MethodReturnValue(vl.bot(), globals);
+                    return new MethodReturnValue(vl.bot(), globals, new InputBits());
                 }
                 Value inputVal = callSite.definition.getTmpInputVariableDeclarations().stream()
                         .map(t -> {
@@ -750,11 +770,11 @@ public abstract class MethodInvocationHandler {
                                                          .mapToObj(i -> bl.create(S, set)).collect(Value.collector())
                                         ).append(inputVal)));
                 if (!callSite.definition.hasReturnValue()){
-                    return new MethodReturnValue(vl.bot(), newGlobals);
+                    return new MethodReturnValue(vl.bot(), newGlobals, new InputBits());
                 }
                 Value value = IntStream.range(0, arguments.stream().mapToInt(Value::size).max().getAsInt())
                         .mapToObj(i -> bl.create(U, set)).collect(Value.collector());
-                return new MethodReturnValue(value, newGlobals);
+                return new MethodReturnValue(value, newGlobals, new InputBits());
             }
         });
         examplePropLines.add("handler=basic");
@@ -797,7 +817,7 @@ public abstract class MethodInvocationHandler {
         Map<Variable, AppendOnlyValue> newGlobals = globals.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(new Value(bl.create(S, set)))));
         Value ret = analyze(c, callSite, arguments);
-        return new MethodReturnValue(ret, newGlobals);
+        return new MethodReturnValue(ret, newGlobals, new InputBits());
     }
 
     public Value analyze(Context c, MethodInvocationNode callSite, List<Value> arguments){

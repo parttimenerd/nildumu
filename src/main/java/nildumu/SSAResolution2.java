@@ -188,7 +188,12 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
             }
             VisRet ret = child.accept(this);
             if (child instanceof BlockNode){
-                popNewVariablesScope();
+                Scope scope = scopes.pop();
+                scope.newVariables.forEach((o, n) -> {
+                    if (appendOnlyVariables.contains(o)){
+                        scopes.peek().newVariables.put(o, n);
+                    }
+                });
             }
             blockPartNodes.addAll(ret.statementsToPrepend);
             if (!ret.removeCurrentStatement) {
@@ -296,7 +301,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
             return resolution.create(v, true);
         }));
         resolution.resolve(method.parameters);
-        resolution.resolve(method.body).stream().filter(v -> !pre.values().contains(v))
+        List<String> createdVars = resolution.resolve(method.body);
+        createdVars.stream().filter(v -> !pre.values().contains(v))
                 .forEach(v -> method.body.prependVariableDeclaration(v, resolution.appendValueVariables.contains(resolution.resolveOrigin(v))));
         Map<String, String> post = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, v -> {
             return resolution.resolve(v);

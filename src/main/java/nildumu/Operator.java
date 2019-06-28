@@ -872,6 +872,7 @@ public interface Operator {
             callSite.globalDefs.forEach((v, p) -> {
                 c.setVariableValue(p.second, ret.globals.get(v));
             });
+            c.getNewlyIntroducedInputs().putAll(ret.inputBits);
             return ret.value;
         }
 
