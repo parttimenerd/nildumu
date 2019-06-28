@@ -68,6 +68,12 @@ program
 - the features are trimmed down, to make the implementation as simple
   as feasable
 - the analysis assumes that all program evaluations terminate
+- it supports `print(X)` statements, where `X` is an arbitrary expression
+  whichs value is leaked to low,
+  and `VAR = input();` statements where a high user input is assigned to the variable `VAR`
+- `input()` calls do not leak information on their own, in general,
+  this can be modified via the `input_prints` statement, that has to be placed
+  after the bit width statement
 
 UI
 ---
