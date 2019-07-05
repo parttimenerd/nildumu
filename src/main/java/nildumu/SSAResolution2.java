@@ -168,7 +168,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
             VariableAccessNode variableAccess = (VariableAccessNode)assignment.expression;
             assignment.expression = new VariableAccessNode(assignment.expression.location, resolve(variableAccess.ident));
         } else {
-            visitChildrenDiscardReturn(assignment.expression);
+            assignment.expression.accept(this);
         }
         String newVariable = create(assignment.variable);
         return new VisRet(true,
@@ -358,8 +358,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     @Override
     public VisRet visit(MethodInvocationNode methodInvocation) {
-        Map<String, String> appToBeforeSSA = appendOnlyVariables.stream().collect(Collectors.toMap(s -> s, this::resolve));
         visitChildrenDiscardReturn(methodInvocation);
+        Map<String, String> appToBeforeSSA = appendOnlyVariables.stream().collect(Collectors.toMap(s -> s, this::resolve));
         Map<String, String> afterSSA = appendOnlyVariables.stream()
                 .map(v -> new Pair<>(v, create(v))).collect(Collectors.toMap(p -> p.first, p -> p.second));
         Map<String, Pair<String, String>> combined = appendOnlyVariables.stream()

@@ -206,7 +206,6 @@ public class Processor {
                     && reduceResult.finished()){
                         // this is the case if nothing else changes, except the append only variables
                         // basic idea: just create a star as for summary graphs
-                        // TODO improve
                         System.out.println("-> Return");
                         return false;
                     }

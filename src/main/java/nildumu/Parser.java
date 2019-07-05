@@ -32,9 +32,6 @@ import static nildumu.util.Util.p;
  */
 public class Parser implements Serializable {
 
-    static final String L_PRINT_VAR = "__l_print";
-    static final String H_INPUT_VAR = "__h_input";
-
     /**
      * The terminals with the matching regular expression
      */
@@ -54,11 +51,9 @@ public class Parser implements Serializable {
         ELSE("else"),
         TRUE("true"),
         FALSE("false"),
-        PRINT("print"),
         VOID("void"),
         USE_SEC("use_sec"),
         BIT_WIDTH("bit_width"),
-        INPUT_PRINTS("input_prints"),
         PHI("phi"),
         TILDE("~"),
 
@@ -135,17 +130,16 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8ldd9r5g7gfff45fff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static Generator generator = Generator.getCachedIfPossible("stuff/ik8ldd9frf5gg7gfff345fff2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
-                Util.Box<Boolean> inputPrints = new Util.Box<>(false);
-                builder.addRule("program", "use_sec? bit_width? input_prints? lines", asts -> {
+                builder.addRule("program", "use_sec? bit_width? lines", asts -> {
                             SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>)asts.get(0)).get(0).wrapped;
                             int declaredBitWidth = asts.get(1).children().isEmpty() ? -1 : ((ListAST<WrapperNode<Integer>>)asts.get(1)).get(0).wrapped;
                             /*
                              * Calc bit width
                              */
-                            List<MJNode> topLevelNodes = asts.get(3).<WrapperNode<List<MJNode>>>as().wrapped;
+                            List<MJNode> topLevelNodes = asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped;
                             int lowerBitWidthBound = topLevelNodes.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
 
                                 @Override
@@ -202,48 +196,7 @@ public class Parser implements Serializable {
                                 }
                             };
                             topLevelNodes.forEach(n -> n.accept(visitor));
-                            switch (topLevelNodes.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
-
-                                @Override
-                                public Integer visit(MJNode node) {
-                                    return visitChildren(node).stream().max(Comparator.naturalOrder()).orElse(0);
-                                }
-
-                                @Override
-                                public Integer visit(VariableAssignmentNode assignment) {
-                                    switch (assignment.variable){
-                                        case H_INPUT_VAR:
-                                            return 2;
-                                        case L_PRINT_VAR:
-                                            return 1;
-                                        default:
-                                            return 0;
-                                    }
-                                }
-
-                                @Override
-                                public Integer visit(VariableDeclarationNode variableDeclaration) {
-                                    switch (variableDeclaration.variable){
-                                        case H_INPUT_VAR:
-                                            return 3;
-                                        case L_PRINT_VAR:
-                                            return 4;
-                                        default:
-                                            return 0;
-                                    }
-                                }
-                            })).max().orElse(0)){
-                                case 2:
-                                    node.globalBlock.add(0,
-                                            new AppendOnlyVariableDeclarationNode(new Location(0, 0), H_INPUT_VAR, secLattice.top().toString()));
-                                    node.context.addAppendOnlyVariable(secLattice.top(), H_INPUT_VAR);
-                                case 1:
-                                    node.globalBlock.add(0,
-                                            new AppendOnlyVariableDeclarationNode(new Location(0, 0), L_PRINT_VAR, secLattice.bot().toString()));
-                                    node.context.addAppendOnlyVariable(secLattice.bot(), L_PRINT_VAR);
-                            }
-                            inputPrints.val = false;
-                            statedBitWidth.val = 2;
+                            node.handleInputAndPrint();
                             return node;
                         })
                         .addRule("use_sec", "USE_SEC IDENT SEMICOLON", asts -> {
@@ -252,10 +205,6 @@ public class Parser implements Serializable {
                         .addRule("bit_width", "BIT_WIDTH INTEGER_LITERAL SEMICOLON", asts -> {
                             statedBitWidth.val = Integer.parseInt(asts.get(1).getMatchedString());
                             return new WrapperNode<>(asts.getStartLocation(), statedBitWidth.val);
-                        })
-                        .addRule("input_prints", "INPUT_PRINTS SEMICOLON", asts -> {
-                            inputPrints.val = true;
-                            return asts;
                         })
                         .addRule("lines", "line_w_semi lines", asts -> {
                             WrapperNode<List<MJNode>> left = (WrapperNode<List<MJNode>>) asts.get(1);
@@ -300,26 +249,26 @@ public class Parser implements Serializable {
                                     (IntegerLiteralNode)asts.get(5),
                                     asts.get(0).getMatchedString());
                         })
-                        .addRule("append_decl_statement", "IDENT APPEND_ONLY INT IDENT", asts -> {
+                        .addRule("append_decl_statement", "IDENT APPEND_ONLY INT ident", asts -> {
                             return new AppendOnlyVariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(3).getMatchedString(),
                                     asts.get(0).getMatchedString());
                         })
-                        .addRule("append_decl_statement", "IDENT APPEND_ONLY INPUT INT IDENT", asts -> {
+                        .addRule("append_decl_statement", "IDENT APPEND_ONLY INPUT INT ident", asts -> {
                             return new AppendOnlyVariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(4).getMatchedString(),
                                     asts.get(0).getMatchedString(),
                                     true);
                         })
-                        .addRule("method", "INT IDENT LPAREN parameters RPAREN method_body", asts -> {
+                        .addRule("method", "INT ident LPAREN parameters RPAREN method_body", asts -> {
                             return new MethodNode(asts.get(0).getMatchedTokens().get(0).location,
                                     asts.get(1).getMatchedString(),
                                     (ParametersNode)asts.get(3), (BlockNode)asts.get(5),
                                     new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
                         })
-                        .addRule("method", "INT IDENT globals LPAREN parameters RPAREN method_body", asts -> {
+                        .addRule("method", "INT ident globals LPAREN parameters RPAREN method_body", asts -> {
                             return new MethodNode(asts.get(0).getMatchedTokens().get(0).location,
                                     asts.get(1).getMatchedString(),
                                     (ParametersNode)asts.get(4), (BlockNode)asts.get(6),
@@ -336,7 +285,7 @@ public class Parser implements Serializable {
                             ParameterNode param = (ParameterNode)asts.get(0);
                             return new ParametersNode(param.location, Utils.makeArrayList(param));
                         })
-                        .addRule("parameter", "INT IDENT", asts -> {
+                        .addRule("parameter", "INT ident", asts -> {
                             return new ParameterNode(asts.getStartLocation(), asts.get(1).getMatchedString());
                         })
                         .addEitherRule("statement", "block")
@@ -392,21 +341,21 @@ public class Parser implements Serializable {
                         .addRule("block_statement", "input_statement")
                         .addRule("block_statement", "tmp_input_decl_statement")
                         .addRule("block_statement", "block")
-                        .addRule("var_decl", "INT IDENT", asts -> {
+                        .addRule("var_decl", "INT ident", asts -> {
                             return new VariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(1).getMatchedString(),
                                     null,
                                     !asts.get(0).getMatchedString().equals("int"));
                         })
-                        .addRule("var_decl", "INT IDENT EQUAL_SIGN (phi|expression)", asts -> {
+                        .addRule("var_decl", "INT ident EQUAL_SIGN (phi|expression)", asts -> {
                             return new VariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(1).getMatchedString(),
                                     (ExpressionNode)asts.get(3),
                                     !asts.get(0).getMatchedString().equals("int"));
                         })
-                        .addRule("local_variable_assignment_statement", "IDENT EQUAL_SIGN (phi|expression)", asts -> {
+                        .addRule("local_variable_assignment_statement", "ident EQUAL_SIGN (phi|expression)", asts -> {
                             return new VariableAssignmentNode(
                                     asts.getStartLocation(),
                                     asts.get(0).getMatchedString(),
@@ -451,41 +400,6 @@ public class Parser implements Serializable {
                         .addRule("return_statement", "RETURN expression", asts -> {
                             return new ReturnStatementNode((ExpressionNode)asts.get(1));
                         })
-                        .addRule("print_statement", "PRINT LPAREN expression RPAREN", asts -> {
-                            Location loc = asts.getStartLocation();
-                            return new VariableAssignmentNode(loc, L_PRINT_VAR,
-                                    new BinaryOperatorNode(
-                                            new VariableAccessNode(loc, L_PRINT_VAR),
-                                                                   (ExpressionNode)asts.get(2),
-                                            APPEND));
-                        })
-                        .addRule("print_statement", "PRINT LPAREN RPAREN", asts -> {
-                            Location loc = asts.getStartLocation();
-                            return new VariableAssignmentNode(loc, L_PRINT_VAR,
-                                    new BinaryOperatorNode(
-                                            new VariableAccessNode(loc, L_PRINT_VAR),
-                                            new IntegerLiteralNode(loc, vl.parse(0)),
-                                            APPEND));
-                        })
-                        .addRule("input_statement", "IDENT EQUAL_SIGN INPUT LPAREN RPAREN", asts -> {
-                            Location loc = asts.getStartLocation();
-                            String var = "__tmp__" + loc.column + "_" + loc.line;
-                            BlockNode block = new BlockNode(loc, new ArrayList<>(Arrays.asList(
-                                    new TmpInputVariableDeclarationNode(loc, var,
-                                            new IntegerLiteralNode(loc, IntStream.range(0, statedBitWidth.val).mapToObj(i -> bl.create(Lattices.B.U)).collect(Lattices.Value.collector())),
-                                            "h"),
-                                    new VariableAssignmentNode(loc, H_INPUT_VAR, new BinaryOperatorNode(new VariableAccessNode(loc, H_INPUT_VAR), new VariableAccessNode(loc, var), APPEND)),
-                                    new VariableAssignmentNode(loc, asts.get(0).getMatchedString(), new VariableAccessNode(loc, var))
-                                    )));
-                            if (inputPrints.val){
-                                block.add(new VariableAssignmentNode(loc, L_PRINT_VAR,
-                                        new BinaryOperatorNode(
-                                                new VariableAccessNode(loc, L_PRINT_VAR),
-                                                new IntegerLiteralNode(loc, vl.parse(0)),
-                                                APPEND)));
-                            }
-                            return block;
-                        })
                         .addOperators("expression", "postfix_expression", operators -> {
                             operators.defaultBinaryAction((asts, op) -> {
                                         return new BinaryOperatorNode((ExpressionNode)asts.get(0), (ExpressionNode)asts.get(2), valueOf(op));
@@ -526,27 +440,27 @@ public class Parser implements Serializable {
                         })
                         .addRule("postfix_expression", "primary_expression")
                         .addEitherRule("postfix_expression", "method_invocation")
-                        .addRule("method_invocation", "IDENT globals LPAREN arguments RPAREN", asts -> {
+                        .addRule("method_invocation", "ident globals LPAREN arguments RPAREN", asts -> {
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
                                     (ArgumentsNode)asts.get(3), asts.get(1).as());
                         })
-                        .addRule("method_invocation", "IDENT globals LPAREN expression RPAREN", asts -> {
+                        .addRule("method_invocation", "ident globals LPAREN expression RPAREN", asts -> {
                             ExpressionNode arg = (ExpressionNode)asts.get(3);
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
                                     new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
                                     asts.get(1).as());
                         })
-                        .addRule("method_invocation", "IDENT LPAREN arguments RPAREN", asts -> {
+                        .addRule("method_invocation", "ident LPAREN arguments RPAREN", asts -> {
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
                                     (ArgumentsNode)asts.get(2), new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
                         })
-                        .addRule("method_invocation", "IDENT LPAREN expression RPAREN", asts -> {
+                        .addRule("method_invocation", "ident LPAREN expression RPAREN", asts -> {
                             ExpressionNode arg = (ExpressionNode)asts.get(2);
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
                                     new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
                                     new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
                         })
-                        .addRule("phi", "PHI LPAREN IDENT COMMA IDENT RPAREN", asts -> {
+                        .addRule("phi", "PHI LPAREN ident COMMA ident RPAREN", asts -> {
                             return new PhiNode(asts.getStartLocation(), Arrays.asList(asts.get(2).getMatchedString(),
                                     asts.get(4).getMatchedString()));
                         })
@@ -568,7 +482,7 @@ public class Parser implements Serializable {
                             return new IntegerLiteralNode(asts.getStartLocation(), val);
                         })
                         .addRule("primary_expression", "var_access")
-                        .addRule("var_access", "IDENT", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
+                        .addRule("var_access", "ident", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
                         .addRule("primary_expression", "LPAREN expression RPAREN", asts -> {
                             return asts.get(1);
                         })
@@ -595,10 +509,11 @@ public class Parser implements Serializable {
                             globalNode.globalVarSSAVars.put(glob.first, p(glob.second, glob.third));
                             return new GlobalVariablesNode(((WrapperNode<?>)asts.get(0)).location, globalNode.globalVarSSAVars);
                         })
-                        .addRule("global", "IDENT ARROW IDENT ARROW IDENT", asts -> {
+                        .addRule("global", "ident ARROW ident ARROW ident", asts -> {
                             return new WrapperNode<>(asts.getStartLocation(),
                                     new Utils.Triple<>(asts.get(0).getMatchedString(), asts.get(2).getMatchedString(), asts.get(4).getMatchedString()));
-                        });
+                        })
+                        .addRule("ident", "IDENT|INPUT");
             }, "program");
 
     /**
@@ -1058,6 +973,47 @@ public class Parser implements Serializable {
                 }
             });
         }
+
+        /**
+         * From all called methods, …
+         */
+        public List<TmpInputVariableDeclarationNode>  getTmpInputVariableDeclarationsFromAll(){
+            Set<MJNode> alreadyChecked = new HashSet<>();
+            List<TmpInputVariableDeclarationNode> collection = new ArrayList<>();
+            accept(new NodeVisitor<Object>() {
+                @Override
+                public Object visit(MJNode node) {
+                    if (!alreadyChecked.contains(node)) {
+                        alreadyChecked.add(node);
+                        visitChildrenDiscardReturn(node);
+                    }
+                    return null;
+                }
+
+                @Override
+                public Object visit(TmpInputVariableDeclarationNode inputDecl) {
+                    collection.add(inputDecl);
+                    return null;
+                }
+
+                @Override
+                public Object visit(BlockNode block) {
+                    if (!alreadyChecked.contains(block)){
+                        alreadyChecked.add(block);
+                        visitChildrenDiscardReturn(block);
+                    }
+                    return null;
+                }
+
+                @Override
+                public Object visit(MethodInvocationNode methodInvocation) {
+                    visitChildrenDiscardReturn(methodInvocation);
+                    visitChildrenDiscardReturn(methodInvocation.definition.body);
+                    return null;
+                }
+            });
+            return collection;
+        }
     }
 
     /**
@@ -1188,6 +1144,108 @@ public class Parser implements Serializable {
 
         public Collection<MethodNode> methods(){
             return methods.values();
+        }
+
+        void handleInputAndPrint(){
+            for (Sec<?> sec : context.sl.elements()){
+                handleInputAndPrint(sec);
+            }
+        }
+
+        public String inputName(Sec<?> sec){
+            if (sec == sec.lattice().top()){
+                return "input";
+            }
+            return sec.toString() + "_input";
+        }
+
+        public static String printName(Sec<?> sec){
+            if (sec == sec.lattice().bot()){
+                return "print";
+            }
+            return sec.toString() + "_print";
+        }
+
+        private void handleInputAndPrint(Sec<?> sec){
+            handleInput(sec);
+            handlePrint(sec);
+        }
+
+        private void handleInput(Sec<?> sec){
+            if (!isMethodUsed(inputName(sec))){
+                return;
+            }
+            Location loc = new Location(0, 0);
+            addMethodIfNeeded(new MethodNode(loc, inputName(sec),
+                    new ParametersNode(loc, Collections.emptyList()), new BlockNode(loc, Utils.makeArrayList(
+                    new TmpInputVariableDeclarationNode(loc, "tmp",
+                            new IntegerLiteralNode(loc, IntStream.range(0, context.maxBitWidth).mapToObj(i -> bl.create(Lattices.B.U)).collect(Lattices.Value.collector())),
+                            "h"),
+                    new VariableAssignmentNode(loc, inputName(sec), new BinaryOperatorNode(new VariableAccessNode(loc, inputName(sec)), new VariableAccessNode(loc, "tmp"), APPEND)),
+                    new ReturnStatementNode(new VariableAccessNode(loc, "tmp"))
+            )), new GlobalVariablesNode(loc, new HashMap<>())));
+            addAppendOnlyVariableDeclarationIfNeeded(inputName(sec), sec);
+        }
+
+        private void handlePrint(Sec<?> sec){
+            if (!isMethodUsed(printName(sec))){
+                return;
+            }
+            Location loc = new Location(0, 0);
+            addMethodIfNeeded(new MethodNode(loc, printName(sec), new ParametersNode(loc, Arrays.asList(new ParameterNode(loc, "x"))), new BlockNode(loc, Utils.makeArrayList(
+                    new VariableAssignmentNode(loc, printName(sec),
+                            new BinaryOperatorNode(
+                                    new VariableAccessNode(loc, printName(sec)),
+                                    new VariableAccessNode(loc, "x"),
+                                    APPEND))
+            )), new GlobalVariablesNode(loc, new HashMap<>())));
+            addAppendOnlyVariableDeclarationIfNeeded(printName(sec), sec);
+        }
+
+        private void addAppendOnlyVariableDeclarationIfNeeded(String name, Sec<?> sec){
+            if (!doesVariableExist(name)){
+                globalBlock.statementNodes.add(0, new AppendOnlyVariableDeclarationNode(new Location(0, 0), name, sec.toString()));
+                context.addAppendOnlyVariable(sec, name);
+            }
+        }
+
+        private void addMethodIfNeeded(MethodNode method){
+            if (!hasMethod(method.name)){
+                addMethod(method);
+            }
+        }
+
+        private boolean doesVariableExist(String variable){
+            return globalBlock.accept(new StatementVisitor<Boolean>() {
+                @Override
+                public Boolean visit(StatementNode statement) {
+                    return false;
+                }
+
+                @Override
+                public Boolean visit(VariableDeclarationNode variableDeclaration) {
+                    return variableDeclaration.variable.equals(variable);
+                }
+
+                @Override
+                public Boolean visit(BlockNode block) {
+                    return visitChildren(block).stream().anyMatch(Boolean::booleanValue);
+                }
+            });
+        }
+
+        private boolean isMethodUsed(String name){
+            return accept(new NodeVisitor<Boolean>() {
+                @Override
+                public Boolean visit(MJNode node) {
+                    return visitChildren(node).stream().anyMatch(Boolean::booleanValue);
+                }
+
+                @Override
+                public Boolean visit(MethodInvocationNode methodInvocation) {
+                    return methodInvocation.method.equals(name) || visit((MJNode)methodInvocation);
+                }
+            });
         }
     }
 
@@ -2034,7 +2092,7 @@ public class Parser implements Serializable {
         @Override
         public String toString() {
             return String.format("while [%s] (%s) %s", preCondVarAss.stream()
-                    .map(MJNode::toString).collect(Collectors.joining(";")),
+                    .map(MJNode::toString).collect(Collectors.joining(" ")),
                     conditionalExpression, body);
         }
 
@@ -2072,7 +2130,7 @@ public class Parser implements Serializable {
         @Override
         public String toPrettyString(String indent, String incr) {
             String pres = preCondVarAss.stream()
-                    .map(MJNode::toString).collect(Collectors.joining(""));
+                    .map(MJNode::toString).collect(Collectors.joining(" "));
             return String.format("%swhile %s (%s) {\n%s\n%s}", indent, pres.isEmpty() ? "" : "[" + pres + "]",
                     conditionalExpression, body.toPrettyString(indent + incr, incr), indent);
         }

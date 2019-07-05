@@ -82,6 +82,7 @@ public class PrintHistory {
         ReduceResult<Lattices.AppendOnlyValue> reduceAppendOnly(BiConsumer<Bit, Integer> weighter){
             HistoryPerGlobalEntry currentHist = this;
             System.out.println("Reduce");
+            System.out.println("                 " + name + ": " + currentHist.value);
             ReduceResult<Lattices.AppendOnlyValue> current = new ReduceResult<>(currentHist.value.clone(), false, true);
             if (!prev.isPresent()){ // its the first round
                 return current;
@@ -119,7 +120,10 @@ public class PrintHistory {
             // if the previous value did already ends with the star bits that we want to add
             // return the previous value
             System.out.println(previousHist.difference);
-            if (previousHist.difference.get(previousHist.difference.size()).valueGreaterEquals(s) ||
+            if (previousHist.value.valueEquals(currentHist.value)){
+                return new ReduceResult<>(previousHist.value.cloneWithoutEs(), false, false);
+            }
+            if ((previousHist.difference.size() > 0 && previousHist.difference.get(previousHist.difference.size()).valueGreaterEquals(s)) ||
                 previousHist.value.stream().anyMatch(b -> b.valueGreaterEquals(s))){
                 return new ReduceResult<>(previousHist.value.cloneWithoutEs(), true, false);
             }
@@ -127,7 +131,7 @@ public class PrintHistory {
             // => merging
 
             // if the current variable is also related to input, then we know, that `s` may leak infinitely many bytes
-            // HACK
+            // TODO this is just a hack
             if (name.name.contains("input")) {
                 s.deps().stream().forEach(b -> weighter.accept(b, Context.INFTY));
             }

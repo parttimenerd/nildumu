@@ -6,12 +6,14 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
+import java.util.logging.Level;
 
+import static com.google.common.truth.Truth.assertThat;
 import static java.time.Duration.ofSeconds;
+import static nildumu.Context.LOG;
 import static nildumu.FunctionTests.parse;
 import static nildumu.SSA2Tests.toSSA;
-import static org.junit.jupiter.api.Assertions.assertTimeout;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class AppendTests {
 
@@ -54,12 +56,12 @@ public class AppendTests {
 
     @Test
     public void testPrint(){
-        parse("bit_width 2; h input int h = 0buu; if (h){print()}").leaks(1).run();
+        parse("bit_width 2; h input int h = 0buu; if (h){print(0)}").leaks(1).run();
     }
 
     @ParameterizedTest
     @CsvSource({
-            "'while (h == 0) { print() }', 3",
+            "'while (h == 0) { print(0) }', 3",
             "'while (h == 0) { print(h) }', 3"
     })
     public void testBasicPrintLoop(String program, double leakage){
@@ -89,12 +91,12 @@ public class AppendTests {
     @CsvSource({
             "'int func(int a, int b) {print(a + b)} func(h, 0)', 'basic', '0bss', 2",
             "'int func(int a, int b) {print(a + b)} func(h, 0)', 'handler=inlining;maxrec=1;bot=basic', '0buu', 2",
-            "'int func(int a){ if (a > 0){print(); func(a - 1)}} func(h)', basic, '0bss', 2"
+            "'int func(int a){ if (a > 0){print(0); func(a - 1)}} func(h)', basic, '0bss', 2"
     })
     public void testPrintInFunction(String program, String handler, String expectedPrintValue, double leakage){
         String runProgram = "bit_width 2; h input int h = 0buu; " + program;
         System.out.println(toSSA(runProgram, false).toPrettyString());
-        parse(runProgram, handler).leaks(leakage).val(Parser.L_PRINT_VAR, expectedPrintValue).run();
+        parse(runProgram, handler).leaks(leakage).val(Parser.ProgramNode.printName(Lattices.BasicSecLattice.LOW), expectedPrintValue).run();
     }
 
     @ParameterizedTest
@@ -103,25 +105,24 @@ public class AppendTests {
                     "1', 0",
             "'int func(int a) {print(a)} func(h)', summary, '0buu', 2",
             "'int func(int a, int b) {print(a + b)} func(h, 0)', summary, '0buu', 2",
-            "'int func(int a){ if (a > 0){print(); func(a - 1)}} func(h)', summary, '', 2",
-            "'int func(int a){ print(); func(a - 1) } func(h)', summary, '', 0"
+            "'int func(int a){ if (a > 0){print(0); func(a - 1)}} func(h)', summary, '', 2",
+            "'int func(int a){ print(0); func(a - 1) } func(h)', summary, '', 0"
     })
     public void testPrintInFunctionWithSummaryHandler(String program, String handler, String expectedPrintValue, double leakage){
         String runProgram = "bit_width 2; h input int h = 0buu; " + program;
         System.out.println(toSSA(runProgram, false).toPrettyString());
         ContextMatcher matcher = parse(runProgram, handler).leaks(leakage);
         if (expectedPrintValue.isEmpty()){
-            matcher.val(Parser.L_PRINT_VAR, val -> val.lastBit(Lattices.B.S));
+            matcher.val(Parser.ProgramNode.printName(Lattices.BasicSecLattice.LOW), val -> val.lastBit(Lattices.B.S));
         } else {
-            matcher.val(Parser.L_PRINT_VAR, expectedPrintValue);
+            matcher.val(Parser.ProgramNode.printName(Lattices.BasicSecLattice.LOW), expectedPrintValue);
         }
         matcher.run();
     }
 
     @ParameterizedTest
     @CsvSource({
-            "'bit_width 2; int a; a = input(); print(a)', 2",
-            "'bit_width 2; input_prints; int a; a = input(); print(a)', 2"
+            "'bit_width 2; int a; a = input(); print(a)', 2"
     })
     public void basicInputTest(String program, double leakage){
         parse(program).leaks(leakage).run();
@@ -136,8 +137,7 @@ public class AppendTests {
 
     @ParameterizedTest
     @CsvSource({
-            "'', 0",
-            "'input_prints;', 1"
+            "'', 0"
     })
     public void testBasicInputIfAndInputPrints(String insertAfterBitWidth, double leakage){
         String program = String.format("bit_width 3; %s h input int h = 0buuu; int a = 0; " +
@@ -178,22 +178,72 @@ public class AppendTests {
 
     @ParameterizedTest
     @CsvSource({
+            "'int func() {return input();} int a = func()', 1",
+            "'int func() {print(input());} int a = func()', 1"
+    })
+    public void testGetTmpInputVariableDeclarationsFromAll(String program, int count){
+        Parser.ProgramNode parsedProgram = Parser.process(program);
+        assertEquals(count, parsedProgram.globalBlock.getTmpInputVariableDeclarationsFromAll().size());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'int a = input()', 0buu",
+            "'int func() {return input();} int a = func()', 0buu"
+    })
+    public void testBasicHandlerWithInputs(String program, String valueOfA){
+        String runProgram = "bit_width 2; " + program;
+        System.out.println(toSSA(runProgram, false).toPrettyString());
+        parse(runProgram, "basic").val("a", valueOfA).run();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             "'int func() {int a; a = input(); print(a); func()} func()', basic, inf",
             "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', basic, inf",
+            "'int func() {print(input());} func()', inlining, 2",
+            "'int func() {return input();} print(func())', basic, inf",
+            "'int func() {print(input());} func()', basic, inf",
+            "'int func() {return input();} print(func())', basic, inf",
             "'int func() {int a; a = input(); print(a); func()} func()', inlining, inf",
             "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', inlining, inf",
             "'int func() {int a; a = input(); return a;} l output int o = func()', 'handler=summary', 2",
             "'int func() {int a; a = input(); print(a);} func()', 'handler=summary', 2",
             "'int func() {int a; a = input(); print(a); func()} func()', 'handler=summary', inf",
             "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', summary, inf",
-            "'int func(int h) {int a; a = input(); print(a); func2(0)}" +
-              " int func2(int h) {int a; a = input(); print(a); func(0)} func(h)', summary, inf",
             "'int func() {int a; a = input(); print(a); func()} func()', 'handler=summary;reduction=mincut', inf",
             "'int func(int h) {int a; a = input(); print(a); func(0)} func(h)', 'handler=summary;reduction=mincut', inf",
     })
     public void testPrintInFunctionWithSummaryHandler(String program, String handler, String leakage){
         String runProgram = "bit_width 2; h input int h = 0buu; " + program;
         System.out.println(toSSA(runProgram, false).toPrettyString());
+        parse(runProgram, handler).leaks(leakage).run();
+    }
+
+    @Test
+    public void testCallGraphContainsInputFuncProperly(){
+        Parser.ProgramNode program = Parser.process("int func() {print(input()); func2()} int func2() {func()} func()");
+        CallGraph graph = new CallGraph(program);
+        assertThat(graph.mainNode.calledCallNodesAndSelfInPostOrder()).contains(graph.methodToNode.get(program.getMethod("input")));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'int func() {print(input()); func2()}" +
+                    " int func2() {func()} func()', basic, inf",
+            "'int func() {print(input()); func2()}" +
+                    " int func2() {func()} func()', inlining, inf",
+            "'print(input())', summary, 2",
+            "'int func() {print(input()); func()} func()', summary, inf",
+            "'int func() {print(input()); func2()}" +
+                    " int func2() {func()} func()', summary, inf",
+            "'int func(int h) {int a; a = input(); print(a); func2(0)}" +
+                    " int func2(int h) {int a; a = input(); print(a); func(0)} func(h)', summary, inf"
+    })
+    public void testPrintInFunctionWithSummaryHandlerTwoLevelRecursion(String program, String handler, String leakage){
+        String runProgram = "bit_width 2; h input int h = 0buu; " + program;
+        System.out.println(toSSA(runProgram, false).toPrettyString());
+        LOG.setLevel(Level.FINE);
         parse(runProgram, handler).leaks(leakage).run();
     }
 }

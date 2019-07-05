@@ -253,7 +253,9 @@ public abstract class MethodInvocationHandler {
                     c.setVariableValue(method.parameters.get(i).definition, arguments.get(i));
                 }
                 globals.forEach((v, a) -> {
-                    c.setVariableValue(method.globalDefs.get(v).first, a);
+                    if (method.globalDefs.containsKey(v)) {
+                        c.setVariableValue(method.globalDefs.get(v).first, a);
+                    }
                 });
                 Processor.process(c, method.body);
                 Value ret = c.getReturnValue();
@@ -573,6 +575,8 @@ public abstract class MethodInvocationHandler {
                 }
                 DotRegistry.get().store("summary",  name + " [reduced]",
                         () -> () -> furtherReducedGraph.value.createDotGraph("", false));
+                        System.out.println("~~~" + name);
+                        furtherReducedGraph.value.methodReturnValue.globals.forEach((v, a) -> System.out.println("      " + v + " = " + a));
                 return furtherReducedGraph;
             }, node ->  {
                 BitGraph graph = bot(program, node.method, callSites, usedMode);
@@ -751,17 +755,20 @@ public abstract class MethodInvocationHandler {
         register("basic", s -> {}, ps -> new MethodInvocationHandler(){
             @Override
             public MethodReturnValue analyze(Context c, MethodInvocationNode callSite, List<Value> arguments, Map<Variable, AppendOnlyValue> globals) {
-                if (arguments.isEmpty() && callSite.definition.getTmpInputVariableDeclarations().isEmpty()){
+                if (arguments.isEmpty() && callSite.definition.getTmpInputVariableDeclarationsFromAll().isEmpty()){
                     return new MethodReturnValue(vl.bot(), globals, new InputBits());
                 }
-                Value inputVal = callSite.definition.getTmpInputVariableDeclarations().stream()
+                Value inputVal = callSite.definition.getTmpInputVariableDeclarationsFromAll().stream()
                         .map(t -> {
-                            Bit b = bl.create(U);
-                            c.weight(b, INFTY);
-                            c.addInputValue(c.sl.parse(t.secLevel), new Value(b));
-                            return b;
-                        }).collect(Value.collector());
-                DependencySet set = arguments.stream().flatMap(Value::stream).collect(DependencySet.collector());
+                            Value val = IntStream.range(0, c.maxBitWidth).mapToObj(i -> {
+                                Bit b = bl.create(U);
+                                c.weight(b, INFTY);
+                                return b;
+                            }).collect(Value.collector());
+                            c.addInputValue(c.sl.parse(t.secLevel), val);
+                            return val;
+                        }).flatMap(Value::stream).collect(Value.collector());
+                DependencySet set = Stream.concat(arguments.stream().flatMap(Value::stream), inputVal.stream()).collect(DependencySet.collector());
                 Map<Variable, AppendOnlyValue> newGlobals = globals.entrySet().stream()
                         .collect(Collectors.toMap(Map.Entry::getKey,
                                 m -> m.getValue()
@@ -772,7 +779,7 @@ public abstract class MethodInvocationHandler {
                 if (!callSite.definition.hasReturnValue()){
                     return new MethodReturnValue(vl.bot(), newGlobals, new InputBits());
                 }
-                Value value = IntStream.range(0, arguments.stream().mapToInt(Value::size).max().getAsInt())
+                Value value = IntStream.range(0, arguments.stream().mapToInt(Value::size).max().orElse(c.maxBitWidth))
                         .mapToObj(i -> bl.create(U, set)).collect(Value.collector());
                 return new MethodReturnValue(value, newGlobals, new InputBits());
             }

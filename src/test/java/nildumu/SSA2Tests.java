@@ -184,6 +184,17 @@ public class SSA2Tests {
         toSSA("while (1) {int a = 0; a = a + 1; }");
     }
 
+    @Test
+    public void testBasicNestedCalls(){
+        toSSA("print(input())").globalBlock.children().stream()
+                .filter(b -> b.toPrettyString().startsWith("print[")).forEach(b -> {
+            Parser.MethodInvocationNode print = (Parser.MethodInvocationNode)b.children().get(0);
+            Parser.MethodInvocationNode input = (Parser.MethodInvocationNode)print.arguments.get(0);
+            assertEquals(input.globals.globalVarSSAVars.get("input").second,
+                    print.globals.globalVarSSAVars.get("input").first);
+        });
+    }
+
     public static Parser.ProgramNode toSSA(String program){
         return toSSA(program, true);
     }

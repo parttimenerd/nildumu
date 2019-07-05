@@ -113,7 +113,7 @@ public class CallGraph {
 
         @Override
         public Set<MethodNode> visit(MethodInvocationNode methodInvocation) {
-            return Collections.singleton(methodInvocation.definition);
+            return Stream.concat(Stream.of(methodInvocation.definition), methodInvocation.arguments.accept(this).stream()).collect(Collectors.toSet());
         }
 
         @Override

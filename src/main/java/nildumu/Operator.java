@@ -870,7 +870,9 @@ public interface Operator {
                     .collect(Collectors.toMap(e -> e.getKey(), e -> c.getVariableValue(e.getValue().first).asAppendOnly()));
             MethodInvocationHandler.MethodReturnValue ret = c.methodInvocationHandler().analyze(c, callSite, arguments, globals);
             callSite.globalDefs.forEach((v, p) -> {
-                c.setVariableValue(p.second, ret.globals.get(v));
+                if (ret.globals.containsKey(v)) {
+                    c.setVariableValue(p.second, ret.globals.get(v));
+                }
             });
             c.getNewlyIntroducedInputs().putAll(ret.inputBits);
             return ret.value;
