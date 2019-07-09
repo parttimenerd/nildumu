@@ -248,7 +248,7 @@ public abstract class MethodInvocationHandler {
             MethodNode method = callSite.definition;
             if (methodCallCounter.get(method) < maxRec) {
                 methodCallCounter.put(method, methodCallCounter.get(method) + 1);
-                c.pushNewMethodInvocationState(callSite, arguments);
+                c.pushNewFrame(callSite, arguments);
                 for (int i = 0; i < arguments.size(); i++) {
                     c.setVariableValue(method.parameters.get(i).definition, arguments.get(i));
                 }
@@ -262,7 +262,7 @@ public abstract class MethodInvocationHandler {
                 Map<Variable, AppendOnlyValue> globalVals = method.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                         e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
                 InputBits inputBits = c.getNewlyIntroducedInputs();
-                c.popMethodInvocationState();
+                c.popFrame();
                 methodCallCounter.put(method, methodCallCounter.get(method) - 1);
                 return new MethodReturnValue(ret, globalVals, inputBits);
             }
@@ -634,8 +634,8 @@ public abstract class MethodInvocationHandler {
         }
 
         BitGraph methodIteration(Context c, MethodInvocationNode callSite, MethodInvocationHandler handler, List<Value> parameters){
-            c.resetNodeValueStates();
-            c.pushNewMethodInvocationState(callSite, parameters.stream().flatMap(Value::stream).collect(Collectors.toSet()));
+            c.resetFrames();
+            c.pushNewFrame(callSite, parameters.stream().flatMap(Value::stream).collect(Collectors.toSet()));
             for (int i = 0; i < parameters.size(); i++) {
                 c.setVariableValue(callSite.definition.parameters.get(i).definition, parameters.get(i));
             }
@@ -645,7 +645,7 @@ public abstract class MethodInvocationHandler {
             Map<Variable, AppendOnlyValue> globalVals = callSite.definition.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                     e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
             InputBits inputBits = c.getNewlyIntroducedInputs();
-            c.popMethodInvocationState();
+            c.popFrame();
             c.forceMethodInvocationHandler(this);
             MethodReturnValue retValue = new MethodReturnValue(ret, globalVals, inputBits);
             System.out.println("--------------------------> " + retValue);

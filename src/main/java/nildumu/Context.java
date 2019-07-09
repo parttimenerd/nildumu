@@ -98,8 +98,6 @@ public class Context {
 
     public final IOValues output = new IOValues();
 
-    private final Stack<State> variableStates = new Stack<>();
-
     public final boolean USE_REDUCED_ADD_OPERATOR = true;
 
     private final DefaultMap<Bit, Sec<?>> secMap =
@@ -161,7 +159,7 @@ public class Context {
 
         @Override
         public String toString() {
-            return path.stream().map(Object::toString).collect(Collectors.joining(" → "));
+            return path.stream().map(m -> m.method).collect(Collectors.joining(" → "));
         }
 
         public boolean isEmpty() {
@@ -249,15 +247,39 @@ public class Context {
         }
     }
 
-    private final DefaultMap<CallPath, NodeValueState> nodeValueStates = new DefaultMap<>((map, path) -> new NodeValueState(path));
-
-    private CallPath currentCallPath = new CallPath();
-
-    private NodeValueState nodeValueState = nodeValueStates.get(currentCallPath);
-
-    private Stack<InputBits> introducedInputsStack = new Stack<>();
-
     private Mode mode;
+
+    final Stack<Frame> frames = new Stack<>();
+    private Frame frame;
+
+    class Frame {
+        final CallPath callPath;
+        final State state;
+        final Set<Bit> methodParameterBits;
+        final NodeValueState nodeValueState;
+        /**
+         * Newly introduced input bits
+         */
+        final InputBits inputBits;
+
+        Frame(CallPath callPath, Set<Bit> methodParameterBits, State state) {
+            this.callPath = callPath;
+            this.state = state;
+            this.methodParameterBits = methodParameterBits;
+            this.nodeValueState = new NodeValueState(callPath);
+            this.inputBits = new InputBits();
+        }
+
+        Frame(CallPath callPath, Set<Bit> methodParameterBits) {
+            this(callPath, methodParameterBits, new State(new State.OutputState()));
+        }
+
+        @Override
+        public String toString() {
+            return callPath.toString();
+        }
+    }
+
 
     /*-------------------------- extended mode specific -------------------------------*/
 
@@ -275,15 +297,12 @@ public class Context {
 
     private MethodInvocationHandler methodInvocationHandler;
 
-    private Stack<Set<Bit>> methodParameterBits = new Stack<>();
-
     /*-------------------------- unspecific -------------------------------*/
 
     public Context(SecurityLattice sl, int maxBitWidth, State.OutputState outputState) {
         this.sl = sl;
         this.maxBitWidth = maxBitWidth;
-        this.variableStates.push(new State(outputState));
-        this.introducedInputsStack.push(new InputBits());
+        resetFrames(outputState);
         ValueLattice.get().bitWidth = maxBitWidth;
     }
 
@@ -334,11 +353,11 @@ public class Context {
     }
 
     public void addAppendOnlyVariable(Sec<?> sec, String variable){
-        variableStates.peek().outputState.add(sec, variable);
+        frame.state.outputState.add(sec, variable);
     }
 
     public State.OutputState getOutputState(){
-        return variableStates.peek().outputState;
+        return frame.state.outputState;
     }
 
     public Value addOutputValue(Sec<?> sec, Value value){
@@ -386,11 +405,11 @@ public class Context {
         } else if (node instanceof WrapperNode){
             return ((WrapperNode<Value>) node).wrapped;
         }
-        return nodeValueState.nodeValueMap.get(node);
+        return frame.nodeValueState.nodeValueMap.get(node);
     }
 
     public Value nodeValue(MJNode node, Value value){
-        return nodeValueState.nodeValueMap.put(node, value);
+        return frame.nodeValueState.nodeValueMap.put(node, value);
     }
 
     Operator operatorForNode(MJNode node){
@@ -431,22 +450,22 @@ public class Context {
     private boolean compareAndStoreParamVersion(MJNode node){
         List<Integer> curVersions = paramNode(node).stream().map(n -> {
             if (n instanceof VariableAccessNode && ((VariableAccessNode) n).definingExpression == null){
-                return nodeValueState.variableVersionMap.get(((VariableAccessNode) n).definition);
+                return frame.nodeValueState.variableVersionMap.get(((VariableAccessNode) n).definition);
             }
-            return nodeValueState.nodeVersionMap.get(n);
+            return frame.nodeValueState.nodeVersionMap.get(n);
         }).collect(Collectors.toList());
         if (node instanceof MethodInvocationNode){
             ((MethodInvocationNode) node).globalDefs.entrySet().stream()
                     .sorted(Comparator.comparing(e -> e.getKey().name))
                     .map(Map.Entry::getValue).map(Pair::first)
-                    .map(nodeValueState.variableVersionMap::get)
+                    .map(frame.nodeValueState.variableVersionMap::get)
                     .forEach(curVersions::add);
         }
         boolean somethingChanged = true;
-        if (nodeValueState.lastParamVersions.containsKey(node)){
-            somethingChanged = !nodeValueState.lastParamVersions.get(node).equals(curVersions);
+        if (frame.nodeValueState.lastParamVersions.containsKey(node)){
+            somethingChanged = !frame.nodeValueState.lastParamVersions.get(node).equals(curVersions);
         }
-        nodeValueState.lastParamVersions.put(node, curVersions);
+        frame.nodeValueState.lastParamVersions.put(node, curVersions);
         return somethingChanged;
     }
 
@@ -457,8 +476,8 @@ public class Context {
             Value newVal = getVariableValue(((VariableAccessNode) node).definition);
             boolean somethingChanged = !newVal.valueEquals(nodeValue(node));
             if (somethingChanged){
-                nodeValueState.nodeVersionMap.put(node, nodeValueState.nodeVersionMap.get(node) + 1);
-                nodeValueState.nodeVersionUpdateCount++;
+                frame.nodeValueState.nodeVersionMap.put(node, frame.nodeValueState.nodeVersionMap.get(node) + 1);
+                frame.nodeValueState.nodeVersionUpdateCount++;
             }
             nodeValue(node, newVal);
             return somethingChanged;
@@ -504,7 +523,7 @@ public class Context {
             nodeValue(node, newValue);
         }
         if (somethingChanged && !gt){
-            nodeValueState.nodeVersionMap.put(node, nodeValueState.nodeVersionMap.get(node) + 1);
+            frame.nodeValueState.nodeVersionMap.put(node, frame.nodeValueState.nodeVersionMap.get(node) + 1);
            // nodeValueState.nodeVersionUpdateCount++;
         }
         log(() -> "Evaluate node " + node + " -> new value = " + nodeValue(node));
@@ -555,7 +574,7 @@ public class Context {
     }
 
     public Value getVariableValue(Variable variable){
-        return variableStates.peek().get(variable);
+        return frame.state.get(variable);
     }
 
     public Value setVariableValue(Variable variable, Value value){
@@ -566,30 +585,30 @@ public class Context {
     }
 
     public Value setVariableValue(Variable variable, Value value, MJNode node, boolean useVar){
-        if (variableStates.size() == 1) {
-            if (variable.isInput && !variableStates.get(0).get(variable).isBot()) {
+        if (frames.size() == 1) {
+            if (variable.isInput && !frames.get(0).state.get(variable).isBot()) {
                 throw new UnsupportedOperationException(String.format("Setting an input variable (%s)", variable));
             }
         }
         if (useVar){
-            nodeValueState.variableVersionMap.put(variable, nodeValueState.variableVersionMap.get(variable) + 1);
+            frame.nodeValueState.variableVersionMap.put(variable, frame.nodeValueState.variableVersionMap.get(variable) + 1);
         } else {
-            nodeValueState.variableVersionMap.put(variable, nodeValueState.nodeVersionMap.get(node));
+            frame.nodeValueState.variableVersionMap.put(variable, frame.nodeValueState.nodeVersionMap.get(node));
         }
-        variableStates.peek().set(variable, value);
+        frame.state.set(variable, value);
         return value;
     }
 
     public Value getVariableValue(String variable){
-        return variableStates.peek().get(variable);
+        return frame.state.get(variable);
     }
 
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
         builder.append("Variable states\n");
-        for (int i = 0; i < variableStates.size(); i++){
-            builder.append(variableStates.get(i));
+        for (int i = 0; i < frames.size(); i++){
+            builder.append(frames.get(i).state);
         }
         builder.append("Input\n" + input.toString()).append("Output\n" + output.toString());
         return builder.toString();
@@ -630,13 +649,13 @@ public class Context {
     }
 
     public Set<MJNode> nodes(){
-        return nodeValueState.nodeValueMap.keySet();
+        return frame.nodeValueState.nodeValueMap.keySet();
     }
 
     public List<String> variableNames(){
         List<String> variables = new ArrayList<>();
-        for (int i = variableStates.size() - 1; i >= 0; i--){
-            variables.addAll(variableStates.get(i).variableNames());
+        for (int i = frames.size() - 1; i >= 0; i--){
+            variables.addAll(frames.get(i).state.variableNames());
         }
         return variables;
     }
@@ -646,23 +665,23 @@ public class Context {
             Bit condBit = nodeValue(branch.condition).get(1);
             ModsCreator modsCreator = repl(condBit);
             Mods newMods = modsCreator.apply(this, condBit, bl.create(branch.val ? B.ONE : B.ZERO));
-            if (nodeValueState.modsMap.containsKey(branch)) {
-                nodeValueState.modsMap.put(branch, Mods.empty().add(nodeValueState.modsMap.get(branch)).merge(newMods));
+            if (frame.nodeValueState.modsMap.containsKey(branch)) {
+                frame.nodeValueState.modsMap.put(branch, Mods.empty().add(frame.nodeValueState.modsMap.get(branch)).merge(newMods));
             } else {
-                nodeValueState.modsMap.put(branch, newMods);
+                frame.nodeValueState.modsMap.put(branch, newMods);
             }
         }
     }
 
     public void pushBranch(Branch branch){
         Optional<Branch> parent =
-                nodeValueState.branchStack.isEmpty() ? Optional.empty() : Optional.of(nodeValueState.branchStack.peek());
-        nodeValueState.branchStack.push(branch);
-        nodeValueState.parentBranch.put(branch, parent);
+                frame.nodeValueState.branchStack.isEmpty() ? Optional.empty() : Optional.of(frame.nodeValueState.branchStack.peek());
+        frame.nodeValueState.branchStack.push(branch);
+        frame.nodeValueState.parentBranch.put(branch, parent);
     }
 
     public void popBranch(){
-        nodeValueState.branchStack.pop();
+        frame.nodeValueState.branchStack.pop();
     }
 
     /**
@@ -688,21 +707,21 @@ public class Context {
         if (inExtendedMode()) {
             Optional<Branch> optCur = Optional.of(branch);
             while (optCur.isPresent()){
-                Mods curMods = nodeValueState.modsMap.get(optCur.get());
+                Mods curMods = frame.nodeValueState.modsMap.get(optCur.get());
                 if (curMods.definedFor(bit)){
                     return curMods.replace(bit);
                 }
-                optCur = nodeValueState.parentBranch.get(optCur.get());
+                optCur = frame.nodeValueState.parentBranch.get(optCur.get());
             }
         }
         return bit;
     }
 
     public Value replace(Value value) {
-        if (nodeValueState.branchStack.isEmpty()){
+        if (frame.nodeValueState.branchStack.isEmpty()){
             return value;
         }
-        return replace(value, nodeValueState.branchStack.peek());
+        return replace(value, frame.nodeValueState.branchStack.peek());
     }
 
     public Value replace(Value value, Branch branch) {
@@ -738,7 +757,7 @@ public class Context {
     }
 
     private int c1(Bit bit){
-        if (!currentCallPath.isEmpty() && methodParameterBits.peek().contains(bit)){
+        if (!frame.callPath.isEmpty() && frame.methodParameterBits.contains(bit)){
             return 1;
         }
         if (isInputBit(bit) && sec(bit) != sl.bot()){
@@ -753,7 +772,7 @@ public class Context {
         Set<Bit> anchors = new HashSet<>();
         while (!q.isEmpty()) {
             Bit cur = q.poll();
-            if ((!currentCallPath.isEmpty() && methodParameterBits.peek().contains(cur)) ||
+            if ((!frame.callPath.isEmpty() && frame.methodParameterBits.contains(cur)) ||
                     isInputBit(cur) && sec(cur) != sl.bot()) {
                 anchors.add(cur);
             } else {
@@ -839,19 +858,19 @@ public class Context {
     }
 
     public void setReturnValue(Value value){
-        variableStates.get(variableStates.size() - 1).setReturnValue(value);
+        frames.get(frames.size() - 1).state.setReturnValue(value);
     }
 
     public Value getReturnValue(){
-        return variableStates.get(variableStates.size() - 1).getReturnValue();
+        return frames.get(frames.size() - 1).state.getReturnValue();
     }
 
     public long getNodeVersionUpdateCount(){
-        return nodeValueState.nodeVersionUpdateCount;
+        return frame.nodeValueState.nodeVersionUpdateCount;
     }
 
     public long getNodeVersionWOAppendValuedUpdateCount(){
-        return nodeValueState.nodeVersionWOAppendValuedUpdateCount;
+        return frame.nodeValueState.nodeVersionWOAppendValuedUpdateCount;
     }
 
 
@@ -874,45 +893,44 @@ public class Context {
         return methodInvocationHandler;
     }
 
-    public void pushNewMethodInvocationState(MethodInvocationNode callSite, List<Value> arguments){
-        pushNewMethodInvocationState(callSite, arguments.stream().flatMap(Value::stream).collect(Collectors.toSet()));
+    public void pushNewFrame(MethodInvocationNode callSite, List<Value> arguments){
+        pushNewFrame(callSite, arguments.stream().flatMap(Value::stream).collect(Collectors.toSet()));
     }
 
-    public void pushNewMethodInvocationState(MethodInvocationNode callSite, Set<Bit> argumentBits){
-        currentCallPath = currentCallPath.push(callSite);
-        variableStates.push(new State(new State.OutputState()));
-        methodParameterBits.push(argumentBits);
-        nodeValueState = nodeValueStates.get(currentCallPath);
-        introducedInputsStack.push(new InputBits());
+    public void pushNewFrame(MethodInvocationNode callSite, Set<Bit> argumentBits){
+        frames.push(new Frame(frame.callPath.push(callSite), argumentBits));
+        frame = frames.peek();
     }
 
-    public void popMethodInvocationState(){
-        currentCallPath = currentCallPath.pop();
-        variableStates.pop();
-        methodParameterBits.pop();
-        nodeValueState = nodeValueStates.get(currentCallPath);
-        introducedInputsStack.pop();
+    public void popFrame(){
+        frames.pop();
+        frame = frames.peek();
     }
 
     public InputBits getNewlyIntroducedInputs(){
-        return introducedInputsStack.peek();
+        return frame.inputBits;
     }
 
     public CallPath callPath(){
-        return currentCallPath;
+        return frame.callPath;
     }
 
     public int numberOfMethodFrames(){
-        return nodeValueStates.size();
+        return frames.size();
     }
 
     public int numberOfinfiniteWeightNodes(){
         return weightMap.size();
     }
 
-    public void resetNodeValueStates(){
-        nodeValueStates.clear();
-        nodeValueState = nodeValueStates.get(currentCallPath);
+    public void resetFrames(State.OutputState outputState){
+        frames.clear();
+        frames.push(new Frame(new CallPath(), new HashSet<>(), new State(outputState)));
+        frame = frames.peek();
+    }
+
+    public void resetFrames(){
+        resetFrames(frame != null ? frame.state.outputState : new State.OutputState());
     }
 
     public Set<Bit> sources(Sec<?> sec){
@@ -922,7 +940,7 @@ public class Context {
                 .map(s -> (Sec<?>) s)
                 .filter(s -> ((Lattice) sl).lowerEqualsThan(s, sec))
                 .flatMap(s -> Stream.concat(output.getBits((Sec) s).stream(),
-                        variableStates.peek().outputState.getBits((Sec) s).stream()))
+                        frame.state.outputState.getBits((Sec) s).stream()))
                 .collect(Collectors.toSet());
     }
 
