@@ -871,7 +871,9 @@ public interface Operator {
             MethodInvocationHandler.MethodReturnValue ret = c.methodInvocationHandler().analyze(c, callSite, arguments, globals);
             callSite.globalDefs.forEach((v, p) -> {
                 if (ret.globals.containsKey(v)) {
-                    c.setVariableValue(p.second, ret.globals.get(v));
+                    c.setVariableValue(p.second, ret.globals.get(v), null, true);
+                } else {
+                    c.setVariableValue(p.second, globals.get(v), null, true);
                 }
             });
             c.getNewlyIntroducedInputs().putAll(ret.inputBits);

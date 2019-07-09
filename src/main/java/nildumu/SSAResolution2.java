@@ -460,6 +460,17 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
                 phi.joinedVariables.addAll(vars);
                 return null;
             }
+
+            @Override
+            public Object visit(MethodInvocationNode methodInvocation) {
+                methodInvocation.globals.globalVarSSAVars.forEach((v, p) -> {
+                    if (p.first.equals(search)){
+                        methodInvocation.globals.globalVarSSAVars.put(v, p(replacement, p.second));
+                    }
+                });
+                visitChildrenDiscardReturn(methodInvocation);
+                return null;
+            }
         });
     }
 }

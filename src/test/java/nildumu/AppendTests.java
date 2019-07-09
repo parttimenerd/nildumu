@@ -1,9 +1,11 @@
 package nildumu;
 
+import org.junit.Rule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.rules.Timeout;
 
 import java.time.Duration;
 import java.util.logging.Level;
@@ -61,15 +63,16 @@ public class AppendTests {
 
     @ParameterizedTest
     @CsvSource({
+            "'while (1) { print(0) }', 0",
             "'while (h == 0) { print(0) }', 3",
             "'while (h == 0) { print(h) }', 3"
     })
     public void testBasicPrintLoop(String program, double leakage){
-//        assertTimeoutPreemptively(ofSeconds(1), () -> {
+        //assertTimeoutPreemptively(ofSeconds(1), () -> {
         String runProgram = "bit_width 3; h input int h = 0buuu; " + program;
         System.out.println(toSSA(runProgram, false).toPrettyString());
             parse(runProgram).leaks(leakage).run();
- //       });
+        //});
     }
 
     @ParameterizedTest
@@ -168,10 +171,11 @@ public class AppendTests {
 
     @ParameterizedTest
     @ValueSource(strings = {
+            "while (1){ print(input()) }",
             "while (1){ int a; a = input(); print(a) }"
     })
     public void testInfiniteLeakage(String program){
-        String runProgram = "bit_width 3; l input int l = 0buuu; " + program;
+        String runProgram = "bit_width 3; " + program;
         System.out.println(toSSA(runProgram, true));
         parse(runProgram).leaks("inf").run();
     }

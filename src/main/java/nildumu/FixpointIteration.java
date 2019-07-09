@@ -144,6 +144,7 @@ public class FixpointIteration {
                             !(c instanceof Parser.ParameterAccessNode)) && !(c instanceof Parser.PhiNode))
                     .forEach(c -> walkExpression(visitor, (Parser.ExpressionNode) c));
     //}
+
         visitor.accept(expression);
     }
 

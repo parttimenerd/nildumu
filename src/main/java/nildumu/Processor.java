@@ -242,7 +242,7 @@ public class Processor {
                 Set<Bit> outsideBits = outerVars.stream() // includes the input bits
                         .flatMap(v -> context.getVariableValue(v).stream())
                         .filter(Bit::isAtLeastUnknown).collect(Collectors.toSet());
-                outsideBits.addAll(whileStatement.getInnerTmpInputs(context));
+                outsideBits.addAll(context.getNewlyIntroducedInputs().getBits());
                 return PrintHistory.HistoryEntry.create(whileStatement.getPreCondVarAss().stream()
                                 .filter(a -> a.definition.hasAppendValue)
                                 .collect(Collectors.toMap(a -> a.definition, a -> context.getVariableValue(a.variable).asAppendOnly().clone())),
@@ -253,7 +253,10 @@ public class Processor {
             private PrintHistory.ReduceResult<Map<Variable, AppendOnlyValue>>
                 reduceAppendOnlyVariables(PrintHistory.HistoryEntry history) {
                 return PrintHistory.ReduceResult.create(
-                                history.map.keySet().stream().collect(Collectors.toMap(v -> v, v -> history.map.get(v).reduceAppendOnly(context::weight))));
+                                history.map.keySet().stream().collect(Collectors.toMap(v -> v, v -> {
+                                    PrintHistory.ReduceResult<AppendOnlyValue> res = history.map.get(v).reduceAppendOnly(context::weight);
+                                    return res;
+                                })));
             }
 
 

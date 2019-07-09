@@ -1,5 +1,7 @@
 package swp.util;
 
+import nildumu.Variable;
+
 import java.io.Serializable;
 import java.util.stream.Stream;
 
@@ -37,5 +39,9 @@ public class Pair<T, V> implements Serializable {
 	@Override
 	public String toString() {
 		return String.format("(%s,%s)", first, second);
+	}
+
+    public T first(){
+		return first;
 	}
 }

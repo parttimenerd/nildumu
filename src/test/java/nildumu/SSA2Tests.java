@@ -195,6 +195,17 @@ public class SSA2Tests {
         });
     }
 
+    @Test
+    public void testInputCallsInLoop(){
+        Parser.WhileStatementNode whileStatement =
+                (Parser.WhileStatementNode) toSSA("while (1) { input() }").globalBlock.children().stream()
+                        .filter(a -> a.toPrettyString().startsWith("while")).findAny().get();
+        assertEquals(whileStatement.getPreCondVarAss().get(0).definition,
+                ((Parser.MethodInvocationNode) ((Parser.ExpressionStatementNode) ((Parser.BlockNode)
+                        whileStatement.body.statementNodes.get(0)).statementNodes.get(0)).expression)
+                        .globalDefs.values().iterator().next().first);
+    }
+
     public static Parser.ProgramNode toSSA(String program){
         return toSSA(program, true);
     }

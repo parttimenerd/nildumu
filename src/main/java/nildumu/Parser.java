@@ -960,6 +960,11 @@ public class Parser implements Serializable {
                     .collect(Collectors.toSet());
         }
 
+        public Set<Bit> getInnerTmpInputsFromAll(Context context){
+            return getTmpInputVariableDeclarationsFromAll().stream().flatMap(t -> context.getVariableValue(t.variable).stream())
+                    .collect(Collectors.toSet());
+        }
+
         public Set<TmpInputVariableDeclarationNode> getTmpInputVariableDeclarations(){
             return this.accept(new NodeVisitor<Set<TmpInputVariableDeclarationNode>>() {
                 @Override

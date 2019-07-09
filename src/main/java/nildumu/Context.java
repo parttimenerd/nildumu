@@ -435,6 +435,13 @@ public class Context {
             }
             return nodeValueState.nodeVersionMap.get(n);
         }).collect(Collectors.toList());
+        if (node instanceof MethodInvocationNode){
+            ((MethodInvocationNode) node).globalDefs.entrySet().stream()
+                    .sorted(Comparator.comparing(e -> e.getKey().name))
+                    .map(Map.Entry::getValue).map(Pair::first)
+                    .map(nodeValueState.variableVersionMap::get)
+                    .forEach(curVersions::add);
+        }
         boolean somethingChanged = true;
         if (nodeValueState.lastParamVersions.containsKey(node)){
             somethingChanged = !nodeValueState.lastParamVersions.get(node).equals(curVersions);
@@ -493,12 +500,12 @@ public class Context {
                 nodeValue(node, oldValue);
             }
         } else {
-            somethingChanged = nodeValue(node).isBot();
+            somethingChanged = nodeValue(node).isBot() && !newValue.isBot();
             nodeValue(node, newValue);
         }
         if (somethingChanged && !gt){
             nodeValueState.nodeVersionMap.put(node, nodeValueState.nodeVersionMap.get(node) + 1);
-            nodeValueState.nodeVersionUpdateCount++;
+           // nodeValueState.nodeVersionUpdateCount++;
         }
         log(() -> "Evaluate node " + node + " -> new value = " + nodeValue(node));
         newValue.description(node.getTextualId()).node(node);
@@ -554,14 +561,21 @@ public class Context {
     public Value setVariableValue(Variable variable, Value value){
         return setVariableValue(variable, value, null);
     }
-
     public Value setVariableValue(Variable variable, Value value, MJNode node){
+        return setVariableValue(variable, value, node, false);
+    }
+
+    public Value setVariableValue(Variable variable, Value value, MJNode node, boolean useVar){
         if (variableStates.size() == 1) {
             if (variable.isInput && !variableStates.get(0).get(variable).isBot()) {
                 throw new UnsupportedOperationException(String.format("Setting an input variable (%s)", variable));
             }
         }
-        nodeValueState.variableVersionMap.put(variable, nodeValueState.nodeVersionMap.get(node));
+        if (useVar){
+            nodeValueState.variableVersionMap.put(variable, nodeValueState.variableVersionMap.get(variable) + 1);
+        } else {
+            nodeValueState.variableVersionMap.put(variable, nodeValueState.nodeVersionMap.get(node));
+        }
         variableStates.peek().set(variable, value);
         return value;
     }
