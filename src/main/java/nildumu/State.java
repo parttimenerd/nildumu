@@ -83,9 +83,8 @@ class State extends GenericState {
         }
         if (variable.isAppendOnly){
             outputState.set(variable, value);
-        } else {
-            set(variable.name, value);
         }
+        set(variable.name, value);
     }
 
     @Override

@@ -84,7 +84,7 @@ public class PrintHistory {
             System.out.println("Reduce");
             System.out.println("                 " + name + ": " + currentHist.value);
             ReduceResult<Lattices.AppendOnlyValue> current = new ReduceResult<>(currentHist.value.clone(), false, true);
-            if (!prev.isPresent()){ // its the first round
+            if (!prev.isPresent() || prev.get().value.sizeWithoutEs() == 0){ // its the first round
                 return current;
             }
             if (value.sizeWithoutEs() == 0) {

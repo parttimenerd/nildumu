@@ -116,6 +116,11 @@ public class ContextMatcher {
         return this;
     }
 
+    public ContextMatcher value(String var, Consumer<Value> test){
+        builder.add(() -> test.accept(context.getVariableValue(var)));
+        return this;
+    }
+
     public ContextMatcher leaks(String attackerSec, int leakage){
         return leakage(l -> l.leaks(attackerSec, leakage));
     }
@@ -182,6 +187,11 @@ public class ContextMatcher {
 
         public ValueMatcher lastBit(Lattices.B val){
             builder.add(() -> assertEquals(val, value.get(value.size()).val(), String.format("The last bit of %s should have the bit val %s", value, val)));
+            return this;
+        }
+
+        public ValueMatcher endsWithStar(){
+            builder.add(() -> assertTrue(value.endsWithStar(), String.format("%s ends with a s bit", value)));
             return this;
         }
     }

@@ -1,6 +1,8 @@
 package nildumu;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.nio.file.*;
 import java.util.*;
 import java.util.function.*;
@@ -531,15 +533,7 @@ public abstract class MethodInvocationHandler {
             if (_mode == Mode.AUTO){
                 _mode = Mode.INDUCTION;
             }
-           /* if (callGraph.containsRecursion()){
-                if (_mode == Mode.AUTO){
-                    _mode = Mode.COINDUCTION;
-                }
-                if (_mode == Mode.INDUCTION){
-                    System.err.println("Induction cannot be used for programs with reduction");
-                  //  throw new MethodInvocationHandlerInitializationError("Induction cannot be used for programs with reduction");
-                }
-            }*/
+            List<CallNode> nodes = new ArrayList<>();
             Mode usedMode = _mode;
             Context c = program.context;
             Map<MethodNode, MethodInvocationNode> callSites = new DefaultMap<>((map, method) -> {
@@ -556,6 +550,7 @@ public abstract class MethodInvocationHandler {
                 if (node.isMainNode || iteration.val > maxIterations){
                     return s.get(node);
                 }
+                nodes.add(node);
                 log(() -> String.format("Setup: Analyse %s", node.method.name));
                 iteration.val += 1;
                 BitGraph graph = methodIteration(program.context, callSites.get(node.method), handler, s.get(node).value.parameters);
@@ -569,14 +564,11 @@ public abstract class MethodInvocationHandler {
                 PrintHistory.HistoryEntry newHist = PrintHistory.HistoryEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty());
                 PrintHistory.ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist, c);
                 history.put(node, PrintHistory.HistoryEntry.create(furtherReducedGraph.value, newHist.prev));
-                        System.out.println("-------------------------#-> " + furtherReducedGraph.value.methodReturnValue);
                 if (dotFolder != null){
                     graph.writeDotGraph(dotFolder, name + " [reduced]", false);
                 }
                 DotRegistry.get().store("summary",  name + " [reduced]",
                         () -> () -> furtherReducedGraph.value.createDotGraph("", false));
-                        System.out.println("~~~" + name);
-                        furtherReducedGraph.value.methodReturnValue.globals.forEach((v, a) -> System.out.println("      " + v + " = " + a));
                 return furtherReducedGraph;
             }, node ->  {
                 BitGraph graph = bot(program, node.method, callSites, usedMode);
@@ -648,7 +640,6 @@ public abstract class MethodInvocationHandler {
             c.popFrame();
             c.forceMethodInvocationHandler(this);
             MethodReturnValue retValue = new MethodReturnValue(ret, globalVals, inputBits);
-            System.out.println("--------------------------> " + retValue);
             return new BitGraph(c, parameters, retValue, callSite.definition, inputBits);
         }
 

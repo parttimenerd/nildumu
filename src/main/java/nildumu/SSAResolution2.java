@@ -280,9 +280,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
             String newWhilePhiPreVar = create(whileEnd);
 
             replaceVariable(beforeWhile, newWhilePhiPreVar, whileStatement.body);
-            //prepend.add(new VariableDeclarationNode(whileStatement.location, newWhilePhiVar, phi));
             whileStatement.addPreCondVarAss(Arrays.asList((VariableAssignmentNode)new VariableAssignmentNode(whileStatement.location, newWhilePhiPreVar, phi)));
-            //System.err.println(newWhilePhiPreVar + "  " + newWhilePhiVar);
             replaceVariable(beforeWhile, newWhilePhiPreVar, whileStatement.conditionalExpression);
 
           //  stmtsToAdd.add(new VariableAssignmentNode(statementNode.location, newWhilePhiPreVar, phi));

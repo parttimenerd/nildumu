@@ -1,5 +1,8 @@
 package nildumu.util;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.io.Serializable;
 import java.time.temporal.ValueRange;
 import java.util.*;
@@ -86,5 +89,14 @@ public class Util {
 
     public static double log2(double val){
         return Math.log(val) / Math.log(2);
+    }
+
+    public static void disableSysOut(){
+        System.setOut(new PrintStream(new OutputStream() {
+            @Override
+            public void write(int i) throws IOException {
+
+            }
+        }));
     }
 }

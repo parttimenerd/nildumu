@@ -8,6 +8,7 @@ import guru.nidi.graphviz.attribute.*;
 import guru.nidi.graphviz.model.*;
 import guru.nidi.graphviz.model.Node;
 import nildumu.util.DefaultMap;
+import nildumu.util.StablePriorityQueue;
 import swp.lexer.Location;
 import swp.parser.lr.BaseAST;
 import swp.util.*;
@@ -329,8 +330,8 @@ public class CallGraph {
             Function<CallNode, Integer> priority,
             Map<CallNode, T> state,
             BiPredicate<T, T> changed) {
-        PriorityQueue<CallNode> queue =
-                new PriorityQueue<>(new TreeSet<>(Comparator.comparingInt(priority::apply)));
+        StablePriorityQueue<CallNode> queue =
+                new StablePriorityQueue<>(Comparator.comparingInt(priority::apply));
         queue.addAll(mainNode.calledCallNodesAndSelfInPostOrder());
         Context.log(() -> String.format("Initial order: %s", queue.toString()));
         queue.forEach(n -> state.put(n, bot.apply(n)));
