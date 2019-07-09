@@ -127,9 +127,11 @@ public class CallGraph {
     final Map<MethodNode, CallNode> methodToNode;
     final Map<CallNode, Set<CallNode>> dominators;
     final Map<CallNode, Integer> loopDepths;
+    final Set<MethodNode> usedMethods;
 
     public CallGraph(ProgramNode program) {
         this.program = program;
+        this.usedMethods = calcUsedMethods(program);
         this.mainNode =
                 new CallNode(
                         new MethodNode(
@@ -142,7 +144,7 @@ public class CallGraph {
                         Collections.emptySet(),
                         true);
         this.methodToNode =
-                Stream.concat(Stream.of(mainNode), program.methods().stream().map(CallNode::new))
+                Stream.concat(Stream.of(mainNode), usedMethods.stream().map(CallNode::new))
                         .collect(Collectors.toMap(n -> n.method, n -> n));
         methodToNode
                 .entrySet()
@@ -157,6 +159,30 @@ public class CallGraph {
         loopDepths = calcLoopDepth(mainNode, dominators);
         DotRegistry.get().store("summary", "call-graph",
                 () -> () -> mainNode.createDotGraph(n -> Records.of(loopDepths.get(n) + "", n.method.name)));
+    }
+
+    private Set<MethodNode> calcUsedMethods(ProgramNode program){
+        Set<MJNode> alreadyVisited = new HashSet<>();
+        Set<MethodNode> methods = new HashSet<>();
+        program.globalBlock.accept(new NodeVisitor<Object>() {
+            @Override
+            public Object visit(MJNode node) {
+                if (!alreadyVisited.contains(node)) {
+                    alreadyVisited.add(node);
+                    visitChildrenDiscardReturn(node);
+                }
+                return null;
+            }
+
+            @Override
+            public Object visit(MethodInvocationNode methodInvocation) {
+                visit((MJNode)methodInvocation);
+                methods.add(methodInvocation.definition);
+                visit(methodInvocation.definition);
+                return null;
+            }
+        });
+        return methods;
     }
 
     public <T> Map<CallNode, T> worklist(
@@ -314,7 +340,8 @@ public class CallGraph {
             T prevRes = state.get(cur);
             state.put(cur, newRes);
             if (changed.test(prevRes, newRes)) {
-                queue.addAll(next.apply(cur));
+                Set<CallNode> res = next.apply(cur);
+                queue.addAll(res);
             }
         }
         return state;

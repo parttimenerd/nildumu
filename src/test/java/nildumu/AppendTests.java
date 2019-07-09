@@ -233,13 +233,28 @@ public class AppendTests {
 
     @ParameterizedTest
     @CsvSource({
+            "'int func() {print(0); func2()} int func2() {func()} func()', print",
+            "'int func() {input(); func2()} int func2() {func()} func()', input",
+            "'int func() {print(0); input(); func2()} int func2() {func()} func()', input",
+            "'int bla(){ h tmp_input int a = 0buu; return a;} int func() {print(bla()); func()} int func2() {func()} func()', print",
+            "'int bla(){ h tmp_input int a = 0buu; return a;} int func() {print(bla()); func2()} int func2() {func()} func()', print"
+    })
+    public void testPrintTwoLevelRecursion(String program, String variable){
+        String runProgram = "bit_width 2; h input int h = 0buu; " + program;
+        System.out.println(toSSA(runProgram, false).toPrettyString());
+        LOG.setLevel(Level.FINE);
+        parse(runProgram, "summary").val(variable, v -> v.lastBit(Lattices.B.S)).run();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             "'int func() {print(input()); func2()}" +
                     " int func2() {func()} func()', basic, inf",
             "'int func() {print(input()); func2()}" +
                     " int func2() {func()} func()', inlining, inf",
             "'print(input())', summary, 2",
             "'int func() {print(input()); func()} func()', summary, inf",
-            "'int func() {print(input()); func2()}" +
+            "'int func() {print(0); func2()}" +
                     " int func2() {func()} func()', summary, inf",
             "'int func(int h) {int a; a = input(); print(a); func2(0)}" +
                     " int func2(int h) {int a; a = input(); print(a); func(0)} func(h)', summary, inf"
