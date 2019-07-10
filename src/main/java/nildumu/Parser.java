@@ -519,9 +519,6 @@ public class Parser implements Serializable {
      * Start a simple repl
      */
     public static void main(String[] args) {
-        /*for (LexerTerminal terminal : LexerTerminal.values()) {
-            System.out.println(terminal.name() + "#" + terminal.representation + "#" + terminal.description);
-        }*/
         Generator generator = Parser.generator;
         Utils.repl(generator::createLexer);
     }
@@ -556,7 +553,6 @@ public class Parser implements Serializable {
         Lattices.Bit.resetNumberOfCreatedBits();
         Parser.ProgramNode programNode = (Parser.ProgramNode) generator.parse(input);
         SSAResolution2.process(programNode);
-        System.out.println(programNode.toPrettyString());
         Parser.ProgramNode resolvedProgram = (Parser.ProgramNode)Parser.generator.parse(programNode.toPrettyString());
         new NameResolution(resolvedProgram).resolve();
         //checkAndThrow(resolvedProgram);

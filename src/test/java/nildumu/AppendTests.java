@@ -240,7 +240,6 @@ public class AppendTests {
     public void testPrintTwoLevelRecursion(String program, String variable){
         String runProgram = "bit_width 2; h input int h = 0buu; " + program;
         System.out.println(toSSA(runProgram, false).toPrettyString());
-        LOG.setLevel(Level.FINE);
         for (int i = 0; i < 10; i++) {
             parse(runProgram, "summary").val(variable, ContextMatcher.ValueMatcher::endsWithStar).run();
         }

@@ -170,7 +170,6 @@ public class Processor {
                 if (!context.inLoopMode()){
                     throw new NildumuError("while-statements are only supported in modes starting at loop mode");
                 }
-                System.out.println("###########" + context.getNodeVersionUpdateCount() + "  " + context.getNodeVersionWOAppendValuedUpdateCount());
                 Value cond = context.nodeValue(whileStatement.conditionalExpression);
                 Bit condBit = cond.get(1);
                 Lattices.B condVal = condBit.val();
@@ -198,17 +197,14 @@ public class Processor {
 
                 historyPerWhile.put(whileStatement, PrintHistory.HistoryEntry.create(reduceResult.value, newHist.prev, newHist));
                 if (lastUpdateCounts.get(whileStatement) == context.getNodeVersionUpdateCount()) {
-                    System.out.println("-> Return bla");
                     return false; // that is the common case without prints
                 } else {
                     if (lastUpdateWOAppendValuedCounts.get(whileStatement) == context.getNodeVersionWOAppendValuedUpdateCount()
                     && reduceResult.finished()){
                         // this is the case if nothing else changes, except the append only variables
                         // basic idea: just create a star as for summary graphs
-                        System.out.println("-> Return");
                         return false;
                     }
-                    System.out.println("-> Return bla2");
                     nodeValueUpdatesAtCondition.push(context.getNodeVersionUpdateCount());
                     lastUpdateCounts.put(whileStatement, context.getNodeVersionUpdateCount());
                     lastUpdateWOAppendValuedCounts.put(whileStatement, context.getNodeVersionWOAppendValuedUpdateCount());

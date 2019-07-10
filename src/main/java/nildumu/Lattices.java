@@ -1497,7 +1497,6 @@ public class Lattices {
             AppendOnlyValue newValue = new AppendOnlyValue();
             stream().filter(b -> !b.val.isE() && b.val != X).forEach(newValue::add);
             value.stream().forEach(newValue::add);
-            System.out.println(value + " " + newValue + " " + this);
             return newValue;
         }
 
