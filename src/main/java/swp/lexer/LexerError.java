@@ -16,14 +16,13 @@ public class LexerError extends LocatedSWPException {
 
 	public static LexerError create(Token errorToken, Collection<Integer> expectedTokens, String source){
 		StringBuilder builder = new StringBuilder();
-		List<Integer> list = new ArrayList<>();
-		list.addAll(expectedTokens);
+        List<Integer> list = new ArrayList<>(expectedTokens);
 		builder.append(errorToken.terminalSet.typesToString(list));
 		String errorTokenStr = "";
 		if (errorToken.type >= Utils.MIN_CHAR && errorToken.type <= Utils.MAX_CHAR) {
 			errorTokenStr = errorToken.terminalSet.typeToString(errorToken.type);
 		} else {
-			errorTokenStr = "<unsupported character " + Character.toString((char)(errorToken.type + Utils.MIN_CHAR)) + ">";
+			errorTokenStr = "<unsupported character " + (char) (errorToken.type + Utils.MIN_CHAR) + ">";
 		}
 		return new LexerError(errorToken, String.format("Expected one of %s but got %s at %s", builder.toString(), errorTokenStr, errorToken.location), source);
 	}

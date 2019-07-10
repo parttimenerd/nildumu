@@ -25,7 +25,7 @@ public class MinCut {
 
     public static Algo usedAlgo = Algo.GRAPHT_PP;
 
-    public static enum Algo {
+    public enum Algo {
         EK_APPROX("approximate Edmonds-Karp"),
         GRAPHT_PP("JGraphT Preflow-Push");
 

@@ -21,7 +21,7 @@ import static swp.parser.examples.MiniJava.LexerTerminal.*;
  */
 public class MiniJava {
 
-    public static enum LexerTerminal implements Generator.LexerTerminalEnum {
+    public enum LexerTerminal implements Generator.LexerTerminalEnum {
         EOF(""),
         COMMENT("/\\*([^*\\n]*(\\*[^/\\n])?)*\\*/"),
         WS("[\\s]"),
@@ -745,7 +745,7 @@ public class MiniJava {
 
         public String cppDefinition() {
             StringBuilder builder = new StringBuilder();
-            builder.append(returnType.cpp()).append(parent.name).append("::").append("$" + name);
+            builder.append(returnType.cpp()).append(parent.name).append("::").append("$").append(name);
             builder.append("(").append(parameters.cpp()).append(")").append(body.cpp());
             return builder.toString();
         }
@@ -1414,7 +1414,7 @@ public class MiniJava {
         @Override
         public String cpp(int identation) {
             StringBuilder builder = new StringBuilder();
-            builder.append(expression.cpp()).append("->").append("$" + method)
+            builder.append(expression.cpp()).append("->").append("$").append(method)
                     .append("(").append(arguments.cpp()).append(")");
             return builder.toString();
         }

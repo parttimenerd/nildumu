@@ -475,7 +475,7 @@ public class BasicUI {
             context = c;
             long analysisTime = System.currentTimeMillis() - time;
             updateLeakageTable(context);
-            addOutput(String.format(String.format("Analysis: %,dms, #Bits: %,d", analysisTime, Bit.getNumberOfCreatedBits())));
+            addOutput(String.format("Analysis: %,dms, #Bits: %,d", analysisTime, Bit.getNumberOfCreatedBits()));
             addOutput(String.format("#Nodes: %,d", Parser.MJNode.getCurrentIdCount()));
             addOutput(String.format("Node version updates: %,d", context.getNodeVersionUpdateCount()));
             addOutput(String.format("#Created frames: %,d", context.numberOfMethodFrames()));
@@ -536,9 +536,9 @@ public class BasicUI {
         outputMode = newMode;
         setVarContent("lastOutputMode", outputMode.name());
         if (outputMode == OutputMode.ALL) {
-            context.LOG.setLevel(Level.FINE);
+            Context.LOG.setLevel(Level.FINE);
         } else {
-            context.LOG.setLevel(Level.WARNING);
+            Context.LOG.setLevel(Level.WARNING);
         }
     }
 

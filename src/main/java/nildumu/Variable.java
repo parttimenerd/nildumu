@@ -24,16 +24,23 @@ public class Variable {
 
     final boolean hasAppendValue;
 
+    private boolean isAppendableInput;
+
     public Variable(String name, boolean isInput, boolean isOutput, boolean isAppendOnly, boolean hasAppendValue) {
         this.name = name;
         this.isOutput = isOutput;
         this.isInput = isInput;
         this.isAppendOnly = isAppendOnly;
         this.hasAppendValue = hasAppendValue;
+        this.isAppendableInput = name.startsWith("input");
     }
 
     public Variable(String name){
         this(name, false, false, false, false);
+    }
+
+    public void changeToAppendableInput(){
+        this.isAppendableInput = true;
     }
 
     @Override
@@ -61,5 +68,9 @@ public class Variable {
     @Override
     public boolean equals(Object obj) {
         return obj instanceof Variable && ((Variable) obj).name.equals(name);
+    }
+
+    public boolean isAppendableInput() {
+        return isAppendableInput;
     }
 }

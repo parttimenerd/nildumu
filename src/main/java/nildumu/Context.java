@@ -291,7 +291,7 @@ public class Context {
 
     private final HashMap<Bit, Double> weightMap = new HashMap<>();
 
-    public static final int INFTY = Integer.MAX_VALUE;
+    public static final float INFTY = Float.MAX_VALUE;
 
     /*-------------------------- methods -------------------------------*/
 

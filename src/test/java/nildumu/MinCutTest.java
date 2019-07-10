@@ -79,7 +79,7 @@ public class MinCutTest implements MinimalCounterexampleHook {
 
         @Override
         public BitGraphWrapper generate(SourceOfRandomness random, GenerationStatus status) {
-            vl.bitWidth = INFTY;
+            vl.bitWidth = Integer.MAX_VALUE;
             Bit.resetNumberOfCreatedBits();
             int bitNum = random.nextInt(2, maxBitNum);
             int sourceNum = random.nextInt(1, Math.min(bitNum - 1, maxSourceNum));
@@ -88,7 +88,7 @@ public class MinCutTest implements MinimalCounterexampleHook {
             Box<Integer> nonInftyBitCount = new Box<>(0);
             Set<Bit> bits = IntStream.range(0, bitNum).mapToObj(i -> {
                 Bit bit = bl.create(B.U);
-                int weight = random.nextInt(10 ) <= 1 ? INFTY : 1;
+                double weight = random.nextInt(10 ) <= 1 ? INFTY : 1;
                 con.weight(bit, weight);
                 if (weight != INFTY){
                     nonInftyBitCount.val++;

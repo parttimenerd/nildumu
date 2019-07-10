@@ -12,7 +12,7 @@ public class Fui {
 
 	private Generator generator;
 
-	private static enum LexerTerminal implements Generator.LexerTerminalEnum {
+	private enum LexerTerminal implements Generator.LexerTerminalEnum {
 		EOF(""),
 		FUN("fun"),
 		LET("let"),

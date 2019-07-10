@@ -10,9 +10,9 @@ import nildumu.eval.tools.AbstractTool;
  */
 @FunctionalInterface
 public interface LeakageParser {
-    public float parse(String out, String err) throws LeakageParserException;
+    float parse(String out, String err) throws LeakageParserException;
 
-    public static LeakageParser forLine(AbstractTool tool, String lineStart, String lineEnd){
+    static LeakageParser forLine(AbstractTool tool, String lineStart, String lineEnd){
         return (out, err) -> {
             String combined = out + "\n" + err;
             List<String> leakLines = Arrays.stream(combined.split("\n"))
@@ -29,7 +29,7 @@ public interface LeakageParser {
         };
     }
 
-    public static LeakageParser forLinePart(AbstractTool tool, String start, String end){
+    static LeakageParser forLinePart(AbstractTool tool, String start, String end){
         return (out, err) -> {
             String combined = out + "\n" + err;
             List<String> leakLines = Arrays.stream(combined.split("\n"))

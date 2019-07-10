@@ -1,6 +1,5 @@
 package nildumu;
 
-import nildumu.util.DefaultMap;
 import swp.util.Pair;
 
 import java.util.*;
@@ -40,10 +39,6 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         VisRet(boolean removeCurrentStatement, StatementNode... statementsToAdd) {
             this(removeCurrentStatement, Arrays.asList(statementsToAdd), Collections.emptyList());
         }
-
-        boolean isDefault(){
-            return !removeCurrentStatement && statementsToAdd.isEmpty() && statementsToPrepend.isEmpty();
-        }
     }
 
     private static class Scope {
@@ -77,19 +72,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
      */
     private Map<String, String> reverseMapping;
 
-    private final Map<String, Scope> definingScope;
-
-    /**
-     * Variable → Variable it overrides
-     */
-    private Map<String, String> directPredecessor;
-
     private Map<String, Integer> versionCount;
-
-    /**
-     * The current method if resolving in a
-     */
-    private final Optional<MethodNode> currentMethod;
 
     private final List<String> introducedVariables;
 
@@ -100,10 +83,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     public SSAResolution2(MethodNode method) {
         reverseMapping = new HashMap<>();
         versionCount = new HashMap<>();
-        directPredecessor = new HashMap<>();
         scopes = new Stack<>();
-        definingScope = new HashMap<>();
-        this.currentMethod = Optional.ofNullable(method);
         this.introducedVariables = new ArrayList<>();
         appendOnlyVariables = new HashSet<>();
         appendValueVariables = new HashSet<>();
@@ -211,7 +191,6 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
             if (scopes.peek().definedVariables.contains(o)){
                 block.prependVariableDeclaration(n, appendValueVariables.contains(o));
                 reverseMapping.remove(n);
-                directPredecessor.remove(n);
                 introducedVariables.remove(n);
             } else {
                 filtered.put(o, n);
@@ -280,7 +259,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
             String newWhilePhiPreVar = create(whileEnd);
 
             replaceVariable(beforeWhile, newWhilePhiPreVar, whileStatement.body);
-            whileStatement.addPreCondVarAss(Arrays.asList((VariableAssignmentNode)new VariableAssignmentNode(whileStatement.location, newWhilePhiPreVar, phi)));
+            whileStatement.addPreCondVarAss(Collections.singletonList((VariableAssignmentNode) new VariableAssignmentNode(whileStatement.location, newWhilePhiPreVar, phi)));
             replaceVariable(beforeWhile, newWhilePhiPreVar, whileStatement.conditionalExpression);
 
           //  stmtsToAdd.add(new VariableAssignmentNode(statementNode.location, newWhilePhiPreVar, phi));
@@ -302,9 +281,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         List<String> createdVars = resolution.resolve(method.body);
         createdVars.stream().filter(v -> !pre.values().contains(v))
                 .forEach(v -> method.body.prependVariableDeclaration(v, resolution.appendValueVariables.contains(resolution.resolveOrigin(v))));
-        Map<String, String> post = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, v -> {
-            return resolution.resolve(v);
-        }));
+        Map<String, String> post = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, resolution::resolve));
         parent.appendOnlyVariables.forEach(v -> method.globals.globalVarSSAVars.put(v, p(pre.get(v), post.get(v))));
     }
 
@@ -317,34 +294,12 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     void assignAppendOnlyVariables(BlockNode block){
-        this.appendOnlyVariables.forEach(v -> {
-            block.add(new VariableAssignmentNode(block.location, v, new VariableAccessNode(block.location, resolveLocated(v))));
-        });
+        this.appendOnlyVariables.forEach(v -> block.add(new VariableAssignmentNode(block.location, v, new VariableAccessNode(block.location, resolveLocated(v)))));
     }
 
     @Override
     public VisRet visit(ParameterNode parameter) {
         return VisRet.DEFAULT;
-    }
-
-    /**
-     * Replaces all controlDeps that are exactly the passed variable
-     */
-    private void replaceVariableInPhiConds(Variable var, ExpressionNode expr, MJNode node){
-        node.accept(new NodeVisitor<Object>() {
-
-            @Override
-            public Object visit(MJNode node) {
-                visitChildrenDiscardReturn(node);
-                return null;
-            }
-
-            @Override
-            public Object visit(PhiNode phi) {
-                phi.alterCondDeps(e -> e instanceof VariableAccessNode && ((VariableAccessNode) e).definition == var ? expr : e);
-                return null;
-            }
-        });
     }
 
     @Override
@@ -421,7 +376,6 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         String origin = resolveOrigin(variable);
         String newVariable = origin + (numberOfVersions(origin) + 1);
         String pred = resolveLocated(variable);
-        directPredecessor.put(newVariable, pred);
         versionCount.put(origin, numberOfVersions(origin) + 1);
         reverseMapping.put(newVariable, origin);
         definingScope(origin).newVariablesLocated.put(origin, newVariable);

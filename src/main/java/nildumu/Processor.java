@@ -54,9 +54,9 @@ public class Processor {
             /**
              * conditional bits with their assumed value for each conditional statement body
              */
-            Map<BlockNode, Pair<Bit, Bit>> conditionalBits = new HashMap<>();
+            final Map<BlockNode, Pair<Bit, Bit>> conditionalBits = new HashMap<>();
 
-            Map<BlockNode, Context.Branch> branchOfBlock = new HashMap<>();
+            final Map<BlockNode, Context.Branch> branchOfBlock = new HashMap<>();
 
             int unfinishedLoopIterations = 0;
 
@@ -69,14 +69,14 @@ public class Processor {
             final Map<MJNode, Long> lastUpdateCounts = new DefaultMap<>(new HashMap<>(), new DefaultMap.Extension<MJNode, Long>() {
                 @Override
                 public Long defaultValue(Map<MJNode, Long> map, MJNode key) {
-                    return 0l;
+                    return 0L;
                 }
             });
 
             final Map<MJNode, Long> lastUpdateWOAppendValuedCounts = new DefaultMap<>(new HashMap<>(), new DefaultMap.Extension<MJNode, Long>() {
                 @Override
                 public Long defaultValue(Map<MJNode, Long> map, MJNode key) {
-                    return 0l;
+                    return 0L;
                 }
             });
 
@@ -153,7 +153,6 @@ public class Processor {
             @Override
             public Boolean visit(BlockNode block) {
                 if (conditionalBits.containsKey(block)){
-                    Pair<Bit, Bit> bitPair = conditionalBits.get(block);
                     Context.Branch branch = branchOfBlock.get(block);
                     context.pushBranch(branch);
                     context.initModsForBranch(branch);
@@ -254,8 +253,7 @@ public class Processor {
                 reduceAppendOnlyVariables(PrintHistory.HistoryEntry history) {
                 return PrintHistory.ReduceResult.create(
                                 history.map.keySet().stream().collect(Collectors.toMap(v -> v, v -> {
-                                    PrintHistory.ReduceResult<AppendOnlyValue> res = history.map.get(v).reduceAppendOnly(context::weight);
-                                    return res;
+                                    return history.map.get(v).reduceAppendOnly(context::weight);
                                 })));
             }
 
@@ -306,37 +304,5 @@ public class Processor {
             }
         }, context::evaluate, node, statementNodesToOmitOneTime);
         return context;
-    }
-
-    private static boolean isLogicalOpOrPhi(MJNode node){
-        return node.accept(new NodeVisitor<Boolean>() {
-            @Override
-            public Boolean visit(MJNode node) {
-                return false;
-            }
-
-            @Override
-            public Boolean visit(BinaryOperatorNode binaryOperator) {
-                return binaryOperator.operator == LexerTerminal.AND ||
-                        binaryOperator.operator == LexerTerminal.OR ||
-                        binaryOperator.operator == LexerTerminal.XOR;
-            }
-
-            @Override
-            public Boolean visit(UnaryOperatorNode unaryOperator) {
-                return true;
-            }
-
-            @Override
-            public Boolean visit(PhiNode phi) {
-                return true;
-            }
-
-            @Override
-            public Boolean visit(VariableAccessNode variableAccess) {
-                return variableAccess.definingExpression != null &&
-                        isLogicalOpOrPhi(variableAccess.definingExpression);
-            }
-        });
     }
 }

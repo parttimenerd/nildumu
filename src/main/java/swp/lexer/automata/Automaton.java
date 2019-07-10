@@ -168,9 +168,7 @@ public class Automaton {
 		List<Set<State>> epsilonReachable = new ArrayList<>();
 		for (State state : states){
 			Set<State> set = new HashSet<State>();
-			for (State reachableState : state.epsilonReachableStates()) {
-				set.add(reachableState);
-			}
+			set.addAll(state.epsilonReachableStates());
 			epsilonReachable.add(set);
 		}
 
@@ -198,8 +196,7 @@ public class Automaton {
 		};
 
 		Function<Set<State>, Set<State>> closure = powerSet -> {
-			Set<State> ret = new HashSet<>();
-			ret.addAll(powerSet);
+			Set<State> ret = new HashSet<>(powerSet);
 			for (State state : powerSet){
 				ret.addAll(epsilonReachable.get(state.id));
 			}

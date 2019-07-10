@@ -94,8 +94,7 @@ public class DiffState extends State {
 		}
 
 		builder.append("</table>> ];\n");
-		List<Symbol> finalSymbols = new ArrayList<>();
-		finalSymbols.addAll(finalItem.adjacentStates.keySet());
+        List<Symbol> finalSymbols = new ArrayList<>(finalItem.adjacentStates.keySet());
 		Collections.sort(finalSymbols);
 		Map<Symbol, State> currentAdjStates = hidden ? new HashMap<>() : currentItem.adjacentStates;
 		for (Symbol shiftSymbol : finalSymbols){
@@ -170,7 +169,7 @@ public class DiffState extends State {
 		Utils.ColorPair ovColor = Utils.diffHTMLColorPair(situationJustAdded, situationHidden, isUsed);
 
 		StringBuilder builder = new StringBuilder();
-		builder.append("<font color=\"" + ovColor.color + "\">");
+		builder.append("<font color=\"").append(ovColor.color).append("\">");
 		builder.append(finalSituation.toHTMLStringWoContext());
 		builder.append("; &#32;");
 		builder.append("</font>");

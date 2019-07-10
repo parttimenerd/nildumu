@@ -1,18 +1,13 @@
 package nildumu;
 
-import org.junit.Rule;
-import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.junit.rules.Timeout;
 
-import java.time.Duration;
 import java.util.logging.Level;
 
 import static com.google.common.truth.Truth.assertThat;
-import static java.time.Duration.ofSeconds;
 import static nildumu.Context.LOG;
 import static nildumu.FunctionTests.parse;
 import static nildumu.SSA2Tests.toSSA;

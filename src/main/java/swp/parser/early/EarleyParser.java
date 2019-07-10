@@ -133,7 +133,7 @@ public class EarleyParser {
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
 		for (Closure closure : table){
-			builder.append("Early Set " + closure.i + "\n");
+			builder.append("Early Set ").append(closure.i).append("\n");
 			builder.append(closure.toString());
 			if (closure.i < table.size() - 1){
 				builder.append("\n");

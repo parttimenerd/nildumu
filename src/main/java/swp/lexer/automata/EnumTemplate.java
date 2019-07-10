@@ -12,7 +12,7 @@ public enum EnumTemplate {
 
     private final String description;
 
-    private EnumTemplate(String description){
+    EnumTemplate(String description){
         this.description = description;
     }
 

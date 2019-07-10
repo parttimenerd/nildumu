@@ -81,7 +81,7 @@ public class LLParser {
 				}
 				advanceTokenNum();
 			} else {
-				Map<Integer, Integer> row = table.table.get((NonTerminal) topStackSymbol);
+				Map<Integer, Integer> row = table.table.get(topStackSymbol);
 				if (!row.containsKey(tokenType)) {
 					ArrayList<String> arr = new ArrayList<>();
 					for (int t : row.keySet()) {

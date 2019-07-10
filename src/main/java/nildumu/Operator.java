@@ -14,19 +14,19 @@ import static nildumu.util.Util.log2;
 
 public interface Operator {
 
-    public static class WrongArgumentNumber extends NildumuError {
+    class WrongArgumentNumber extends NildumuError {
         WrongArgumentNumber(String op, int actualNumber, int expectedNumber){
             super(String.format("%s, expected %d, but got %d argument(s)", op, expectedNumber, actualNumber));
         }
     }
 
-    public static Bit wrapBit(Context c, Bit source) {
+    static Bit wrapBit(Context c, Bit source) {
         Bit wrap = bl.create(source.val(), ds.create(source));
         c.repl(wrap, ((con, b, a) -> con.choose(b, a) == a ? new Mods(b, a).add(c.repl(source).apply(con, source, a)) : Mods.empty()));
         return wrap;
     }
 
-    public static class ParameterAccess implements Operator {
+    class ParameterAccess implements Operator {
 
         private final Variable variable;
 
@@ -53,7 +53,7 @@ public interface Operator {
         }
     }
 
-    public static class LiteralOperator implements Operator {
+    class LiteralOperator implements Operator {
         private final Value literal;
 
         public LiteralOperator(Value literal) {
@@ -77,7 +77,7 @@ public interface Operator {
         }
     }
 
-    public static abstract class UnaryOperator implements Operator {
+    abstract class UnaryOperator implements Operator {
 
         public final String symbol;
 
@@ -106,7 +106,7 @@ public interface Operator {
         }
     }
 
-    public static abstract class BinaryOperator implements Operator {
+    abstract class BinaryOperator implements Operator {
 
         public final String symbol;
 
@@ -141,7 +141,7 @@ public interface Operator {
         }
     }
 
-    public static abstract class BitWiseBinaryOperator extends BinaryOperator {
+    abstract class BitWiseBinaryOperator extends BinaryOperator {
 
         public BitWiseBinaryOperator(String symbol) {
             super(symbol);
@@ -160,7 +160,7 @@ public interface Operator {
      * adds the default bit modification for the own bit to all computed modifications, except for the unused
      * case.
      */
-    static interface StructuredModsCreator extends Context.ModsCreator {
+    interface StructuredModsCreator extends Context.ModsCreator {
 
         default Mods apply(Context c, Bit r, Bit a) {
             if (r.isConstant()){
@@ -223,7 +223,7 @@ public interface Operator {
      *
      * <b>Only usable for operators that don't add control dependencies</b>
      */
-    public static abstract class BitWiseBinaryOperatorStructured extends BitWiseBinaryOperator {
+    abstract class BitWiseBinaryOperatorStructured extends BitWiseBinaryOperator {
 
         public BitWiseBinaryOperatorStructured(String symbol) {
             super(symbol);
@@ -248,7 +248,7 @@ public interface Operator {
         abstract Context.ModsCreator computeModificator(Bit x, Bit y, Bit r, DependencySet dataDeps);
     }
 
-    public static abstract class BitWiseOperator implements Operator {
+    abstract class BitWiseOperator implements Operator {
 
         private final String symbol;
 
@@ -283,7 +283,7 @@ public interface Operator {
      * </ol>
      * <b>Only usable for operators that don't add control dependencies</b>
      */
-    public static abstract class BitWiseOperatorStructured extends BitWiseOperator {
+    abstract class BitWiseOperatorStructured extends BitWiseOperator {
         public BitWiseOperatorStructured(String symbol) {
             super(symbol);
         }
@@ -307,7 +307,7 @@ public interface Operator {
         abstract Context.ModsCreator computeModsCreator(Bit r, DependencySet dataDeps);
     }
 
-    public static abstract class BinaryOperatorStructured extends BinaryOperator {
+    abstract class BinaryOperatorStructured extends BinaryOperator {
 
         public BinaryOperatorStructured(String symbol) {
             super(symbol);
@@ -352,7 +352,7 @@ public interface Operator {
     /**
      * the bitwise or operator (can be used for booleans (ints of which only the first bit matters) too)
      */
-    static final BitWiseBinaryOperatorStructured OR = new BitWiseBinaryOperatorStructured("|") {
+    BitWiseBinaryOperatorStructured OR = new BitWiseBinaryOperatorStructured("|") {
 
         @Override
         public B computeBitValue(Bit x, Bit y) {
@@ -394,7 +394,7 @@ public interface Operator {
         }
     };
 
-    static final BitWiseBinaryOperatorStructured AND = new BitWiseBinaryOperatorStructured("&") {
+    BitWiseBinaryOperatorStructured AND = new BitWiseBinaryOperatorStructured("&") {
 
         @Override
         public B computeBitValue(Bit x, Bit y) {
@@ -436,7 +436,7 @@ public interface Operator {
         }
     };
 
-    static final BitWiseBinaryOperator XOR = new BitWiseBinaryOperatorStructured("^") {
+    BitWiseBinaryOperator XOR = new BitWiseBinaryOperatorStructured("^") {
 
         @Override
         public B computeBitValue(Bit x, Bit y) {
@@ -486,7 +486,7 @@ public interface Operator {
         }
     };
 
-    static final UnaryOperator NOT = new UnaryOperator("~") {
+    UnaryOperator NOT = new UnaryOperator("~") {
         @Override
         public Value compute(Context c, Value x) {
             return x.stream().map(b -> {
@@ -514,7 +514,7 @@ public interface Operator {
         }
     };
 
-    static final BinaryOperator EQUALS = new BinaryOperatorStructured("==") {
+    BinaryOperator EQUALS = new BinaryOperatorStructured("==") {
         @Override
         public Lattices.B computeBitValue(int i, Value x, Value y) {
             if (i > 1) {
@@ -562,7 +562,7 @@ public interface Operator {
         }
     };
 
-    static final BinaryOperator UNEQUALS = new BinaryOperatorStructured("!=") {
+    BinaryOperator UNEQUALS = new BinaryOperatorStructured("!=") {
 
         @Override
         public Lattices.B computeBitValue(int i, Value x, Value y) {
@@ -614,7 +614,7 @@ public interface Operator {
         }
     };
 
-    static final BinaryOperatorStructured LESS = new BinaryOperatorStructured("<") {
+    BinaryOperatorStructured LESS = new BinaryOperatorStructured("<") {
 
         Stack<DependencySet> dependentBits = new Stack<>();
 
@@ -685,7 +685,7 @@ public interface Operator {
         }
     };
 
-    static final BitWiseBinaryOperatorStructured PHI = new BitWiseBinaryOperatorStructured("phi") {
+    BitWiseBinaryOperatorStructured PHI = new BitWiseBinaryOperatorStructured("phi") {
 
         @Override
         public boolean supportsArguments(List<Value> arguments) {
@@ -770,7 +770,7 @@ public interface Operator {
         }
     };
 
-    static final BitWiseOperator PHI_GENERIC = new BitWiseOperatorStructured("phi") {
+    BitWiseOperator PHI_GENERIC = new BitWiseOperatorStructured("phi") {
 
         @Override
         public boolean supportsArguments(List<Value> arguments) {
@@ -799,7 +799,7 @@ public interface Operator {
 
         @Override
         public Lattices.B computeBitValue(List<Bit> bits) {
-            return bs.sup(bits.stream().map(b -> b.val()));
+            return bs.sup(bits.stream().map(Bit::val));
         }
 
         @Override
@@ -826,7 +826,7 @@ public interface Operator {
         }
     };
 
-    public static class PlaceBit extends UnaryOperator {
+    class PlaceBit extends UnaryOperator {
 
         final int index;
 
@@ -841,7 +841,7 @@ public interface Operator {
         }
     }
 
-    public static class SelectBit extends UnaryOperator {
+    class SelectBit extends UnaryOperator {
 
         final int index;
 
@@ -856,7 +856,7 @@ public interface Operator {
         }
     }
 
-    public static class MethodInvocation implements Operator {
+    class MethodInvocation implements Operator {
 
         final Parser.MethodInvocationNode callSite;
 
@@ -867,7 +867,7 @@ public interface Operator {
         @Override
         public Value compute(Context c, List<Value> arguments) {
             Map<Variable, AppendOnlyValue> globals = callSite.globalDefs.entrySet().stream()
-                    .collect(Collectors.toMap(e -> e.getKey(), e -> c.getVariableValue(e.getValue().first).asAppendOnly()));
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> c.getVariableValue(e.getValue().first).asAppendOnly()));
             MethodInvocationHandler.MethodReturnValue ret = c.methodInvocationHandler().analyze(c, callSite, arguments, globals);
             callSite.globalDefs.forEach((v, p) -> {
                 if (ret.globals.containsKey(v)) {
@@ -886,7 +886,7 @@ public interface Operator {
         }
     }
 
-    static final BinaryOperator ADD = new BinaryOperator("+") {
+    BinaryOperator ADD = new BinaryOperator("+") {
         @Override
         Value compute(Context c, Value first, Value second) {
             Set<Bit> argBits = Stream.concat(first.stream(), second.stream()).collect(Collectors.toSet());
@@ -913,7 +913,7 @@ public interface Operator {
         }
     };
 
-    static final BinaryOperator LEFT_SHIFT = new BinaryOperator("<<") {
+    BinaryOperator LEFT_SHIFT = new BinaryOperator("<<") {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isConstant()){
@@ -935,7 +935,7 @@ public interface Operator {
         }
     };
 
-    static final BinaryOperator RIGHT_SHIFT = new BinaryOperator(">>") {
+    BinaryOperator RIGHT_SHIFT = new BinaryOperator(">>") {
 
 
         @Override
@@ -976,7 +976,7 @@ public interface Operator {
         return IntStream.range(0, size).mapToObj(i -> bl.create(U, depBits)).collect(Value.collector());
     }
 
-    static final BinaryOperator MULTIPLY = new BinaryOperator("+") {
+    BinaryOperator MULTIPLY = new BinaryOperator("+") {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isPowerOfTwo()){
@@ -992,7 +992,7 @@ public interface Operator {
         }
     };
 
-    static final BinaryOperator DIVIDE = new BinaryOperator("+") {
+    BinaryOperator DIVIDE = new BinaryOperator("+") {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isPowerOfTwo()){
@@ -1008,7 +1008,7 @@ public interface Operator {
         }
     };
 
-    static final BinaryOperator MODULO = new BinaryOperator("+") {
+    BinaryOperator MODULO = new BinaryOperator("+") {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isPowerOfTwo() && !second.isNegative()) {
@@ -1026,7 +1026,7 @@ public interface Operator {
         }
     };
 
-    static final BinaryOperator APPEND = new BinaryOperator("@") {
+    BinaryOperator APPEND = new BinaryOperator("@") {
 
         @Override
         public boolean supportsArguments(List<Value> arguments) {
@@ -1058,13 +1058,13 @@ public interface Operator {
         return compute(c, arguments);
     }
 
-    public String toString(List<Value> arguments);
+    String toString(List<Value> arguments);
 
-    public default boolean allowsUnevaluatedArguments(){
+    default boolean allowsUnevaluatedArguments(){
         return false;
     }
 
     default boolean supportsArguments(List<Value> arguments){
-        return !arguments.stream().anyMatch(a -> a instanceof AppendOnlyValue);
+        return arguments.stream().noneMatch(a -> a instanceof AppendOnlyValue);
     }
 }

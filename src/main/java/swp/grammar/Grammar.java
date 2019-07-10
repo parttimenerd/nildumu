@@ -623,8 +623,7 @@ public class Grammar implements Serializable {
 				if (production.isEpsilonProduction()){
 					continue;
 				}
-				Set<Symbol> lastFollow = new HashSet<>();
-				lastFollow.addAll(follow.get(production.left));
+                Set<Symbol> lastFollow = new HashSet<>(follow.get(production.left));
 				for (int i = production.right.size() - 1; i >= 0; i--){
 					if (production.right.get(i) instanceof NonTerminal){
 						NonTerminal rightPart = (NonTerminal)production.right.get(i);
@@ -910,8 +909,7 @@ public class Grammar implements Serializable {
 		while (somethingChanged){
 			somethingChanged = false;
 			for (NonTerminal lhs : nonTerminals) {
-				Set<NonTerminal> intersectionOfAllProds = new HashSet<>();
-				intersectionOfAllProds.addAll(productions.get(0).nonTerminals);
+                Set<NonTerminal> intersectionOfAllProds = new HashSet<>(productions.get(0).nonTerminals);
 				for (Production production : lhs.getProductions()) {
 					intersectionOfAllProds.retainAll(production.nonTerminals);
 				}

@@ -1,7 +1,6 @@
 package swp.lexer.automata;
 
 import swp.SWPException;
-import swp.lexer.LexerError;
 
 /**
  * Created by parttimenerd on 03.08.16.

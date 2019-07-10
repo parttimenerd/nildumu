@@ -3,13 +3,10 @@ package nildumu;
 import java.util.*;
 import java.util.function.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import nildumu.util.DefaultMap;
-import swp.lexer.Location;
 import swp.util.Pair;
 
-import static nildumu.Lattices.bl;
 import static nildumu.Lattices.vl;
 import static nildumu.Parser.*;
 import static nildumu.Parser.LexerTerminal.*;
@@ -20,9 +17,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     private final int maxBitWidth;
     private final boolean transformPlus;
 
-    private final DefaultMap<ExpressionNode, ExpressionNode> replacedMap = new DefaultMap<>((map, node) -> {
-        return repl(node);
-    });
+    private final DefaultMap<ExpressionNode, ExpressionNode> replacedMap = new DefaultMap<>((map, node) -> repl(node));
 
     private final DefaultMap<ConditionalStatementNode, ConditionalStatementNode> replacedCondStmtsMap = new DefaultMap<>((map, stmt) -> stmt);
 
@@ -99,9 +94,8 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
                 }
             } else if (node instanceof UnaryOperatorNode){
                 UnaryOperatorNode unOp = (UnaryOperatorNode)node;
-                switch (unOp.operator){
-                    case MINUS:
-                        return new BinaryOperatorNode(new IntegerLiteralNode(unOp.location, Lattices.ValueLattice.get().parse(1)), new UnaryOperatorNode(unOp.expression, INVERT), PLUS);
+                if (unOp.operator == MINUS) {
+                    return new BinaryOperatorNode(new IntegerLiteralNode(unOp.location, Lattices.ValueLattice.get().parse(1)), new UnaryOperatorNode(unOp.expression, INVERT), PLUS);
                 }
                 return unOp;
             }
@@ -337,7 +331,6 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     }
 
     public void setDefiningAndConditionalExpressions(MJNode node){
-        Map<Variable, ExpressionNode> variableToExpr = new HashMap<>();
         node.accept(new NodeVisitor<Object>() {
 
             @Override
@@ -357,14 +350,6 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
                 visitChildrenDiscardReturn(phi);
                 //phi.controlDeps = phi.controlDeps.stream().map(MetaOperatorTransformator.this::replace).collect(Collectors.toList());
                 phi.joinedVariables.forEach(v -> v.definingExpression = replace(v.definingExpression));
-                return null;
-            }
-
-            @Override
-            public Object visit(VariableAssignmentNode assignment) {
-                visitChildrenDiscardReturn(assignment);
-                //assignment.expression = replace(assignment.expression);
-                variableToExpr.put(assignment.definition, assignment.expression);
                 return null;
             }
 

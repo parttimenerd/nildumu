@@ -56,8 +56,7 @@ public class DiffHistory {
 		if (lastItem != null && !lastItem.didSomethingChange() && !onlyUsedAtThisTime){
 			return new Item(this, -2, onlyUsedAtThisTime, new ArrayList<>(), new ArrayList<>(), new HashMap<>());
 		}
-		Map<Symbol, State> adjStates = new HashMap<>();
-		adjStates.putAll(state.adjacentStates);
+        Map<Symbol, State> adjStates = new HashMap<>(state.adjacentStates);
 		Collections.sort(state.nonClosureItems);
 		return new Item(this, -1, onlyUsedAtThisTime, cloneSituationList(state),
 				cloneSituationList(state.nonClosureItems), adjStates);

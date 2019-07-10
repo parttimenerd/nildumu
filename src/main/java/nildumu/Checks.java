@@ -1,7 +1,5 @@
 package nildumu;
 
-import swp.util.Pair;
-
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -13,7 +11,7 @@ import static nildumu.Parser.*;
  */
 public class Checks {
 
-    public static enum ErrorType {
+    public enum ErrorType {
         GENERAL,
         DEFINITION_MISSING,
         UNEVALUATED;
@@ -106,8 +104,8 @@ public class Checks {
     }
 
     @FunctionalInterface
-    public static interface NullaryFunction {
-        public void call();
+    public interface NullaryFunction {
+        void call();
     }
 
     public static abstract class ErrorReportingVisitor implements NodeVisitor<ErrorPipe> {

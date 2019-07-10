@@ -1,7 +1,5 @@
 package swp.util;
 
-import nildumu.Variable;
-
 import java.io.Serializable;
 import java.util.stream.Stream;
 

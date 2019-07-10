@@ -142,7 +142,7 @@ public class MetaState {
 	}
 
 	public MetaState appendExcluding(Pair<Integer, Integer>... excludedRanges){
-		Map<Integer, Boolean> isExcluded = new HashMap<>(Utils.MAX_CHAR - Utils.MAX_CHAR);
+		Map<Integer, Boolean> isExcluded = new HashMap<>(Utils.MAX_CHAR - Utils.MIN_CHAR);
 		for (int i = Utils.MIN_CHAR; i < Utils.MAX_CHAR; i++){
 			isExcluded.put(i, false);
 		}

@@ -86,7 +86,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         };
         program.globalBlock.children().forEach(n -> ((MJNode)n).accept(visitor));
         program.methods().forEach(m -> {
-            m.globalDefs = m.globalStringDefs.entrySet().stream().collect(Collectors.toMap(e -> appendToVar.get(e.getKey()), e -> e.getValue()));
+            m.globalDefs = m.globalStringDefs.entrySet().stream().collect(Collectors.toMap(e -> appendToVar.get(e.getKey()), Map.Entry::getValue));
         });
         return null;
     }

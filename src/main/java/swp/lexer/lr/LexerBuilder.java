@@ -67,7 +67,7 @@ public class LexerBuilder {
 		LRParserTable parserTable = graph.toParserTable();
 		LRParser parser = new LRParser(new AlphabetLexer(input, ignoredUnderlyingTokenTypes), parserTable, true);
 		BaseAST ast = parser.parse();
-		ListAST list = ast.<ListAST>as();
+		ListAST list = ast.as();
 		System.out.println(list.toPrettyString());
 		List<Token> tokens = list.getMatchedTokens();
 		Token token = tokens.get(tokens.size() - 1);

@@ -59,10 +59,9 @@ public class AutomatonLexer implements Lexer {
 		if (!lookaheadFromLast.isEmpty()){
 			location = lookaheadFromLast.get(0).location;
 		}
-		List<Token> readTokens = new ArrayList<>();
 		int rtPosition = 0;
 		int lastRtPosition = 0;
-		readTokens.addAll(lookaheadFromLast);
+		List<Token> readTokens = new ArrayList<>(lookaheadFromLast);
 		Token lastToken = null;
 		while (true){
 			int cur;
@@ -94,9 +93,7 @@ public class AutomatonLexer implements Lexer {
 				for (int i = 0; i < row.length; i++){
 					if (row[i] != -1){
 						if (usesCompressedTable){
-							for (int c : compressedTable.reverseTranslations.get(i)){
-								expected.add(c);
-							}
+                            expected.addAll(compressedTable.reverseTranslations.get(i));
 						} else {
 							expected.add(i);
 						}

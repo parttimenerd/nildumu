@@ -1,19 +1,21 @@
 package nildumu;
 
+import nildumu.util.Lazy;
+
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static nildumu.Lattices.*;
+import static nildumu.util.Lazy.l;
 
 /**
  * Contains the classes to work with repeated print statements and their reduction
  */
+@SuppressWarnings("ALL")
 public class PrintHistory {
 
     static class HistoryEntry {
@@ -38,8 +40,7 @@ public class PrintHistory {
         static HistoryEntry create(Map<Variable, Lattices.AppendOnlyValue> map, Optional<HistoryEntry> prev, HistoryEntry base){
             return new HistoryEntry(prev, map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                     e -> new HistoryPerGlobalEntry(prev.map(p -> p.map.get(e.getKey())), e.getKey(), e.getValue().deepClone(),
-                            base.map.get(e.getKey()).reachableBitNum,
-                            base.map.get(e.getKey()).reachableBitsForDiff, base.map.get(e.getKey()).reachableBits))));
+                            base.map.get(e.getKey()).reachableBitsForDiff.get(), base.map.get(e.getKey()).reachableBits.get()))));
         }
 
     }
@@ -51,21 +52,16 @@ public class PrintHistory {
         final Lattices.AppendOnlyValue value;
         final Lattices.AppendOnlyValue difference;
 
+        final Lazy<Set<Bit>> reachableBitsForDiff;
+        final Lazy<Set<Lattices.Bit>> reachableBits;
 
-        final long reachableBitNum;
-        final long reachableBitNumForDiff;
-        final Set<Lattices.Bit> reachableBitsForDiff;
-        final Set<Lattices.Bit> reachableBits;
-
-        HistoryPerGlobalEntry(Optional<HistoryPerGlobalEntry> prev, Variable name, AppendOnlyValue value, long reachableBitNum, Set<Bit> reachableBitsForDiff, Set<Bit> reachableBits) {
+        HistoryPerGlobalEntry(Optional<HistoryPerGlobalEntry> prev, Variable name, AppendOnlyValue value, Set<Bit> reachableBitsForDiff, Set<Bit> reachableBits) {
             this.prev = prev;
             this.name = name;
             this.value = value;
-            this.reachableBits = reachableBits;
+            this.reachableBits = l(reachableBits);
             this.difference = prev.map(h -> value.difference(h.value)).orElse(value);
-            this.reachableBitNum = reachableBitNum;
-            this.reachableBitNumForDiff = reachableBitsForDiff.size();
-            this.reachableBitsForDiff = reachableBitsForDiff;
+            this.reachableBitsForDiff = l(reachableBitsForDiff);
         }
 
         HistoryPerGlobalEntry(Optional<HistoryPerGlobalEntry> prev, Variable name, Lattices.AppendOnlyValue value, Function<Lattices.Value, Set<Lattices.Bit>> reachabilityCalculator) {
@@ -73,39 +69,31 @@ public class PrintHistory {
             this.name = name;
             this.value = value;
             this.difference = prev.map(h -> value.difference(h.value)).orElse(value);
-            this.reachableBits = reachabilityCalculator.apply(value);
-            this.reachableBitNum = reachableBits.size();
-            this.reachableBitsForDiff = reachabilityCalculator.apply(difference);
-            this.reachableBitNumForDiff = reachableBitsForDiff.size();
+            this.reachableBits = l(reachabilityCalculator.apply(value));
+            this.reachableBitsForDiff = l(reachabilityCalculator.apply(difference));
         }
 
-        ReduceResult<Lattices.AppendOnlyValue> reduceAppendOnly(BiConsumer<Bit, Integer> weighter){
+        ReduceResult<Lattices.AppendOnlyValue> reduceAppendOnly(BiConsumer<Bit, Double> weighter){
             HistoryPerGlobalEntry currentHist = this;
-            System.out.println("Reduce");
-            System.out.println("                 " + name + ": " + currentHist.value);
             ReduceResult<Lattices.AppendOnlyValue> current = new ReduceResult<>(currentHist.value.clone(), false, true);
-            if (!prev.isPresent() || prev.get().value.sizeWithoutEs() == 0){ // its the first round
+
+            if (!prev.isPresent() || prev.get().value.sizeWithoutEs() == 0 || // its the first round
+                value.sizeWithoutEs() == 0 // or the value is just empty
+                ){
                 return current;
             }
-            if (value.sizeWithoutEs() == 0) {
-                return current;
-            }
+
             HistoryPerGlobalEntry previousHist = prev.get();
             // if the previous and the current are the same length, nothing changed too
-            /*if (previousHist.value.sizeWithoutEs() == currentHist.value.sizeWithoutEs()) {
-                return current;
-            }*/
-            // if it got longer and added new dependencies, then we don't have anything to do either
-            if (currentHist.reachableBitNum != previousHist.reachableBitNum){
+            if (previousHist.value.sizeWithoutEs() == currentHist.value.sizeWithoutEs()) {
                 return current;
             }
-            // if it got longer and added parameter dependencies compared to the last version,
-            // then we can ignore it too
-            if (currentHist.reachableBitNumForDiff > previousHist.reachableBitNumForDiff){
-                return current;
-            }
-            // same for the size
+            // if more bits are added than in the last round, the value changed
             if (currentHist.difference.sizeWithoutEs() > previousHist.difference.sizeWithoutEs() && previousHist.difference.sizeWithoutEs() > 0){
+                return current;
+            }
+            // if the values did not change...
+            if (previousHist.value.valueEquals(currentHist.value)){
                 return current;
             }
             // and if the bit values changed to higher levels
@@ -114,15 +102,19 @@ public class PrintHistory {
                     && previousHist.difference.sizeWithoutEs() > 0){
                 return current;
             }
-            System.out.println("Did not change");
+            // if it got longer and added new dependencies, then we don't have anything to do either
+            if (currentHist.reachableBits.get().size() != previousHist.reachableBits.get().size()){
+                return current;
+            }
+            // if it got longer and added parameter dependencies compared to the last version,
+            // then we can ignore it too
+            if (currentHist.reachableBitsForDiff.get().size() > previousHist.reachableBitsForDiff.get().size()){
+                return current;
+            }
             // Idea: end this recursion by using an "s" bit that depends to all bits that the difference depends on
-            Lattices.Bit s = bl.create(B.S, ds.create(currentHist.reachableBitsForDiff));
+            Lattices.Bit s = bl.create(B.S, ds.create(currentHist.reachableBitsForDiff.get()));
             // if the previous value did already ends with the star bits that we want to add
             // return the previous value
-            System.out.println(previousHist.difference);
-            if (previousHist.value.valueEquals(currentHist.value)){
-                return new ReduceResult<>(previousHist.value.cloneWithoutEs(), false, false);
-            }
             if ((previousHist.difference.size() > 0 && previousHist.difference.get(previousHist.difference.size()).valueGreaterEquals(s)) ||
                 previousHist.value.stream().anyMatch(b -> b.valueGreaterEquals(s))){
                 return new ReduceResult<>(previousHist.value.cloneWithoutEs(), true, false);
@@ -131,9 +123,8 @@ public class PrintHistory {
             // => merging
 
             // if the current variable is also related to input, then we know, that `s` may leak infinitely many bytes
-            // TODO this is just a hack
-            if (name.name.contains("input")) {
-                s.deps().stream().forEach(b -> weighter.accept(b, Context.INFTY));
+            if (name.isAppendableInput()) {
+                s.deps().forEach(b -> weighter.accept(b, (double)Context.INFTY));
             }
 
             // TODO: improve
@@ -159,7 +150,7 @@ public class PrintHistory {
 
         static ReduceResult<Map<Variable, AppendOnlyValue>> create(Map<Variable, ReduceResult<AppendOnlyValue>> val){
             return new ReduceResult<>((val.entrySet().stream().collect(Collectors.toMap(
-                    e -> e.getKey(),
+                    Map.Entry::getKey,
                     e -> e.getValue().value
             ))), val.values().stream().map(v -> v.addedAStarBit).reduce((f, s) -> f && s).orElse(false),
             val.values().stream().map(v -> v.somethingChanged).reduce((f, s) -> f && s).orElse(false));

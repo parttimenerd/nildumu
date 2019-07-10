@@ -185,10 +185,9 @@ public class State implements Comparable<State> {
 	}
 
 	public Set<State> epsilonReachableStates(){
-		Set<State> alreadyVisited = new HashSet<>();
-		Stack<State> stack = new Stack<>();
+        Stack<State> stack = new Stack<>();
 		stack.addAll(epsilonNeighbors);
-		alreadyVisited.addAll(epsilonNeighbors);
+        Set<State> alreadyVisited = new HashSet<>(epsilonNeighbors);
 		while (!stack.isEmpty()){
 			State top = stack.pop();
 			for (State reachable : top.epsilonNeighbors){

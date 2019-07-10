@@ -32,7 +32,7 @@ public class State extends ArrayList<Situation> implements Comparable<State> {
 			if (j != 0){
 				builder.append("\n");
 			}
-			builder.append("- " + tempSituations.get(j).toString());
+			builder.append("- ").append(tempSituations.get(j).toString());
 		}
 		return "State " + id + "\n" + builder.toString();
 	}

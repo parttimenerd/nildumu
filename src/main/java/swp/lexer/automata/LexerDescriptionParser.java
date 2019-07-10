@@ -123,7 +123,7 @@ public class LexerDescriptionParser {
 						}
 				),
 				new Pair<Object[], SerializableFunction<ListAST, BaseAST>>(builder.combine("term"),
-						list -> ((MetaStateNode)list.get(0)))
+						list -> list.get(0))
 				)
 		);
 

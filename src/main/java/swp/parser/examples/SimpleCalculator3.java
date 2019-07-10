@@ -17,7 +17,7 @@ public class SimpleCalculator3 implements Serializable {
 
 	private Context context = new Context();
 
-	private static enum LexerTerminal implements Generator.LexerTerminalEnum {
+	private enum LexerTerminal implements Generator.LexerTerminalEnum {
 		EOF(""),
 		PLUS("\\+"),
 		MINUS("\\-"),
@@ -163,11 +163,11 @@ public class SimpleCalculator3 implements Serializable {
 		}
 	}
 
-	private static enum UnaryOperation {
+	private enum UnaryOperation {
 		NEGATE, INVERT
 	}
 
-	private static enum BinaryOperation {
+	private enum BinaryOperation {
 		PLUS, MINUS, POW, DIVIDE, MULTIPLY,
 		GREATER, LOWER, EQUALS, UNEQUALS,
 		AND, OR

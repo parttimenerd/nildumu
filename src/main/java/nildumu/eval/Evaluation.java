@@ -1,7 +1,6 @@
 package nildumu.eval;
 
 import com.beust.jcommander.*;
-import com.beust.jcommander.converters.EnumConverter;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -115,7 +114,7 @@ public class Evaluation {
         return getPacketsForToolsOrDie(new TestProgram(name, Parser.process(program), integerType), baseFolder);
     }
 
-    static enum Mode {
+    enum Mode {
         SCAL,
         NORMAL
     }
@@ -241,7 +240,7 @@ public class Evaluation {
         }
     }
 
-    public static enum ScalBench {
+    public enum ScalBench {
         ALL(i -> null){
             @Override
             void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, List<AbstractTool> tools) {

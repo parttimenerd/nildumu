@@ -228,17 +228,13 @@ public class Utils {
 
 	public static <T> ArrayList<T> makeArrayList(T... elements){
 		ArrayList<T> ret = new ArrayList<>(elements.length);
-		for (int i = 0; i < elements.length; i++){
-			ret.add(elements[i]);
-		}
+		Collections.addAll(ret, elements);
 		return ret;
 	}
 
 	public static <T> HashSet<T> makeHashSet(T... elements){
 		HashSet<T> ret = new HashSet<>(elements.length);
-		for (int i = 0; i < elements.length; i++){
-			ret.add(elements[i]);
-		}
+		Collections.addAll(ret, elements);
 		return ret;
 	}
 

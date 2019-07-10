@@ -2,7 +2,6 @@ package nildumu;
 
 import nildumu.util.DefaultMap;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Function;
@@ -36,7 +35,7 @@ public class InputBits {
     }
 
     public void putAll(Sec<?> sec, Set<Bit> bits){
-        bits.stream().forEach(b -> put(sec, b));
+        bits.forEach(b -> put(sec, b));
     }
 
     public Set<Bit> getBits(){

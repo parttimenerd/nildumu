@@ -14,7 +14,7 @@ import static nildumu.util.DefaultMap.ForbiddenAction.*;
  */
 public class IOValues {
 
-    public static class MultipleLevelsPerValue extends NildumuError {
+    static class MultipleLevelsPerValue extends NildumuError {
         MultipleLevelsPerValue(Value value){
             super(String.format("Multiple security levels per value are not supported, attempted it for value %s", value));
         }
@@ -56,13 +56,6 @@ public class IOValues {
         }
     }
 
-    public List<Pair<Sec, Value>> getValues(){
-        return valuesPerSec.entrySet().stream()
-                .flatMap(e -> e.getValue().stream()
-                        .map(v -> new Pair<>((Sec)e.getKey(), v)))
-                .collect(Collectors.toList());
-    }
-
     public boolean contains(Bit bit){
         return bits.contains(bit);
     }
@@ -92,7 +85,4 @@ public class IOValues {
         return secPerBit.get(bit);
     }
 
-    public boolean hasBitWithoutValue(){
-        return bits.stream().anyMatch(b -> b.value() == null);
-    }
 }

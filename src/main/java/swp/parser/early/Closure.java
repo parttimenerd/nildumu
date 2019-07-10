@@ -21,7 +21,7 @@ public class Closure extends ArrayList<EarlyItem> {
 			if (j != 0){
 				builder.append("\n");
 			}
-			builder.append("- " + this.get(j).toString());
+			builder.append("- ").append(this.get(j).toString());
 		}
 		return builder.toString();
 	}

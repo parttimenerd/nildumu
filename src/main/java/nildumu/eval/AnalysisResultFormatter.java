@@ -2,5 +2,5 @@ package nildumu.eval;
 
 @FunctionalInterface
 public interface AnalysisResultFormatter {
-    public String format(AnalysisResult result);
+    String format(AnalysisResult result);
 }

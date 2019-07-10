@@ -41,8 +41,7 @@ public class Graph {
 				State currentState = states.get(i);
 				if (currentState.hasShiftableSituations()){
 					Map<Symbol, State> createdStates = currentState.shift();
-					List<Symbol> symbols = new ArrayList<>();
-					symbols.addAll(createdStates.keySet());
+					List<Symbol> symbols = new ArrayList<>(createdStates.keySet());
 					try {
 					//	Collections.sort(symbols);
 					} catch (IllegalArgumentException ex){

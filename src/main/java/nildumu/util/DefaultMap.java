@@ -126,12 +126,12 @@ public class DefaultMap<K, V> implements Map<K, V> {
         return map.hashCode();
     }
 
-    public static enum ForbiddenAction {
+    public enum ForbiddenAction {
         FORBID_VALUE_UPDATES,
         FORBID_DELETIONS
     }
 
-    public static interface Extension<K, V> {
+    public interface Extension<K, V> {
         default void handleValueUpdate(DefaultMap<K, V> map, K key, V value) {}
 
         default V defaultValue(Map<K, V> map, K key) {

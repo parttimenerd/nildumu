@@ -16,9 +16,7 @@ public class Context extends ArrayList<Terminal> {
 	}
 
 	public Context(List<Terminal> terminals){
-		for (Terminal terminal : terminals){
-			add(terminal);
-		}
+		this.addAll(terminals);
 	}
 
 	public void addTerminal(Terminal terminal){

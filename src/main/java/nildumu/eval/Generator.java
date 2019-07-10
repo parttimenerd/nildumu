@@ -141,8 +141,7 @@ public class Generator {
                 new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
                 "l"));
         program.addGlobalStatement(new VariableDeclarationNode(loc(), "z", literal(1)));
-        List<StatementNode> innerStmts = new ArrayList<>();
-        innerStmts.addAll(createMultipleIfStatements(comparisons,
+        List<StatementNode> innerStmts = new ArrayList<>(createMultipleIfStatements(comparisons,
                 i -> new BinaryOperatorNode(new VariableAccessNode(loc(), "h"),
                         literal(i + 1), LexerTerminal.EQUALS), thenStmtCreator,
                 i -> new EmptyStatementNode(loc())).statementNodes);

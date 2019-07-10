@@ -175,7 +175,7 @@ public class Generator {
 		return new Pair<>(table, parserTable);
 	}
 
-	public static interface LexerTerminalEnum {
+	public interface LexerTerminalEnum {
 		String getTerminalDescription();
 	}
 

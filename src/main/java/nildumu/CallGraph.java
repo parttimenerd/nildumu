@@ -29,14 +29,14 @@ public class CallGraph {
         private final Set<CallNode> callers;
         final boolean isMainNode;
 
-        public CallNode(MethodNode method, Set<CallNode> callees, Set<CallNode> callers, boolean isMainNode) {
+        CallNode(MethodNode method, Set<CallNode> callees, Set<CallNode> callers, boolean isMainNode) {
             this.method = method;
             this.callees = callees;
             this.callers = callers;
             this.isMainNode = isMainNode;
         }
 
-        public CallNode(MethodNode method){
+        CallNode(MethodNode method){
             this(method, new HashSet<>(), new HashSet<>(), false);
         }
 
@@ -50,7 +50,7 @@ public class CallGraph {
             return method.getTextualId();
         }
 
-        public Set<CallNode> calledCallNodes(){
+        Set<CallNode> calledCallNodes(){
             Set<CallNode> alreadyVisited = new LinkedHashSet<>();
             Queue<CallNode> queue = new ArrayDeque<>();
             queue.add(this);
@@ -64,7 +64,7 @@ public class CallGraph {
             return alreadyVisited;
         }
 
-        public Set<CallNode> calledCallNodesAndSelf() {
+        Set<CallNode> calledCallNodesAndSelf() {
             Set<CallNode> nodes = calledCallNodes();
             nodes.add(this);
             return nodes;
@@ -82,14 +82,14 @@ public class CallGraph {
                     Stream.of(this)).collect(Collectors.toList());
         }
 
-        public Graph createDotGraph(Function<CallNode, Attributes> attrSupplier){
+        Graph createDotGraph(Function<CallNode, Attributes> attrSupplier){
             return graph().graphAttr().with(RankDir.TOP_TO_BOTTOM).directed().with((Node[])calledCallNodesAndSelf()
                     .stream().map(n -> node(n.method.name)
                             .link((String[])n.callees.stream()
-                            .map(m -> m.method.name).toArray(i -> new String[i])).with().with(attrSupplier.apply(n))).toArray(i -> new Node[i]));
+                            .map(m -> m.method.name).toArray(String[]::new)).with().with(attrSupplier.apply(n))).toArray(Node[]::new));
         }
 
-        public Set<CallNode> getCallees() {
+        Set<CallNode> getCallees() {
             return Collections.unmodifiableSet(callees);
         }
 
@@ -97,14 +97,14 @@ public class CallGraph {
             return Collections.unmodifiableSet(callers);
         }
 
-        public MethodNode getMethod() {
+        MethodNode getMethod() {
             return method;
         }
     }
 
     public static class CallFinderNode implements NodeVisitor<Set<MethodNode>> {
 
-        Set<BaseAST> alreadyVisited = new HashSet<>();
+        final Set<BaseAST> alreadyVisited = new HashSet<>();
 
         @Override
         public Set<MethodNode> visit(MJNode node) {
@@ -123,12 +123,12 @@ public class CallGraph {
         }
     }
 
-    final ProgramNode program;
+    private final ProgramNode program;
     final CallNode mainNode;
     final Map<MethodNode, CallNode> methodToNode;
-    final Map<CallNode, Set<CallNode>> dominators;
-    final Map<CallNode, Integer> loopDepths;
-    final Set<MethodNode> usedMethods;
+    private final Map<CallNode, Set<CallNode>> dominators;
+    private final Map<CallNode, Integer> loopDepths;
+    private final Set<MethodNode> usedMethods;
 
     public CallGraph(ProgramNode program) {
         this.program = program;
@@ -148,14 +148,10 @@ public class CallGraph {
                 Stream.concat(Stream.of(mainNode), usedMethods.stream().map(CallNode::new))
                         .collect(Collectors.toMap(n -> n.method, n -> n));
         methodToNode
-                .entrySet()
-                .forEach(
-                        e -> {
-                            e.getKey()
-                                    .body
-                                    .accept(new CallFinderNode())
-                                    .forEach(m -> e.getValue().call(methodToNode.get(m)));
-                        });
+                .forEach((key, value) -> key
+                        .body
+                        .accept(new CallFinderNode())
+                        .forEach(m -> value.call(methodToNode.get(m))));
         dominators = dominators(mainNode);
         loopDepths = calcLoopDepth(mainNode, dominators);
         DotRegistry.get().store("summary", "call-graph",
@@ -219,7 +215,7 @@ public class CallGraph {
         return methodToNode.get(method);
     }
 
-    public static Map<CallNode, Set<CallNode>> dominators(CallNode mainNode) {
+    private static Map<CallNode, Set<CallNode>> dominators(CallNode mainNode) {
         Set<CallNode> bot = mainNode.calledCallNodesAndSelf();
         return worklist(
                 mainNode,
@@ -228,7 +224,7 @@ public class CallGraph {
                             Set<CallNode> intersection = new HashSet<>(s1);
                             intersection.retainAll(s2);
                             return intersection;
-                        }).orElseGet(() -> new HashSet<>()));
+                        }).orElseGet(HashSet::new));
                         nodes.add(n);
                         return nodes;
                 },
@@ -238,24 +234,20 @@ public class CallGraph {
                 new HashMap<>());
     }
 
-    public static Map<CallNode, Integer> calcLoopDepth(CallNode mainNode, Map<CallNode, Set<CallNode>> dominators) {
+    private static Map<CallNode, Integer> calcLoopDepth(CallNode mainNode, Map<CallNode, Set<CallNode>> dominators) {
         Set<CallNode> loopHeaders = new HashSet<>();
-        dominators.forEach((n, dom) -> {
-            dom.forEach(d -> {
-                if (n.callees.contains(d)) {
-                    loopHeaders.add(d);
-                }
-            });
-        });
+        dominators.forEach((n, dom) -> dom.forEach(d -> {
+            if (n.callees.contains(d)) {
+                loopHeaders.add(d);
+            }
+        }));
         Map<CallNode, Set<CallNode>> dominates = new DefaultMap<>((n, map) -> new HashSet<>());
-        dominators.forEach((n, dom) -> {
-            dom.forEach(d -> dominates.get(d).add(n));
-        });
+        dominators.forEach((n, dom) -> dom.forEach(d -> dominates.get(d).add(n)));
         Map<CallNode, Set<CallNode>> dominatesDirectly = new DefaultMap<>((n, map) -> new HashSet<>());
-        dominates.entrySet().forEach(e -> {
-            for (CallNode dominated : e.getValue()) {
-                if (e.getValue().stream().filter(d -> d != dominated && d != e.getKey()).allMatch(d -> !(dominates.get(d).contains(dominated)))) {
-                    dominatesDirectly.get(e.getKey()).add(dominated);
+        dominates.forEach((key, value) -> {
+            for (CallNode dominated : value) {
+                if (value.stream().filter(d -> d != dominated && d != key).noneMatch(d -> dominates.get(d).contains(dominated))) {
+                    dominatesDirectly.get(key).add(dominated);
                 }
             }
         });
@@ -300,7 +292,7 @@ public class CallGraph {
      * @param <T> type of the data calculated for each node
      * @return the calculated values
      */
-    public static <T> Map<CallNode, T> worklist(
+    private static <T> Map<CallNode, T> worklist(
             CallNode mainNode,
             BiFunction<CallNode, Map<CallNode, T>, T> action,
             Function<CallNode, T> bot,
@@ -322,7 +314,7 @@ public class CallGraph {
      * @param <T> type of the data calculated for each node
      * @return the calculated values
      */
-    public static <T> Map<CallNode, T> worklist(
+    private static <T> Map<CallNode, T> worklist(
             CallNode mainNode,
             BiFunction<CallNode, Map<CallNode, T>, T> action,
             Function<CallNode, T> bot,

@@ -158,7 +158,7 @@ public class ReflectionUtils {
 			try {
 				return getter.apply();
 			} catch (Throwable throwable) {
-				throw new RUWrappedFunctionError(throwable, baseObject, null, new Object[]{(String)name});
+				throw new RUWrappedFunctionError(throwable, baseObject, null, new Object[]{name});
 			}
 		}
 
@@ -170,7 +170,7 @@ public class ReflectionUtils {
 				setter.consume(value);
 				return value;
 			} catch (Throwable throwable) {
-				throw new RUWrappedFunctionError(throwable, baseObject, null, new Object[]{(String)name});
+				throw new RUWrappedFunctionError(throwable, baseObject, null, new Object[]{name});
 			}
 		}
 
@@ -215,12 +215,10 @@ public class ReflectionUtils {
 	private static RUField getStaticMiscField(Object caller, Object base, String field){
 		Object value;
 		CheckedConsumer<Object> setter = null;
-		switch (field){
-			case "methods":
-				value = getAccessibleMethodNames(base instanceof Class ? (Class)base : base.getClass());
-				break;
-			default:
-				return null;
+		if ("methods".equals(field)) {
+			value = getAccessibleMethodNames(base instanceof Class ? (Class) base : base.getClass());
+		} else {
+			return null;
 		}
 		return new RUField(base, field, () -> value, setter == null ? newValue -> {
 			throw new RUError(caller, String.format("Can't set the value of the field %s.%s", base, field));
@@ -269,12 +267,9 @@ public class ReflectionUtils {
 		} else {
 			//List<Method> suitedMethods = getSuitedMethods(base.getClass().getMethods(), name);
 			minArgs = 0; //getMinArgsOfMethods(suitedMethods);
-			switch (name) {
-				default:
-					impl = args -> {
-						return base.getClass().getMethod(name, getTypesOfObjectArr(args)).invoke(base, args);
-					};
-			}
+			impl = args -> {
+				return base.getClass().getMethod(name, getTypesOfObjectArr(args)).invoke(base, args);
+			};
 		}
 		return new RUClosureFunction(name, minArgs, base, true, impl);
 	}

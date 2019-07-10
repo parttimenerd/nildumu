@@ -22,10 +22,10 @@ public class Lattices {
     private static final boolean ENABLE_MISC_CHECKS = false;
 
     @FunctionalInterface
-    public static interface IdToElement {
-        public static IdToElement DEFAULT = x -> null;
+    public interface IdToElement {
+        IdToElement DEFAULT = x -> null;
 
-        public Object toElem(String id);
+        Object toElem(String id);
     }
 
     /**
@@ -35,7 +35,7 @@ public class Lattices {
      *
      * @param <T> type of the elements
      */
-    public static interface Lattice<T> {
+    public interface Lattice<T> {
 
         /**
          * Supremum of the two elements
@@ -45,7 +45,7 @@ public class Lattices {
         /**
          * Calculates the supremum of the elements
          */
-        public default T sup(Stream<T> elems){
+        default T sup(Stream<T> elems){
             return elems.reduce(bot(), this::sup);
         }
 
@@ -59,7 +59,7 @@ public class Lattices {
          *
          * throws an error if elems is empty
          */
-        public default T inf(Stream<T> elems){
+        default T inf(Stream<T> elems){
             return elems.reduce(this::inf).get();
         }
 
@@ -71,12 +71,12 @@ public class Lattices {
         /**
          * Calculate the minimum on the inputs, if they are comparable
          */
-        public default Optional<T> min(T a, T b){
+        default Optional<T> min(T a, T b){
             T infElemen = inf(a, b);
             if (infElemen.equals(a)){
                 return Optional.of(a);
             }
-            if (equals(infElemen.equals(b))){
+            if (infElemen.equals(b)){
                 return Optional.of(b);
             }
             return Optional.empty();
@@ -85,7 +85,7 @@ public class Lattices {
         /**
          * Calculate the minimum on the inputs, if they are comparable
          */
-        public default Optional<T> max(T a, T b){
+        default Optional<T> max(T a, T b){
             T supElement = sup(a, b);
             if (supElement.equals(a)){
                 return Optional.of(a);
@@ -99,21 +99,21 @@ public class Lattices {
         /**
          * a < b?
          */
-        public default boolean lowerEqualsThan(T a, T b){
+        default boolean lowerEqualsThan(T a, T b){
             return inf(a, b).equals(a);
         }
 
         /**
          * a < b?
          */
-        public default boolean greaterEqualsThan(T a, T b){
+        default boolean greaterEqualsThan(T a, T b){
             return sup(a, b).equals(a);
         }
 
         /**
          * Is elem one of the elements in the passed list
          */
-        public default boolean in(T elem, T... elements){
+        default boolean in(T elem, T... elements){
             for (T e : elements) {
                 if (elem.equals(e)){
                     return true;
@@ -122,19 +122,15 @@ public class Lattices {
             return false;
         }
 
-        public default String toString(T elem){
+        default String toString(T elem){
             return elem.toString();
         }
 
-        public default boolean isFinite(){
-            return false;
-        }
-
-        public default T parse(String str){
+        default T parse(String str){
             return parse(str, IdToElement.DEFAULT);
         }
 
-        public default T parse(String str, IdToElement idToElement){
+        default T parse(String str, IdToElement idToElement){
             return parse(0, str, idToElement).first;
         }
 
@@ -265,7 +261,7 @@ public class Lattices {
 
     }
 
-    public static interface CompleteLattice<T> extends Lattice<T> {
+    public interface CompleteLattice<T> extends Lattice<T> {
         T top();
 
         /**
@@ -273,43 +269,43 @@ public class Lattices {
          *
          * throws an error if elems is empty
          */
-        public default T inf(Stream<T> elems){
+        default T inf(Stream<T> elems){
             return elems.reduce(top(), this::inf);
         }
 
     }
 
-    public static interface BoundedLattice<T> extends CompleteLattice<T> {
+    public interface BoundedLattice<T> extends CompleteLattice<T> {
         Set<T> elements();
     }
 
-    public static interface SecurityLattice<T extends Sec> extends BoundedLattice<T> {
+    public interface SecurityLattice<T extends Sec> extends BoundedLattice<T> {
 
-        public static SecurityLattice<?> forName(String name){
+        static SecurityLattice<?> forName(String name){
             if (lattices().containsKey(name)){
                 return lattices().get(name);
             }
             throw new NoSuchElementException(String.format("No such security lattice %s, expected one of these: %s", name, String.join(", ",lattices().keySet())));
         }
 
-        public static Map<String, SecurityLattice> lattices(){
+        static Map<String, SecurityLattice> lattices(){
             Map<String, SecurityLattice> map = new HashMap<>();
             map.put("basic", BasicSecLattice.get());
             map.put("diamond", DiamondSecLattice.get());
             return Collections.unmodifiableMap(map);
         }
 
-        public default String latticeName(){
+        default String latticeName(){
             return lattices().entrySet().stream().filter(e -> getClass().equals(e.getValue().getClass())).findAny().get().getKey();
         }
     }
 
-    public static interface LatticeElement<T, L extends Lattice<T>> {
+    public interface LatticeElement<T, L extends Lattice<T>> {
 
-        public L lattice();
+        L lattice();
     }
 
-    public static interface Sec<T extends Sec<T>> extends LatticeElement<T, SecurityLattice<T>>{}
+    public interface Sec<T extends Sec<T>> extends LatticeElement<T, SecurityLattice<T>>{}
 
     public enum BasicSecLattice implements SecurityLattice<BasicSecLattice>, Sec<BasicSecLattice> {
         LOW, HIGH;
@@ -456,7 +452,7 @@ public class Lattices {
     /**
      * The bit nildumu, known from the BitValue paper
      */
-    public static enum B implements BoundedLattice<B>, LatticeElement<B, B> {
+    public enum B implements BoundedLattice<B>, LatticeElement<B, B> {
 
         /**
          * Bit represents a *
@@ -485,7 +481,7 @@ public class Lattices {
         public final Optional<Integer> value;
         public final int level;
 
-        private B(String name, Optional<Integer> value, int level) {
+        B(String name, Optional<Integer> value, int level) {
             this.name = name;
             this.value = value;
             this.level = level;
@@ -584,14 +580,14 @@ public class Lattices {
         }
     }
 
-    public static interface DependencySet extends Set<Bit> {
-        public default Bit getSingleBit(){
+    public interface DependencySet extends Set<Bit> {
+        default Bit getSingleBit(){
             assert size() == 1;
             return iterator().next();
         }
-        public DependencySet map(Function<Bit, Bit> mapper);
+        DependencySet map(Function<Bit, Bit> mapper);
 
-        public static Collector<Bit, ?, DependencySet> collector(){
+        static Collector<Bit, ?, DependencySet> collector(){
             return Collectors.collectingAndThen(Collectors.toList(), DependencySetImpl::new);
         }
 
@@ -865,29 +861,6 @@ public class Lattices {
             return reachable;
         }
 
-        /**
-         * Doesn't look into the interdependencies of the end bits
-         */
-        public Set<Bit> reachableBitsIncludingInputBits(Collection<Bit> startBits, Set<Bit> endBits){
-            Set<Bit> reachable = new HashSet<>();
-            Set<Bit> alreadyVisitedBits = new HashSet<>();
-            Stack<Bit> bitsToVisit = new Stack<>();
-            bitsToVisit.addAll(startBits);
-            while (!bitsToVisit.isEmpty()){
-                Bit cur = bitsToVisit.pop();
-                if (endBits.contains(cur) || (cur.deps().isEmpty() && cur.isAtLeastUnknown())){
-                    reachable.add(cur);
-                    continue;
-                }
-                if (alreadyVisitedBits.contains(cur)){
-                    continue;
-                }
-                bitsToVisit.addAll(cur.deps);
-                alreadyVisitedBits.add(cur);
-            }
-            return reachable;
-        }
-
         public void walkBits(Bit startBit, Consumer<Bit> consumer, Predicate<Bit> ignoreBit, Set<Bit> alreadyVisitedBits, Function<Bit, Collection<Bit>> next){
             Stack<Bit> bitsToVisit = new Stack<>();
             if (ignoreBit.test(startBit)){
@@ -1032,10 +1005,6 @@ public class Lattices {
                 name = String.format("%s[%d]", value.node() == null ? value.description() : value.node().getTextualId(), valueIndex);
             }
             return String.format("(%s%s, %s)", name, bs.toString(val), ds.toString(deps));
-        }
-
-        public int valueIndex(){
-            return valueIndex;
         }
 
         public Bit valueIndex(int index){
@@ -1294,9 +1263,7 @@ public class Lattices {
                 bit.valueIndex(i + 1);
                 bit.value(this);
             }
-            if (ENABLE_MISC_CHECKS) {
-                assert !hasDuplicateBits();
-            }
+            assert !ENABLE_MISC_CHECKS || !hasDuplicateBits();
         }
 
         public Value(Bit... bits) {
@@ -1324,7 +1291,7 @@ public class Lattices {
         public String toString() {
             List<Bit> reversedBits = new ArrayList<>(bits);
             Collections.reverse(reversedBits);
-            return reversedBits.stream().map(b -> b.val.toString() + b.deps.size()).collect(Collectors.joining(""));
+            return reversedBits.stream().map(b -> b.val.toString()).collect(Collectors.joining(""));
         }
 
         public String repr() {
@@ -1504,7 +1471,7 @@ public class Lattices {
         }
 
         public boolean valueGreaterEquals(Value other) {
-            return vl.mapBits(this, other, (a, b) -> a.valueGreaterEquals(b)).stream().allMatch(Boolean::booleanValue);
+            return vl.mapBits(this, other, Bit::valueGreaterEquals).stream().allMatch(Boolean::booleanValue);
         }
     }
 

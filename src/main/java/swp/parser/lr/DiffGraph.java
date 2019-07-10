@@ -13,7 +13,7 @@ import swp.util.Utils;
  */
 public class DiffGraph {
 
-	public static enum Mode {
+	public enum Mode {
 		STATE_LEVEL,
 		SITUATION_LEVEL
 	}
@@ -50,11 +50,10 @@ public class DiffGraph {
 		while (somethingChanged){
 			somethingChanged = false;
 			for (int i = 0; i < states.size(); i++){
-				DiffState currentState = (DiffState)states.get(i);
+				DiffState currentState = states.get(i);
 				if (currentState.hasShiftableSituations()){
 					Map<Symbol, State> createdStates = currentState.shift();
-					List<Symbol> symbols = new ArrayList<>();
-					symbols.addAll(createdStates.keySet());
+                    List<Symbol> symbols = new ArrayList<>(createdStates.keySet());
 					Collections.sort(symbols);
 					for (Symbol shiftSymbol : symbols){
 						DiffHistory.ItemList toBeAdded = new DiffHistory.ItemList();

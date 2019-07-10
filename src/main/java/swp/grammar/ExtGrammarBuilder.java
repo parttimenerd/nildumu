@@ -169,7 +169,7 @@ public class ExtGrammarBuilder extends GrammarBuilder implements Serializable {
 		return this;
 	}
 
-	public static enum LEFT_OR_RIGHT {
+	public enum LEFT_OR_RIGHT {
 		LEFT, RIGHT
 	}
 

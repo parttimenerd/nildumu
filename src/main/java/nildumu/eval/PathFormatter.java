@@ -4,5 +4,5 @@ import java.nio.file.Path;
 
 @FunctionalInterface
 public interface PathFormatter {
-    public String format(Path path);
+    String format(Path path);
 }

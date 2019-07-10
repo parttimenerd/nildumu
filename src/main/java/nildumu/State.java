@@ -14,7 +14,7 @@ class State extends GenericState {
 
     static class OutputState extends GenericState {
 
-        private DefaultMap<Sec<?>, Set<String>> valuesPerSec = new DefaultMap<>(new HashMap<>(), new DefaultMap.Extension<Sec<?>, Set<String>>() {
+        private final DefaultMap<Sec<?>, Set<String>> valuesPerSec = new DefaultMap<>(new HashMap<>(), new DefaultMap.Extension<Sec<?>, Set<String>>() {
             @Override
             public Set<String> defaultValue(Map<Sec<?>, Set<String>> map, Sec<?> key) {
                 return new HashSet<>();

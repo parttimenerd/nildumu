@@ -8,7 +8,6 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import swp.util.Pair;
 
 import static nildumu.Lattices.BasicSecLattice.*;
@@ -56,16 +55,14 @@ public class LatticesTest {
         @Test
         public void testParsing(){
             assertParsingCorrect(new Lattices.SetLattice<>(Lattices.BasicSecLattice.get(), c -> {
-                        HashSet<Lattices.BasicSecLattice> h = new HashSet<>();
-                        h.addAll(c);
+                        HashSet<Lattices.BasicSecLattice> h = new HashSet<>(c);
                         return h;
                     }),
             p("{}", set()),
                     p("{ h }", set(HIGH)),
                     p("{h, l}", set(HIGH, LOW)));
             assertEquals(set(HIGH), new Lattices.SetLattice<>(Lattices.BasicSecLattice.get(), c -> {
-                HashSet<Lattices.BasicSecLattice> h = new HashSet<>();
-                h.addAll(c);
+                HashSet<Lattices.BasicSecLattice> h = new HashSet<>(c);
                 return h;
             }).parse("{#bla}", x -> HIGH));
         }

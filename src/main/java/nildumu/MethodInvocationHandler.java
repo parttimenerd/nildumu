@@ -1,8 +1,6 @@
 package nildumu;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
 import java.nio.file.*;
 import java.util.*;
 import java.util.function.*;
@@ -417,7 +415,7 @@ public abstract class MethodInvocationHandler {
             return MinCut.compute(outputBits, inputBits, context::weight).minCut;
         }
 
-        public Set<Bit> minCutBits(Set<Bit> outputBits, Set<Bit> inputBits, int outputWeight){
+        public Set<Bit> minCutBits(Set<Bit> outputBits, Set<Bit> inputBits, double outputWeight){
             return MinCut.compute(outputBits, inputBits, b -> outputBits.contains(b) ? outputWeight : context.weight(b)).minCut;
         }
 

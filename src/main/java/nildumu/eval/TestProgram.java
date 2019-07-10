@@ -6,7 +6,6 @@ import java.util.stream.*;
 
 import nildumu.*;
 import nildumu.Parser.ProgramNode;
-import nildumu.eval.tools.AbstractTool;
 import swp.util.Pair;
 
 /**

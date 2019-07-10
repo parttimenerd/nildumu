@@ -2,7 +2,6 @@ package nildumu;
 
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 import swp.parser.lr.BaseAST;
@@ -93,9 +92,6 @@ public class FixpointIteration {
                     nodesToVisit.add(((Parser.WhileStatementEndNode) curNode).whileStatement);
                 } else {
                     List<BaseAST> children = curNode.children();
-                    if (curNode instanceof Parser.WhileStatementNode){
-                        //children.addAll(((Parser.WhileStatementNode) curNode).getPreCondVarAss());
-                    }
                     List<Parser.MJNode> nodesToAdd = children.stream().filter(c -> {
                         if (statementNodesToOmitOneTime.contains(c)) {
                             statementNodesToOmitOneTime.remove(c);
@@ -160,17 +156,12 @@ public class FixpointIteration {
 
             @Override
             public Boolean visit(Parser.ExpressionNode expression) {
-                walkExpression(new Parser.ExpressionVisitorWArgs<Object, List<Object>>() {
-                    @Override
-                    public Object visit(Parser.ExpressionNode expression, List<Object> argument) {
-                        System.out.println("  → " + node.toString());
-                        return null;
-                    }
+                walkExpression((expression1, argument) -> {
+                    System.out.println("  → " + node.toString());
+                    return null;
                 }, expression);
                 return false;
             }
-        }, e -> {
-            System.out.println("    → " + e.toString() + " " + e.shortType());
-        }, node, new HashSet<>());
+        }, e -> System.out.println("    → " + e.toString() + " " + e.shortType()), node, new HashSet<>());
     }
 }

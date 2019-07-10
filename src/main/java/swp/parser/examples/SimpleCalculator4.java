@@ -17,7 +17,7 @@ public class SimpleCalculator4 implements Serializable {
 
 	private Context context = new Context();
 
-	private static enum LexerTerminal implements Generator.LexerTerminalEnum {
+	private enum LexerTerminal implements Generator.LexerTerminalEnum {
 		EOF(""),
 		PLUS("\\+"),
 		MINUS("\\-"),
