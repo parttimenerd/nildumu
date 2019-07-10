@@ -271,4 +271,15 @@ public class AppendTests {
         System.out.println(toSSA(runProgram, false).toPrettyString());
         parse(runProgram).leaks(leakage).run();
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'int a = 0; while (l_input()){ a = input(); }', 0",
+            "'int a = 0; while (l_input()){ a = input(); } print(a)', 32",
+            "'int a = 0; while (l_input()){ print(input()); }', inf"
+    })
+    public void testWithLargeInputs(String program, String leakage){
+        String runProgram = "bit_width 32; " + program;
+        parse(runProgram).leaks(leakage).run();
+    }
 }

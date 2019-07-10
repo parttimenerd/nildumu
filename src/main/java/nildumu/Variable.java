@@ -32,15 +32,11 @@ public class Variable {
         this.isInput = isInput;
         this.isAppendOnly = isAppendOnly;
         this.hasAppendValue = hasAppendValue;
-        this.isAppendableInput = name.startsWith("input");
+        this.isAppendableInput = name.startsWith("input") || name.contains("_input");
     }
 
     public Variable(String name){
         this(name, false, false, false, false);
-    }
-
-    public void changeToAppendableInput(){
-        this.isAppendableInput = true;
     }
 
     @Override
