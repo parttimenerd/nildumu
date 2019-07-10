@@ -260,7 +260,16 @@ public class AppendTests {
     public void testPrintInFunctionWithSummaryHandlerTwoLevelRecursion(String program, String handler, String leakage){
         String runProgram = "bit_width 2; h input int h = 0buu; " + program;
         System.out.println(toSSA(runProgram, false).toPrettyString());
-        LOG.setLevel(Level.FINE);
         parse(runProgram, handler).leaks(leakage).run();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'int a = 0; if (input()) { a = l_input();} print(a)', 1"
+    })
+    public void testLowInputs(String program, String leakage){
+        String runProgram = "bit_width 2; h input int h = 0buu; " + program;
+        System.out.println(toSSA(runProgram, false).toPrettyString());
+        parse(runProgram).leaks(leakage).run();
     }
 }

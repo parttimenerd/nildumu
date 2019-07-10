@@ -1181,7 +1181,7 @@ public class Parser implements Serializable {
                     new ParametersNode(loc, Collections.emptyList()), new BlockNode(loc, Utils.makeArrayList(
                     new TmpInputVariableDeclarationNode(loc, "tmp",
                             new IntegerLiteralNode(loc, IntStream.range(0, context.maxBitWidth).mapToObj(i -> bl.create(Lattices.B.U)).collect(Lattices.Value.collector())),
-                            "h"),
+                            sec.toString()),
                     new VariableAssignmentNode(loc, inputName(sec), new BinaryOperatorNode(new VariableAccessNode(loc, inputName(sec)), new VariableAccessNode(loc, "tmp"), APPEND)),
                     new ReturnStatementNode(new VariableAccessNode(loc, "tmp"))
             )), new GlobalVariablesNode(loc, new HashMap<>())));
