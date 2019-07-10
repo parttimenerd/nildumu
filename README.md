@@ -70,10 +70,12 @@ program
 - the analysis assumes that all program evaluations terminate
 - it supports `print(X)` statements, where `X` is an arbitrary expression
   whichs value is leaked to low,
-  and `VAR = input();` statements where a high user input is assigned to the variable `VAR`
-- `input()` calls do not leak information on their own, in general,
-  this can be modified via the `input_prints` statement, that has to be placed
-  after the bit width statement
+  and `input()` invocations where a high user input is returned
+  - requires the interprocedural analysis
+  - the methods for other security levels are named `SEC_print` and `SEC_input`respectively
+  - the method definitions are inserted automatically
+  - variable names starting with `input` or containing the string `_input` are not recommended when using
+    `input()` (and its variants)  
 
 UI
 ---
