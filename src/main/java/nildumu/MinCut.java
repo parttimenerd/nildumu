@@ -61,13 +61,11 @@ public class MinCut {
 
     public static abstract class Algorithm {
 
-        final Set<Bit> sourceNodes;
-        final Set<Bit> sinkNodes;
+        final Context.SourcesAndSinks sourcesAndSinks;
         final Function<Bit, Double> weights;
 
-        protected Algorithm(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Double> weights) {
-            this.sourceNodes = sourceNodes;
-            this.sinkNodes = sinkNodes;
+        protected Algorithm(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights) {
+            this.sourcesAndSinks = sourcesAndSinks;
             this.weights = weights;
         }
 
@@ -103,12 +101,14 @@ public class MinCut {
 
     public static class GraphTPP extends Algorithm {
 
-        protected GraphTPP(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Double> weights) {
-            super(sourceNodes, sinkNodes, weights);
+        protected GraphTPP(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights) {
+            super(sourcesAndSinks, weights);
         }
 
         private double infty(){
-            return Math.max(nonInfWeightSum(sourceNodes), nonInfWeightSum(sinkNodes));
+            double w = Math.max(sourcesAndSinks.sourceWeight, sourcesAndSinks.sinkWeight);
+            return Math.max(w == INFTY ? 0 : w,
+                    Math.max(nonInfWeightSum(sourcesAndSinks.sources), nonInfWeightSum(sourcesAndSinks.sinks)));
         }
 
         private double nonInfWeightSum(Set<Bit> bits){
@@ -123,11 +123,25 @@ public class MinCut {
         public ComputationResult compute() {
             SimpleDirectedWeightedGraph<Vertex, DefaultWeightedEdge> graph =
                     new SimpleDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+            Vertex initialSource = new Vertex(bl.forceCreateXBit(), false);
             Vertex source = new Vertex(bl.forceCreateXBit(), false);
+            Vertex initialSink = new Vertex(bl.forceCreateXBit(), true);
             Vertex sink = new Vertex(bl.forceCreateXBit(), true);
             graph.addVertex(source);
             graph.addVertex(sink);
+            graph.addVertex(initialSource);
+            graph.addVertex(initialSink);
             double infty = (infty() + Bit.getNumberOfCreatedBits() * 2) * 4;
+            if (sourcesAndSinks.sourceWeight == INFTY){
+                initialSource = source;
+            } else {
+                graph.setEdgeWeight(graph.addEdge(initialSource, source), infty);
+            }
+            if (sourcesAndSinks.sinkWeight == INFTY){
+                initialSink = sink;
+            } else {
+                graph.setEdgeWeight(graph.addEdge(sink, initialSink), infty);
+            }
             Map<Bit, Pair<Vertex, Vertex>> bitToNodes =
                     new DefaultMap<>((map, bit) -> {
                         Vertex start = new Vertex(bit, true);
@@ -139,22 +153,22 @@ public class MinCut {
                         return new Pair<>(start, end);
                     });
             Set<Bit> alreadyVisited = new HashSet<>();
-            for (Bit bit : sourceNodes){
+            for (Bit bit : sourcesAndSinks.sources){
                 bl.walkBits(bit, b -> {
                     for (Bit d : b.deps()){
                         graph.setEdgeWeight(graph.addEdge(bitToNodes.get(b).second, bitToNodes.get(d).first), infty * infty);
                     }
-                }, sinkNodes::contains, alreadyVisited);
+                }, sourcesAndSinks.sinks::contains, alreadyVisited);
                 graph.setEdgeWeight(graph.addEdge(source, bitToNodes.get(bit).first), infty * infty);
             }
-            for (Bit bit : sinkNodes){
+            for (Bit bit : sourcesAndSinks.sinks){
                 graph.setEdgeWeight(graph.addEdge(bitToNodes.get(bit).second, sink), infty * infty);
             }
             PushRelabelMFImpl<Vertex, DefaultWeightedEdge> pp = new PushRelabelMFImpl<Vertex, DefaultWeightedEdge>(graph, 0.5);
-            double maxFlow = pp.calculateMinCut(source, sink);
+            double maxFlow = pp.calculateMinCut(initialSource, initialSink);
             Set<Bit> minCut = pp.getCutEdges().stream().map(e -> graph.getEdgeSource(e).bit).collect(Collectors.toSet());
             // Problem: if soome of the sink nodes or source nodes have weight different than 1, then this should be noted
-            double flow = Math.min(Math.round(maxFlow), Math.min(weightSum(sourceNodes), weightSum(sinkNodes)));
+            double flow = Math.min(Math.round(maxFlow), Math.min(weightSum(sourcesAndSinks.sources), weightSum(sourcesAndSinks.sinks)));
             if (flow > infty / 2){
                 flow = Double.POSITIVE_INFINITY;
             }
@@ -165,8 +179,8 @@ public class MinCut {
     /**
      * Choose the algorithm by setting the static {@link MinCut#usedAlgo} variable
      */
-    public static ComputationResult compute(Set<Bit> sourceNodes, Set<Bit> sinkNodes, Function<Bit, Double> weights){
-        return new GraphTPP(sourceNodes, sinkNodes, weights).compute();
+    public static ComputationResult compute(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights){
+        return new GraphTPP(sourcesAndSinks, weights).compute();
     }
 
     public static ComputationResult compute(Context context, Sec<?> sec){
@@ -174,7 +188,7 @@ public class MinCut {
         if (sec == context.sl.top()){
             return new ComputationResult(Collections.emptySet(), 0);
         }
-        return compute(context.sources(sec), context.sinks(sec), context::weight);
+        return compute(context.sourcesAndSinks(sec), context::weight);
     }
 
     private static Context con;

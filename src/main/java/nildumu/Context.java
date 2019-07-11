@@ -299,15 +299,49 @@ public class Context {
 
     /*-------------------------- unspecific -------------------------------*/
 
-    public Context(SecurityLattice sl, int maxBitWidth, State.OutputState outputState) {
+    /**
+     * Entropy boundaries for the input and the output, allows to use the conventional min-entropy argument
+     */
+    public static class EntropyBounds {
+
+        private final Map<Sec<?>, Double> maxInputEntropyPerSec;
+
+        private final Map<Sec<?>, Double> maxOutputNumberPerSec;
+
+        public EntropyBounds(Map<Sec<?>, Double> maxInputEntropyPerSec, Map<Sec<?>, Double> maxOutputNumberPerSec) {
+            this.maxInputEntropyPerSec = maxInputEntropyPerSec;
+            this.maxOutputNumberPerSec = maxOutputNumberPerSec;
+        }
+
+        public EntropyBounds(){
+            this(Collections.emptyMap(), Collections.emptyMap());
+        }
+
+        public Double getMaxInputEntropy(Sec<?> sec){
+            return maxInputEntropyPerSec.getOrDefault(sec, (double) INFTY);
+        }
+
+        public Double getMaxOutputs(Sec<?> sec){
+            return maxOutputNumberPerSec.getOrDefault(sec, (double) INFTY);
+        }
+    }
+
+    private final EntropyBounds entropyBounds;
+
+    public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds, State.OutputState outputState) {
         this.sl = sl;
         this.maxBitWidth = maxBitWidth;
+        this.entropyBounds = entropyBounds;
         resetFrames(outputState);
         ValueLattice.get().bitWidth = maxBitWidth;
     }
 
+    public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds){
+        this(sl, maxBitWidth, entropyBounds, new State.OutputState());
+    }
+
     public Context(SecurityLattice sl, int maxBitWidth) {
-        this(sl, maxBitWidth, new State.OutputState());
+        this(sl, maxBitWidth, new EntropyBounds());
     }
 
     public static B v(Bit bit) {
@@ -953,5 +987,25 @@ public class Context {
                 .filter(s -> !((Lattice) sl).lowerEqualsThan(s, sec))
                 .flatMap(s -> Stream.concat(input.getBits((Sec) s).stream(), getNewlyIntroducedInputs().get(s).stream()))
                 .collect(Collectors.toSet());
+    }
+
+    public SourcesAndSinks sourcesAndSinks(Sec<?> sec){
+        return new SourcesAndSinks(entropyBounds.getMaxOutputs(sec),
+                sources(sec), entropyBounds.getMaxInputEntropy(sec), sinks(sec));
+    }
+
+    public static class SourcesAndSinks {
+
+        final double sourceWeight;
+        final Set<Bit> sources;
+        final double sinkWeight;
+        final Set<Bit> sinks;
+
+        public SourcesAndSinks(double sourceWeight, Set<Bit> sources, double sinkWeight, Set<Bit> sinks){
+            this.sourceWeight = sourceWeight;
+            this.sources = sources;
+            this.sinkWeight = sinkWeight;
+            this.sinks = sinks;
+        }
     }
 }

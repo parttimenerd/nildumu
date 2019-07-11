@@ -412,11 +412,11 @@ public abstract class MethodInvocationHandler {
         }
 
         public Set<Bit> minCutBits(Set<Bit> outputBits, Set<Bit> inputBits){
-            return MinCut.compute(outputBits, inputBits, context::weight).minCut;
+            return MinCut.compute(new SourcesAndSinks(INFTY, outputBits, INFTY, inputBits), context::weight).minCut;
         }
 
         public Set<Bit> minCutBits(Set<Bit> outputBits, Set<Bit> inputBits, double outputWeight){
-            return MinCut.compute(outputBits, inputBits, b -> outputBits.contains(b) ? outputWeight : context.weight(b)).minCut;
+            return MinCut.compute(new SourcesAndSinks(INFTY, outputBits, INFTY, inputBits), b -> outputBits.contains(b) ? outputWeight : context.weight(b)).minCut;
         }
 
         private Graph createDotGraph(String name, boolean withMinCut){

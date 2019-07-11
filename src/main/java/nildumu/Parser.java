@@ -161,7 +161,7 @@ public class Parser implements Serializable {
                             if (declaredBitWidth == -1){
                                 bitWidth = lowerBitWidthBound;
                             }
-                            ProgramNode node = new ProgramNode(new Context(secLattice, bitWidth, new State.OutputState()));
+                            ProgramNode node = new ProgramNode(new Context(secLattice, bitWidth));
                             NodeVisitor visitor = new NodeVisitor<Object>(){
 
                                 @Override
