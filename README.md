@@ -191,10 +191,7 @@ All configurations and inputs are stored continously in the
               the size of the summary edges.
 - the combobox labeled *Min-Cut* allows to choose between several
   minimum-cut algorithms for the analysis
-    - the JUNG version is correct and optimal
-    - *approximate Edmonds-Karp* is faster as it doesn't need to
-      construct an edge weighted graph, but gives only approximate
-      results, but the results are in most cases optimal
+    - the GraphT version is correct and optimal and currently the only supported
 - the tabs below
     - *Leakage*: contains the leakage of information from higher or
       non-comparable security levels into each security level
