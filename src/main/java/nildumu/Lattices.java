@@ -746,7 +746,7 @@ public class Lattices {
     }
 
     static final DependencySetLattice ds = DependencySetLattice.get();
-    static final B bs = B.U;
+    public static final B bs = B.U;
     public static final BitLattice bl = BitLattice.get();
     public static final ValueLattice vl = ValueLattice.get();
 
@@ -1132,7 +1132,7 @@ public class Lattices {
 
     public static class ValueLattice implements Lattice<Value> {
 
-        int bitWidth = Integer.MAX_VALUE;
+        public int bitWidth = Integer.MAX_VALUE;
 
         private static final ValueLattice lattice = new ValueLattice();
 
