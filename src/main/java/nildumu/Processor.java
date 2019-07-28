@@ -130,6 +130,17 @@ public class Processor {
                 Value cond = context.nodeValue(ifStatement.conditionalExpression);
                 Bit condBit = cond.get(1);
                 Lattices.B condVal = condBit.val();
+                if (condVal.isAtLeastUnknown() && cond.singleValued()){
+                    int val = cond.singleValue();
+                    switch (val){
+                        case 0:
+                            condVal = ZERO;
+                            break;
+                        case 1:
+                            condVal = ONE;
+                            break;
+                    }
+                }
                 if (condVal == U && unfinishedLoopIterations > 0){
                     weightCondBit(condBit);
                 }
@@ -173,6 +184,17 @@ public class Processor {
                 Value cond = context.nodeValue(whileStatement.conditionalExpression);
                 Bit condBit = cond.get(1);
                 Lattices.B condVal = condBit.val();
+                if (condVal.isAtLeastUnknown() && cond.singleValued()){
+                    int val = cond.singleValue();
+                    switch (val){
+                        case 0:
+                            condVal = ZERO;
+                            break;
+                        case 1:
+                            condVal = ONE;
+                            break;
+                    }
+                }
                 weightCondBit(condBit);
                 if (condVal == ONE || condVal == U) {
                     conditionalBits.put(whileStatement.body, new Pair<>(condBit, bl.create(ONE)));

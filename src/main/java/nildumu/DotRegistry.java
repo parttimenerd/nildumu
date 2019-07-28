@@ -1,5 +1,7 @@
 package nildumu;
 
+import org.jgrapht.graph.DefaultWeightedEdge;
+
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
@@ -9,7 +11,9 @@ import java.util.stream.Collectors;
 import guru.nidi.graphviz.attribute.*;
 import guru.nidi.graphviz.engine.*;
 import guru.nidi.graphviz.model.*;
+import nildumu.intervals.Intervals;
 import nildumu.util.DefaultMap;
+import swp.util.Pair;
 
 import static guru.nidi.graphviz.attribute.Attributes.attr;
 import static guru.nidi.graphviz.model.Factory.*;
@@ -206,10 +210,40 @@ public class DotRegistry {
             nodeList.add(node);
             return node;
         });
+        Set<Value> values = new HashSet<>();
         for (Bit bit : botAnchor.value) {
             bl.walkBits(bit, b -> {
                 nodes.get(b).addLink((String[])b.deps().stream().sorted(Comparator.comparingLong(d -> d.bitNo)).map(d -> d.bitNo + "").toArray(String[]::new));
-            }, b -> false, alreadyVisited, b -> b.deps().stream().sorted(Comparator.comparingLong(d -> d.bitNo)).collect(Collectors.toList()));
+                if (b.value() != null){
+                    values.add(b.value());
+                }
+                }, b -> false, alreadyVisited, b -> b.deps().stream().sorted(Comparator.comparingLong(d -> d.bitNo)).collect(Collectors.toList()));
+        }
+        if (context.inIntervalMode()) {
+            Map<Value, MutableNode> intervalToNodes =
+                    new DefaultMap<>((map, value) -> {
+                        MutableNode node = mutNode(value.interval.id + "");
+                        node.add(Records.of(new String[]{value.interval.id + "",
+                                value.interval.start + "", value.interval.end + "", "#" + Intervals.countPattern(value.interval, value.asConstraints())}));
+                        node.add(attr("font-family", "Helvetica"));
+                        node.add(attr("fontname", "Helvetica"));
+                        node.add(Color.CHOCOLATE4, Color.CHOCOLATE4.font());
+                        nodeList.add(node);
+                        return node;
+                    });
+            // insert the interval edges
+            for (Value value : values) {
+                if (value.hasInterval() && !value.getInterval().isDefaultInterval()) {
+                    for (Bit b : value.bits.toArray(new Bit[0])) {
+                        if (nodes.containsKey(b)) {
+                            nodes.get(b).linkTo(intervalToNodes.get(value))
+                                    .add(Color.CHOCOLATE4.fill());
+                            intervalToNodes.get(value).linkTo(nodes.get(b))
+                                    .add(Color.CHOCOLATE4.fill());
+                        }
+                    }
+                }
+            }
         }
         topAnchors.stream().sorted(Comparator.comparing(s -> s.name)).forEach(anchor -> {
             Lattices.Value val = anchor.value;

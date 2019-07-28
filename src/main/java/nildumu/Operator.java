@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.stream.*;
 
+import nildumu.intervals.Interval;
 import nildumu.util.Util;
 import swp.util.Pair;
 
@@ -23,6 +24,12 @@ public interface Operator {
     static Bit wrapBit(Context c, Bit source) {
         Bit wrap = bl.create(source.val(), ds.create(source));
         c.repl(wrap, ((con, b, a) -> con.choose(b, a) == a ? new Mods(b, a).add(c.repl(source).apply(con, source, a)) : Mods.empty()));
+        return wrap;
+    }
+
+    static Interval wrapInterval(Context c, Interval source) {
+        Interval wrap = new Interval(source.start, source.end);
+        wrap.bits.addAll(source.bits);
         return wrap;
     }
 
@@ -104,6 +111,15 @@ public interface Operator {
                 throw new WrongArgumentNumber(symbol, arguments.size(), 1);
             }
         }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, List<Interval> intervals){
+            return computeForIntervals(c, res, intervals.get(0));
+        }
+
+        public Interval computeForIntervals(Context c, Value res, Interval interval){
+            return null;
+        }
     }
 
     abstract class BinaryOperator implements Operator {
@@ -138,6 +154,15 @@ public interface Operator {
             if (arguments.size() != 2){
                 throw new WrongArgumentNumber(symbol, arguments.size(), 2);
             }
+        }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, List<Interval> intervals){
+            return computeForIntervals(c, res, intervals.get(0), intervals.get(1));
+        }
+
+        public Interval computeForIntervals(Context c, Value res, Interval first, Interval second){
+            return null;
         }
     }
 
@@ -617,9 +642,11 @@ public interface Operator {
     BinaryOperatorStructured LESS = new BinaryOperatorStructured("<") {
 
         Stack<DependencySet> dependentBits = new Stack<>();
+        Stack<Pair<Value, Value>> args = new Stack<>();
 
         @Override
         public B computeBitValue(int i, Value x, Value y) {
+            args.add(new Pair<>(x, y));
             if (i > 1) {
                 return ZERO;
             }
@@ -683,13 +710,41 @@ public interface Operator {
         Context.ModsCreator computeModsCreator(int i, Bit r, Value x, Value y, List<B> bitValues, DependencySet dataDeps) {
             return (c, b, a) -> Mods.empty();
         }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value ret, Interval first, Interval second) {
+            Interval interval = new Interval(0, 1);
+            if (first.end < second.start){
+                interval = new Interval(1, 1);
+            }
+            if (first.start >= second.end){
+                interval = new Interval(0, 0);
+            }
+            Pair<Value, Value> arg = args.pop();
+            c.repl(ret.get(1), new Context.ModsCreator() {
+                @Override
+                public Mods apply(Context context, Bit bit, Bit assumedValue) { Mods mods = Mods.empty();
+                    switch (assumedValue.val()){
+                        case ONE:
+                            if (arg.second.singleValued()){
+                                mods.add(first, new Interval(first.start, Math.min(first.end, arg.second.singleValue() -1)).addBits(c.replace(arg.first).bitSet()));
+                                arg.first.bits.forEach(b -> {
+                                    mods.add(b, wrapBit(context, b));
+                                });
+                            }
+                    }
+                    return mods;
+                }
+            });
+            return interval;
+        }
     };
 
     BitWiseBinaryOperatorStructured PHI = new BitWiseBinaryOperatorStructured("phi") {
 
         @Override
         public boolean supportsArguments(List<Value> arguments) {
-            return PHI.supportsArguments(arguments);
+            return PHI_GENERIC.supportsArguments(arguments);
         }
 
         @Override
@@ -702,6 +757,9 @@ public interface Operator {
             Parser.PhiNode phi = (Parser.PhiNode)currentNode;
             if (phi.controlDeps.size() == 1){
                 B condVal = c.nodeValue(phi.controlDeps.get(0)).get(1).val();
+                if (condVal.isAtLeastUnknown() && c.nodeValue(phi.controlDeps.get(0)).singleValued()){
+                    condVal = vl.parse(c.nodeValue(phi.controlDeps.get(0)).singleValue()).get(1).val();
+                }
                 switch (condVal){
                     case ONE:
                         return wrapBit(c, x);
@@ -768,13 +826,33 @@ public interface Operator {
         public boolean allowsUnevaluatedArguments() {
             return true;
         }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, Interval x, Interval y) {
+            if (x.isDefaultInterval()){
+                return wrapInterval(c, y);
+            } else if (y.isDefaultInterval()|| x == y){
+                return wrapInterval(c, x);
+            }
+            Parser.PhiNode phi = (Parser.PhiNode)currentNode;
+            if (phi.controlDeps.size() == 1){
+                B condVal = c.nodeValue(phi.controlDeps.get(0)).get(1).val();
+                switch (condVal){
+                    case ONE:
+                        return wrapInterval(c, x);
+                    case ZERO:
+                        return wrapInterval(c, y);
+                }
+            }
+            return x.merge(y);
+        }
     };
 
     BitWiseOperator PHI_GENERIC = new BitWiseOperatorStructured("phi") {
 
         @Override
         public boolean supportsArguments(List<Value> arguments) {
-            return !(arguments.get(0) instanceof AppendOnlyValue) || arguments.stream().allMatch(a -> a instanceof AppendOnlyValue);
+            return true; //!(arguments.get(0) instanceof AppendOnlyValue) || arguments.stream().allMatch(a -> a instanceof AppendOnlyValue);
         }
 
         @Override
@@ -911,6 +989,16 @@ public interface Operator {
         Pair<Bit, Bit> halfAdder(Context context, Bit first, Bit second) {
             return new Pair<>(XOR.compute(context, first, second), AND.compute(context, first, second));
         }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, Interval first, Interval second) {
+            try {
+                return new Interval(Math.addExact(first.start, second.start),
+                        Math.addExact(first.end, second.end));
+            } catch (ArithmeticException ex){
+                return Interval.forBitWidth(vl.bitWidth);
+            }
+        }
     };
 
     BinaryOperator LEFT_SHIFT = new BinaryOperator("<<") {
@@ -990,6 +1078,16 @@ public interface Operator {
             }
             return createUnknownValue(first, second);
         }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, Interval first, Interval second) {
+            try {
+                return new Interval(Math.multiplyExact(first.start, second.start),
+                        Math.multiplyExact(first.end, second.end));
+            } catch (ArithmeticException ex){
+                return Interval.forBitWidth(vl.bitWidth);
+            }
+        }
     };
 
     BinaryOperator DIVIDE = new BinaryOperator("+") {
@@ -1030,7 +1128,7 @@ public interface Operator {
 
         @Override
         public boolean supportsArguments(List<Value> arguments) {
-            return arguments.get(0) instanceof AppendOnlyValue;
+            return true; //return arguments.get(0) instanceof AppendOnlyValue;
         }
 
         @Override
@@ -1051,10 +1149,22 @@ public interface Operator {
         throw new RuntimeException("Not implemented");
     }
 
-    default Value compute(Context c, Parser.MJNode node, List<Value> arguments){
+    default Value computeWithIntervals(Context c, Parser.MJNode node, List<Value> arguments){
         if (!supportsArguments(arguments)){
             throw new NildumuError("Unsupported operation " + toString(arguments));
         }
+        Value val = compute(c, node, arguments);
+        if (val.canHaveInterval() && c.inIntervalMode()){
+            Interval interval = computeForIntervals(c, val, arguments.stream().map(Value::getInterval).collect(Collectors.toList()));
+            if (interval != null){
+                val.setInterval(interval);
+            }
+            bl.reachableBits(val.bits, arguments.stream().flatMap(Value::stream).collect(Collectors.toSet()));
+        }
+        return val;
+    }
+
+    default Value compute(Context c, Parser.MJNode node, List<Value> arguments){
         return compute(c, arguments);
     }
 
@@ -1066,5 +1176,9 @@ public interface Operator {
 
     default boolean supportsArguments(List<Value> arguments){
         return arguments.stream().noneMatch(a -> a instanceof AppendOnlyValue);
+    }
+
+    default Interval computeForIntervals(Context c, Value result, List<Interval> intervals){
+        return null;
     }
 }

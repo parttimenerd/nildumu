@@ -6,6 +6,7 @@ import java.util.logging.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import nildumu.intervals.Interval;
 import nildumu.util.*;
 import swp.util.Pair;
 
@@ -32,7 +33,11 @@ public class Context {
         /**
          * Combines the extended mode with the support for loops
          */
-        LOOP;
+        LOOP,
+        /**
+         * Add support for intervals
+         */
+        INTERVAL;
 
         @Override
         public String toString() {
@@ -462,7 +467,7 @@ public class Context {
         }
         Operator operator = operatorForNode(node);
         if (operator.allowsUnevaluatedArguments() || arguments.stream().noneMatch(Value::isBot)) {
-            return operator.compute(this, node, arguments);
+            return operator.computeWithIntervals(this, node, arguments);
         }
         return vl.bot();
     }
@@ -589,6 +594,10 @@ public class Context {
         for (; i <= newValue.size(); i++){
             oldValue.add(newValue.get(i));
             somethingChanged = true;
+        }
+        if (oldValue.hasInterval()){
+            oldValue.interval.start = Math.min(oldValue.interval.start, newValue.interval.start);
+            oldValue.interval.start = Math.min(oldValue.interval.end, newValue.interval.end);
         }
         return somethingChanged;
     }
@@ -722,11 +731,15 @@ public class Context {
      * In extended or later mode?
      */
     boolean inExtendedMode(){
-        return mode == Mode.EXTENDED || mode == Mode.LOOP;
+        return mode.ordinal() >= Mode.EXTENDED.ordinal();
     }
 
     boolean inLoopMode(){
-        return mode == Mode.LOOP;
+        return mode.ordinal() >= Mode.LOOP.ordinal();
+    }
+
+    boolean inIntervalMode(){
+        return mode.ordinal() >= Mode.INTERVAL.ordinal();
     }
 
     public Context mode(Mode mode){
@@ -751,6 +764,20 @@ public class Context {
         return bit;
     }
 
+    public Interval replace(Interval inter, Branch branch){
+        if (inExtendedMode()) {
+            Optional<Branch> optCur = Optional.of(branch);
+            while (optCur.isPresent()){
+                Mods curMods = frame.nodeValueState.modsMap.get(optCur.get());
+                if (curMods.definedFor(inter)){
+                    return curMods.replace(inter);
+                }
+                optCur = frame.nodeValueState.parentBranch.get(optCur.get());
+            }
+        }
+        return inter;
+    }
+
     public Value replace(Value value) {
         if (frame.nodeValueState.branchStack.isEmpty()){
             return value;
@@ -767,7 +794,10 @@ public class Context {
             }
             return r;
         }).collect(Value.collector());
-        if (replacedABit.val){
+        Interval inter = replace(value.interval, branch);
+        newValue.setInterval(inter);
+        if (replacedABit.val || inter != value.interval){
+            newValue.bits.forEach(b -> b.value(newValue));
             return newValue;
         }
         return value;

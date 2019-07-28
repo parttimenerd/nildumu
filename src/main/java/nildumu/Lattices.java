@@ -5,6 +5,7 @@ import java.util.*;
 import java.util.function.*;
 import java.util.stream.*;
 
+import nildumu.intervals.*;
 import nildumu.util.Util;
 import swp.util.Pair;
 
@@ -757,6 +758,19 @@ public class Lattices {
         public BitLattice() {
         }
 
+        /**
+         * Returns the bit of the passed set, that are reachable from the bit
+         */
+        public static Set<Bit> calcReachableBits(Bit bit, Set<Bit> bits){
+            Set<Bit> reachableBits = new HashSet<>();
+            bl.walkBits(bit, b -> {
+                if (bits.contains(b)){
+                    reachableBits.add(b);
+                }
+            }, b -> false);
+            return reachableBits;
+        }
+
         @Deprecated
         @Override
         public Bit sup(Bit a, Bit b) {
@@ -1163,6 +1177,7 @@ public class Lattices {
             if (str.length() > start + 1 && str.charAt(start) == '0' && str.charAt(start + 1) == 'b') {
                 int i = start + 2;
                 List<Bit> bits = new ArrayList<>();
+                boolean isConstant = true;
                 while (i < str.length()) {
                     while (str.charAt(i) == ' ') {
                         i++;
@@ -1173,11 +1188,18 @@ public class Lattices {
                     while (i < str.length() && str.charAt(i) == ' ') {
                         i++;
                     }
+                    if (ret.first.isAtLeastUnknown()){
+                        isConstant = false;
+                    }
                 }
                /* if (bits.size() == 1){
                     bits.add(new Bit(ZERO));
                 }*/
-                return new Pair<>(new Value(bits), i);
+                Value val = new Value(bits);
+                if (val.isConstant()){
+                    val.setInterval(new Interval(val.asInt(), val.asInt()));
+                }
+                return new Pair<>(val, i);
             } else {
                 int end = start;
                 char startChar = str.charAt(start);
@@ -1251,6 +1273,8 @@ public class Lattices {
         private String description = "";
         private Parser.MJNode node = null;
 
+        Interval interval = null;
+
         protected Value(){
             this.bits = new ArrayList<>();
         }
@@ -1291,7 +1315,8 @@ public class Lattices {
         public String toString() {
             List<Bit> reversedBits = new ArrayList<>(bits);
             Collections.reverse(reversedBits);
-            return reversedBits.stream().map(b -> b.val.toString()).collect(Collectors.joining(""));
+            return reversedBits.stream().map(b -> b.val.toString()).collect(Collectors.joining("")) +
+                    mapInterval(Interval::toString, "");
         }
 
         public String repr() {
@@ -1301,7 +1326,7 @@ public class Lattices {
             if (!description.equals("")) {
                 return String.format("(%s|%s)", description, ret);
             }
-            return ret;
+            return ret +  mapInterval(i -> i.toString() + "#" + entropy(), "");
         }
 
         public String toString(Function<Bit, String> bitToId) {
@@ -1335,7 +1360,7 @@ public class Lattices {
         }
 
         public boolean isConstant(){
-            return bits.stream().allMatch(Bit::isConstant) && bits.size() > 0;
+            return (bits.stream().allMatch(Bit::isConstant) && bits.size() > 0);
         }
 
         public int asInt(){
@@ -1473,6 +1498,75 @@ public class Lattices {
         public boolean valueGreaterEquals(Value other) {
             return vl.mapBits(this, other, Bit::valueGreaterEquals).stream().allMatch(Boolean::booleanValue);
         }
+
+        public Intervals.Constraints asConstraints(){
+            return new Intervals.Constraints(){
+
+                @Override
+                public B get(int index) {
+                    return Value.this.get(index + 1).val;
+                }
+
+                @Override
+                public int size() {
+                    return Value.this.size();
+                }
+            };
+        }
+
+        public boolean hasInterval(){
+            return interval != null;
+        }
+
+        public boolean canHaveInterval(){
+            return true;
+        }
+
+        public Interval getInterval(){
+            if (canHaveInterval() && interval == null) {
+                interval = Interval.forBitWidth(vl.bitWidth);
+            }
+            return interval;
+        }
+
+        public <T> T mapInterval(Function<Interval, T> func, T defaultVal){
+            if (hasInterval()){
+                return func.apply(getInterval());
+            }
+            return defaultVal;
+        }
+
+        public void setInterval(Interval interval){
+            //Objects.requireNonNull(interval);
+            this.interval = interval;
+        }
+
+        /**
+         * Entropy of this value in bits
+         *
+         * @return entropy
+         */
+        public double entropy(){
+            if (hasInterval()){
+                return Math.log(Intervals.countPattern(interval, asConstraints()));
+            }
+            return this.stream().filter(Bit::isAtLeastUnknown).count();
+        }
+
+        public boolean singleValued() {
+            if (isConstant()){
+                return true;
+            }
+            return hasInterval() && interval.start == interval.end; // TODO
+        }
+
+        public int singleValue(){
+            assert singleValued();
+            if (isConstant()){
+                return asInt();
+            }
+            return interval.start;
+        }
     }
 
     /**
@@ -1562,6 +1656,15 @@ public class Lattices {
 
         public AppendOnlyValue cloneWithoutEs(){
             return new AppendOnlyValue(stream().filter(b -> b.val != E).toArray(Bit[]::new));
+        }
+
+        public double entropy(){
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean hasInterval() {
+            return false;
         }
     }
 }

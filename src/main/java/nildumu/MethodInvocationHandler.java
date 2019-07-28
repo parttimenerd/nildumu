@@ -384,21 +384,8 @@ public abstract class MethodInvocationHandler {
             return new MethodReturnValue(returnValue.map(newBits::get), globs, inputBits.map(newBits::get));
         }
 
-        /**
-         * Returns the bit of the passed set, that are reachable from the bit
-         */
-        public Set<Bit> calcReachableBits(Bit bit, Set<Bit> bits){
-            Set<Bit> reachableBits = new HashSet<>();
-            bl.walkBits(bit, b -> {
-                if (bits.contains(b)){
-                    reachableBits.add(b);
-                }
-            }, b -> false);
-            return reachableBits;
-        }
-
         public Set<Bit> calcReachableParamBits(Bit bit){
-            return calcReachableBits(bit, parameterBits);
+            return BitLattice.calcReachableBits(bit, parameterBits);
         }
 
         public Set<Bit> calcReachableInputAndParameterBits(Bit bit){
@@ -687,7 +674,7 @@ public abstract class MethodInvocationHandler {
             Map<Bit, Bit> newBits = new HashMap<>();
             // create the new bits
             Stream.concat(Stream.concat(bitGraph.inputBits.getBits().stream(), bitGraph.methodReturnValue.getCombinedValue().stream()), minCutBits.stream()).forEach(b -> {
-                Set<Bit> reachable = bitGraph.calcReachableBits(b, anchorBits);
+                Set<Bit> reachable = BitLattice.calcReachableBits(b, anchorBits);
                 if (!b.deps().contains(b)){
                     reachable.remove(b);
                 }
