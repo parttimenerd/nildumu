@@ -8,7 +8,7 @@ import com.pholser.junit.quickcheck.generator.GeneratorConfiguration;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 import nildumu.Lattices;
-import nildumu.intervals.Intervals;
+
 import org.junit.Before;
 import org.junit.runner.RunWith;
 
@@ -85,7 +85,7 @@ public class SizeTest {
             signConstraint.ifPresent(b -> constraints.put(vl.bitWidth - 1, b));
             int start = r.nextInt(conf.min(), conf.max());
             int end = r.nextInt(start, conf.max());
-            return new Intervals.ConstrainedInterval(new Intervals.Interval(start, end), constraints);
+            return new Intervals.ConstrainedInterval(new Interval(start, end), constraints);
         }
 
         @Override
@@ -113,21 +113,17 @@ public class SizeTest {
         vl.bitWidth = 10;
     }
 
-    @Property
-    public void fixBit0(@From(IntervalGenerator.class) @IntervalConf(min=0, max=1, minN=1, maxN=1, maxNDigit=0)
+    @Property(trials = 500)
+    public void fixBit(@From(IntervalGenerator.class) @IntervalConf(min=-10, max=10, minN=0, maxN=5, maxNDigit=4)
                                  Intervals.ConstrainedInterval interval){
-        assertIntervalSize(interval);
-    }
-
-    @Property
-    public void fixBit1(@From(IntervalGenerator.class) @IntervalConf(min=0, max=2, minN=1, maxN=1, minNDigit=1, maxNDigit=1)
-                                Intervals.ConstrainedInterval interval){
         assertIntervalSize(interval);
     }
 
     void assertIntervalSize(Intervals.ConstrainedInterval interval){
         int expected = interval.size();
         System.out.println(interval);
-        assertEquals(String.format("Count elements in %s", interval), expected, interval.approximateSize());
+        assertEquals(String.format("Count elements in %s", interval), expected,
+                Intervals.countPattern(interval.start, interval.end,
+                    new Intervals.ListConstraints(interval.constraints)));
     }
 }
