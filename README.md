@@ -208,4 +208,8 @@ All configurations and inputs are stored continously in the
     - zooming in the graph works by pressing the *Shift* key and
       moving the mouse up or down while pressing an arbitrary mouse key
 
+Requirements
+------------
+Some code requires the [pysat](https://github.com/pysathq/pysat) library to be installed.
+
 It's licensed under the GPLv3 and MIT license.
