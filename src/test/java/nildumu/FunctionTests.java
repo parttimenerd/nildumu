@@ -172,6 +172,29 @@ l output int o = fib(h);
                 "     l output int o = fib(h);", handler)).leaks(1).run();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"handler=inlining;maxrec=5;bot=summary"})
+    public void testWeirdFibonacciTermination32(String handler){
+        Context.LOG.setLevel(Level.INFO);
+        assertTimeoutPreemptively(ofSeconds(10000), () -> parse(
+                "     h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
+                        "     l input int l = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
+                        "     int res = 0;\n" +
+                        "     int fib(int a){\n" +
+                        "         int r = 1;\n" +
+                        "         while (a > 0){\n" +
+                        "             if (a > 1){\n" +
+                        "                r = r + fib(a - 1);\n" +
+                        "             }\n" +
+                        "         }\n" +
+                        "         return r;\n" +
+                        "     }\n" +
+                        "     while (l) {\n" +
+                        "        res = res + fib(h);\n" +
+                        "     }\n" +
+                        "     l output int o = fib(h);", handler)).leaks(32).run();
+    }
+
     /**
      <code>
      int f(int x) {

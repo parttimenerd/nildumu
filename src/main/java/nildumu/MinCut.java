@@ -1,5 +1,8 @@
 package nildumu;
 
+import nildumu.solver.LeakageAlgorithm;
+import nildumu.solver.OpenWBOSolver;
+import nildumu.solver.RC2Solver;
 import org.jgrapht.Graph;
 import org.jgrapht.alg.flow.PushRelabelMFImpl;
 import org.jgrapht.graph.*;
@@ -30,7 +33,9 @@ public class MinCut {
     public static Algo usedAlgo = Algo.GRAPHT_PP;
 
     public enum Algo {
-        GRAPHT_PP("JGraphT Preflow-Push");
+        GRAPHT_PP("JGraphT Preflow-Push"),
+        RC2("RC2 PMSAT solver"),
+        OPENWBO("Open-WBO PMSAT solver");
 
         public final String description;
 
@@ -65,8 +70,8 @@ public class MinCut {
 
     public static abstract class Algorithm {
 
-        final Context.SourcesAndSinks sourcesAndSinks;
-        final Function<Bit, Double> weights;
+        protected final Context.SourcesAndSinks sourcesAndSinks;
+        protected final Function<Bit, Double> weights;
 
         protected Algorithm(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights) {
             this.sourcesAndSinks = sourcesAndSinks;
@@ -172,7 +177,7 @@ public class MinCut {
             for (Bit bit : sourcesAndSinks.sinks){
                 graph.setEdgeWeight(graph.addEdge(bitToNodes.get(bit).second, sink), infty * infty);
             }
-            if (con.inIntervalMode()) {
+            if (sourcesAndSinks.context.inIntervalMode()) {
                 Map<Value, Pair<Vertex, Vertex>> intervalToNodes =
                         new DefaultMap<>((map, value) -> {
                             Vertex start = new Vertex(bl.forceCreateXBit(), true);
@@ -225,24 +230,32 @@ public class MinCut {
         }
     }
 
-    public static ComputationResult compute(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights){
-        return new GraphTPP(sourcesAndSinks, weights).compute();
+    public static ComputationResult compute(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights, Algo algo){
+        switch (algo) {
+            case GRAPHT_PP:
+                return new GraphTPP(sourcesAndSinks, weights).compute();
+            case RC2:
+                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new RC2Solver<>(false)).compute();
+            case OPENWBO:
+                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new OpenWBOSolver<>(false)).compute();
+        }
+        return null;
     }
 
-    public static ComputationResult compute(Context context, Sec<?> sec){
+    public static ComputationResult compute(Context context, Sec<?> sec, Algo algo){
         con = context;
         if (sec == context.sl.top()){
             return new ComputationResult(Collections.emptySet(), 0);
         }
-        return compute(context.sourcesAndSinks(sec), context::weight);
+        return compute(context.sourcesAndSinks(sec), context::weight, algo);
     }
 
     private static Context con;
 
-    public static Map<Sec<?>, ComputationResult> compute(Context context){
+    public static Map<Sec<?>, ComputationResult> compute(Context context, Algo algo){
         return context.sl.elements().stream()
                 .collect(Collectors.toMap(s -> s, s -> s == context.sl.top() ?
                         new ComputationResult(Collections.emptySet(), 0) :
-                        compute(context, s)));
+                        compute(context, s, algo)));
     }
 }

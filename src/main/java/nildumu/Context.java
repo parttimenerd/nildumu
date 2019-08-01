@@ -684,9 +684,9 @@ public class Context {
     private Map<Sec<?>, MinCut.ComputationResult> leaks = null;
 
 
-    public Map<Sec<?>, MinCut.ComputationResult> computeLeakage(){
+    public Map<Sec<?>, MinCut.ComputationResult> computeLeakage(MinCut.Algo algo){
         if (leaks == null){
-            leaks = MinCut.compute(this);
+            leaks = MinCut.compute(this, algo);
         }
         return leaks;
     }
@@ -1021,21 +1021,23 @@ public class Context {
 
     public SourcesAndSinks sourcesAndSinks(Sec<?> sec){
         return new SourcesAndSinks(entropyBounds.getMaxOutputs(sec),
-                sources(sec), entropyBounds.getMaxInputEntropy(sec), sinks(sec));
+                sources(sec), entropyBounds.getMaxInputEntropy(sec), sinks(sec), this);
     }
 
     public static class SourcesAndSinks {
 
         final double sourceWeight;
-        final Set<Bit> sources;
+        public final Set<Bit> sources;
         final double sinkWeight;
-        final Set<Bit> sinks;
+        public final Set<Bit> sinks;
+        public final Context context;
 
-        public SourcesAndSinks(double sourceWeight, Set<Bit> sources, double sinkWeight, Set<Bit> sinks){
+        public SourcesAndSinks(double sourceWeight, Set<Bit> sources, double sinkWeight, Set<Bit> sinks, Context context){
             this.sourceWeight = sourceWeight;
             this.sources = sources;
             this.sinkWeight = sinkWeight;
             this.sinks = sinks;
+            this.context = context;
         }
     }
 }

@@ -210,6 +210,8 @@ All configurations and inputs are stored continously in the
 
 Requirements
 ------------
-Some code requires the [pysat](https://github.com/pysathq/pysat) library to be installed.
+Some code requires the [pysat](https://github.com/pysathq/pysat) library to be installed and
+the content of [Open-WBO.zip](https://maxsat-evaluations.github.io/2018/mse18-solver-src/complete/Open-WBO.zip)
+placed into the `dist` folder.
 
 It's licensed under the GPLv3 and MIT license.

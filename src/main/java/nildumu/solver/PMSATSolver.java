@@ -1,7 +1,6 @@
 package nildumu.solver;
 
 import nildumu.util.Util;
-import swp.util.Pair;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -12,7 +11,7 @@ import java.util.*;
 /**
  * Allows to create partial max sat formulas and solve them, creates output in the WDIMACS format
  */
-public abstract class PMSAT<V, E> extends Solver<V, E> {
+public abstract class PMSATSolver<V> extends Solver<V> {
 
     /**
      * Variables to int with weights (default is 0)
@@ -22,6 +21,7 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
         private final List<T> varToVal;
         private final Map<T, Double> weights;
         private final Set<T> infiniteWeightVars;
+        private boolean hasNonIntegerWeight = false;
 
         private double weightSum;
 
@@ -53,6 +53,9 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
             }
             weights.put(var, weight);
             weightSum += weight;
+            if (Math.ceil(weight) != weight){
+                hasNonIntegerWeight = true;
+            }
         }
 
         public double weight(T var){
@@ -64,7 +67,7 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
         }
 
         public int size() {
-            return varToVal.size();
+            return valToVar.size();
         }
 
         public void addInfinetlyWeighted(T var){
@@ -83,7 +86,7 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
 
     private final List<int[]> clauses;
 
-    private final Variables<Variable<V, E>> variables;
+    private final Variables<V> variables;
 
     /**
      * Creates a new instance
@@ -92,7 +95,7 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
      * @param roundUp round up the weight (for solvers that do only allow integer weights, by default
      *                multiplies the weights with ⌈1 / (log2(2^32) - log2((2^32) - 1))⌉ = 24)
      */
-    public PMSAT(boolean maximize, boolean roundUp) {
+    public PMSATSolver(boolean maximize, boolean roundUp) {
         super(maximize);
         this.roundUp = roundUp;
         clauses = new ArrayList<>();
@@ -100,29 +103,34 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
     }
 
     @Override
-    public void addOrImplication(Variable<V, E> a, Variable<V, E>... oredVariables) {
+    public void addOrImplication(V a, V... oredVariables) {
         int[] clause = new int[oredVariables.length + 1];
         clause[0] = -variables.val(a);
         for (int i = 0; i < oredVariables.length; i++) {
-            clause[i] = variables.val(oredVariables[i]);
+            clause[i + 1] = variables.val(oredVariables[i]);
         }
         clauses.add(clause);
     }
 
     @Override
-    public void addAndImplication(Variable<V, E> a, Variable<V, E>... andedVariables) {
-        for (Variable<V, E> andedVariable : andedVariables) {
+    public void addAndImplication(V a, V... andedVariables) {
+        for (V andedVariable : andedVariables) {
             addOrImplication(a, andedVariables);
         }
     }
 
     @Override
-    public void addWeight(Variable<V, E> var, double weight) {
+    public void addSingleClause(V a) {
+        clauses.add(new int[]{variables.val(a)});
+    }
+
+    @Override
+    public void addWeight(V var, double weight) {
         variables.weight(var, weight);
     }
 
     @Override
-    public void addInfiniteWeight(Variable<V, E> var) {
+    public void addInfiniteWeight(V var) {
         variables.addInfinetlyWeighted(var);
     }
 
@@ -130,9 +138,38 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
         return (long)Math.ceil(variables.getWeightSum() * multiplier) + 1;
     }
 
+    @Override
+    public void writeInHumanReadableFormat(OutputStreamWriter writer) throws IOException {
+        double multiplier = roundUp ? calculateWeightMultiplier() : 1;
+        writer.write(String.format("p wcnf %d %d %s\n",
+                variables.size(), clauses.size() + variables.weights.size(), formatWeight(variables.getTopWeight(multiplier))));
+        for (int[] clause : clauses) {
+            writer.write(String.format("%10d %10f", (long) Math.ceil(variables.getTopWeight(multiplier)), variables.getTopWeight(1)));
+            for (int i : clause) {
+                writer.write(" " + formatVal(i));
+            }
+            writer.write(" 0\n");
+        }
+        for (Map.Entry<V, Double> weightPair : variables.weights.entrySet()) {
+            writer.write(String.format("%10s %10f ¬%s\n", formatWeight(weightPair.getValue() * multiplier), weightPair.getValue(), weightPair.getKey()));
+        }
+        for (V var : variables.infiniteWeightVars) {
+            writer.write(String.format("%d %s", getInfiteWeight(multiplier),
+                    maximize ? var : ("¬" + var)));
+        }
+        writer.flush();
+    }
+
+    private String formatVal(int val){
+        if (val < 0){
+            return "¬" + formatVal(-val);
+        }
+        return variables.var(val).toString();
+    }
+
     void writeInWDIMACSFormat(OutputStreamWriter writer) throws IOException {
         double multiplier = roundUp ? calculateWeightMultiplier() : 1;
-        writer.write(String.format("p wcnf %d %d %d\n",
+        writer.write(String.format("p wcnf %d %d %s\n",
                 variables.size(), clauses.size() + variables.weights.size(), formatWeight(variables.getTopWeight(multiplier))));
         for (int[] clause : clauses) {
             writer.write((long) Math.ceil(variables.getTopWeight(multiplier)) + "");
@@ -141,13 +178,14 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
             }
             writer.write(" 0\n");
         }
-        for (Map.Entry<Variable<V,E>, Double> weightPair : variables.weights.entrySet()) {
-            writer.write(String.format("%s %d\n", formatWeight(weightPair.getValue() * multiplier), variables.val(weightPair.getKey())));
+        for (Map.Entry<V, Double> weightPair : variables.weights.entrySet()) {
+            writer.write(String.format("%s %d 0\n", formatWeight(weightPair.getValue() * multiplier), -variables.val(weightPair.getKey())));
         }
-        for (Variable<V, E> var : variables.infiniteWeightVars) {
-            writer.write(String.format("%d %d", getInfiteWeight(multiplier),
-                    maximize ? variables.val(var) : -variables.val(var)));
+        for (V var : variables.infiniteWeightVars) {
+            writer.write(String.format("%d %d 0\n", getInfiteWeight(multiplier),
+                    (maximize ? variables.val(var) : -variables.val(var))));
         }
+        writer.flush();
     }
 
     private String formatWeight(double weight){
@@ -158,10 +196,10 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
     }
 
 
-    public Optional<Result<V, E>> parse(InputStreamReader reader){
+    public Optional<Result<V>> parse(InputStreamReader reader){
         BufferedReader buf = new BufferedReader(reader);
-        List<Variable<V, E>> trueVariables = new ArrayList<>();
-        List<Variable<V, E>> falseVariables = new ArrayList<>();
+        List<V> trueVariables = new ArrayList<>();
+        List<V> falseVariables = new ArrayList<>();
         String line;
         try {
             while ((line = buf.readLine()) != null) {
@@ -170,13 +208,17 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
                 }
                 if (line.startsWith("v")){
                     for (String str : line.substring(2).split(" ")){
+                        if (str.isEmpty()){
+                            continue;
+                        }
                         int val = Integer.parseInt(str);
-                        if (val > 0 && maximize){
-                            trueVariables.add(variables.var(val));
+                        if (val > 0 && !maximize){
+                            trueVariables.add(variables.var(Math.abs(val)));
                         } else {
-                            falseVariables.add(variables.var(val));
+                            falseVariables.add(variables.var(Math.abs(val)));
                         }
                     }
+                    break;
                 }
             }
         } catch (IOException ex){
@@ -189,7 +231,7 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
     }
 
     @Override
-    public Optional<Result<V, E>> solve() {
+    public Optional<Result<V>> solve() {
         return parse(solveAndRead());
     }
 
@@ -200,6 +242,6 @@ public abstract class PMSAT<V, E> extends Solver<V, E> {
      * Only used if the solver rounds up, by default uses ⌈1 / (log2(2^32) - log2((2^32) - 1))⌉ = 24
      */
     public double calculateWeightMultiplier(){
-        return Math.ceil(1 / (Util.log2(Math.pow(2, 32)) - Util.log2(Math.pow(2, 32) - 1)));
+        return variables.hasNonIntegerWeight ? Math.ceil(1 / (Util.log2(Math.pow(2, 32)) - Util.log2(Math.pow(2, 32) - 1))) : 1;
     }
 }

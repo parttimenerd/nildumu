@@ -106,6 +106,18 @@ public class ExtendedTests {
     }
 
     @Test
+    public void testImplicitFlowCondensed4(){
+        parse("h input int S = 0buu;\n" +
+                "int O = 0;\n" +
+                "if (S == 0) {\n" +
+                "    O = 0;\n" +
+                "} else {\n" +
+                "    O = 1" +
+                "}\n" +
+                "l output int o = O;").leaks(1).run();
+    }
+
+    @Test
     public void testImplicitFlow(){
         parse("h input int S = 0buuuuuu;\n" +
                 "int O;\n" +
@@ -139,6 +151,12 @@ public class ExtendedTests {
                 "    }\n" +
                 "}\n" +
                 "l output int o = O;").leaks(3).run();
+    }
+
+    @Test
+    public void testImplicitFlow3(){
+        parse("h input int S = 0bu;\n" +
+                "l output int o = 0;").leaks(0).run();
     }
 
     public ContextMatcher parse(String program){

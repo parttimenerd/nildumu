@@ -611,7 +611,7 @@ public class BasicUI {
 
     private void updateLeakageTable(Context context) {
         List<Sec<?>> secLevels = new ArrayList<>((Set<Sec<?>>) context.sl.elements());
-        Map<Sec<?>, MinCut.ComputationResult> compRes = context.computeLeakage();
+        Map<Sec<?>, MinCut.ComputationResult> compRes = context.computeLeakage((MinCut.Algo)minCutAlgoComboBox.getSelectedItem());
         leakageTable.setTableHeader(new JTableHeader());
         leakageTable.setModel(new AbstractTableModel() {
 

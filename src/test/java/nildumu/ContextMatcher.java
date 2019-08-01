@@ -89,12 +89,16 @@ public class ContextMatcher {
     public class LeakageMatcher {
 
         public LeakageMatcher leaks(Lattices.Sec<?> attackerSec, double leakage){
-            builder.add(() -> {
-                MinCut.ComputationResult comp = MinCut.compute(context, attackerSec);
-                assertEquals(leakage, comp.maxFlow, () -> {
-                    return String.format("The calculated leakage for an attacker of level %s should be %f, leaking %s", attackerSec, leakage, comp.minCut.stream().map(Lattices.Bit::toString).collect(Collectors.joining(", ")));
+            for (MinCut.Algo algo : MinCut.Algo.values()) {
+                builder.add(() -> {
+                    MinCut.ComputationResult comp = MinCut.compute(context, attackerSec, algo);
+                    assertEquals(leakage, comp.maxFlow, () -> {
+                        return String.format("The calculated leakage for an attacker of level %s should be %f, leaking %s, using %s",
+                                attackerSec, leakage, comp.minCut.stream().map(Lattices.Bit::toString).collect(Collectors.joining(", ")),
+                                algo);
+                    });
                 });
-            });
+            }
             return this;
         }
 
@@ -103,10 +107,14 @@ public class ContextMatcher {
         }
 
         public LeakageMatcher leaksAtLeast(Lattices.Sec sec, double leakage) {
-            builder.add(() -> {
-                MinCut.ComputationResult comp = MinCut.compute(context, sec);
-                assertTrue(comp.maxFlow >= leakage, String.format("The calculated leakage for an attacker of level %s should be at least %f, leaking %f", sec, leakage, comp.maxFlow));
-            });
+            for (MinCut.Algo algo : MinCut.Algo.values()) {
+                builder.add(() -> {
+                    MinCut.ComputationResult comp = MinCut.compute(context, sec, algo);
+                    assertTrue(comp.maxFlow >= leakage,
+                            String.format("The calculated leakage for an attacker of level %s should be at least %f, " +
+                                    "leaking %f, using %s", sec, leakage, comp.maxFlow, algo));
+                });
+            }
             return this;
         }
     }

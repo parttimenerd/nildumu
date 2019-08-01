@@ -5,6 +5,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import static nildumu.FunctionTests.parse;
+import static nildumu.SSA2Tests.toSSA;
 
 public class OperatorTests {
     @ParameterizedTest
@@ -22,10 +23,13 @@ public class OperatorTests {
     @ParameterizedTest
     @CsvSource({
             "0b0u, *, 3, 1",
-            "0bu, *, 2, 1"
+            "0bu, *, 2, 1",
+            "0bu, |, 0, 1"
     })
     public void testLeakage(String arg1, String op, String arg2, int leakage){
-        parse(String.format("bit_width 10; h input int a = %s; h input int b = %s; l output int x = a %s b", arg1, arg2, op)).leaks(leakage).run();
+        String program = String.format("bit_width 10; h input int a = %s; h input int b = %s; l output int x = a %s b", arg1, arg2, op);
+        System.out.println(toSSA(program));
+        parse(program).leaks(leakage).run();
     }
 
     @Test
