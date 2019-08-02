@@ -1,5 +1,8 @@
 package nildumu.intervals;
 
+import nildumu.Context;
+import nildumu.ContextMatcher;
+import nildumu.Processor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -26,5 +29,15 @@ public class IntervalTests {
     @Test
     public void testForBitwidth(){
         assertEquals(4, Interval.forBitWidth(2).size());
+    }
+
+    @Test
+    public void testBasicIf(){
+        new ContextMatcher(Processor.process(" h input int h = 0buu;\n" +
+                "int x = 0;\n" +
+                "if (h < 1){\n" +
+                "    x = h;\n" +
+                "}" +
+                "l output int o = x;", Context.Mode.INTERVAL)).numberOfOutputs(3).run();
     }
 }

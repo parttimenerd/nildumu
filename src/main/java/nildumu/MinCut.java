@@ -3,24 +3,18 @@ package nildumu;
 import nildumu.solver.LeakageAlgorithm;
 import nildumu.solver.OpenWBOSolver;
 import nildumu.solver.RC2Solver;
-import org.jgrapht.Graph;
 import org.jgrapht.alg.flow.PushRelabelMFImpl;
 import org.jgrapht.graph.*;
-import org.jgrapht.io.*;
 
-import java.io.*;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import nildumu.intervals.Interval;
 import nildumu.util.*;
 import swp.util.Pair;
 
 import static nildumu.Context.INFTY;
-import static nildumu.Lattices.B.U;
 import static nildumu.Lattices.*;
-import static nildumu.util.Util.p;
 
 /**
  * Computation of the minimum cut on graphs.
@@ -33,19 +27,25 @@ public class MinCut {
     public static Algo usedAlgo = Algo.GRAPHT_PP;
 
     public enum Algo {
-        GRAPHT_PP("JGraphT Preflow-Push"),
-        RC2("RC2 PMSAT solver"),
-        OPENWBO("Open-WBO PMSAT solver");
+        GRAPHT_PP("JGraphT Preflow-Push", false),
+        //RC2("RC2 PMSAT solver", true),
+        OPENWBO("Open-WBO PMSAT solver", true);
 
         public final String description;
+        public final boolean supportsIntervals;
 
-        Algo(String description){
+        Algo(String description, boolean supportsIntervals){
             this.description = description;
+            this.supportsIntervals = supportsIntervals;
         }
 
         @Override
         public String toString() {
             return description;
+        }
+
+        public boolean supportsIntervals() {
+            return supportsIntervals;
         }
     }
 
@@ -162,14 +162,10 @@ public class MinCut {
                         return new Pair<>(start, end);
                     });
             Set<Bit> alreadyVisited = new HashSet<>();
-            Set<Value> values = new HashSet<>();
             for (Bit bit : sourcesAndSinks.sources){
                 bl.walkBits(bit, b -> {
                     for (Bit d : b.deps()){
                         graph.setEdgeWeight(graph.addEdge(bitToNodes.get(b).second, bitToNodes.get(d).first), infty * infty);
-                    }
-                    if (b.value() != null){
-                        values.add(b.value());
                     }
                 }, sourcesAndSinks.sinks::contains, alreadyVisited);
                 graph.setEdgeWeight(graph.addEdge(source, bitToNodes.get(bit).first), infty * infty);
@@ -177,51 +173,10 @@ public class MinCut {
             for (Bit bit : sourcesAndSinks.sinks){
                 graph.setEdgeWeight(graph.addEdge(bitToNodes.get(bit).second, sink), infty * infty);
             }
-            if (sourcesAndSinks.context.inIntervalMode()) {
-                Map<Value, Pair<Vertex, Vertex>> intervalToNodes =
-                        new DefaultMap<>((map, value) -> {
-                            Vertex start = new Vertex(bl.forceCreateXBit(), true);
-                            Vertex end = new Vertex(bl.forceCreateXBit(), false);
-                            graph.addVertex(start);
-                            graph.addVertex(end);
-                            DefaultWeightedEdge edge = graph.addEdge(start, end);
-                            graph.setEdgeWeight(edge, value.hasInterval() ? value.entropy() : infty);
-                            return new Pair<>(start, end);
-                        });
-                // insert the interval edges
-                for (Value value : values) {
-                    if (value.hasInterval() && !value.getInterval().isDefaultInterval()) {
-                        Pair<Vertex, Vertex> v = intervalToNodes.get(value);
-                        for (Bit b : value.bits) {
-                            graph.setEdgeWeight(graph.addEdge(bitToNodes.get(b).first, v.first), 0);
-                            graph.setEdgeWeight(graph.addEdge(v.second, bitToNodes.get(b).second), 0);
-                            graph.removeEdge(bitToNodes.get(b).first, bitToNodes.get(b).second);
-                        }
-                    }
-                }
-            }
             PushRelabelMFImpl<Vertex, DefaultWeightedEdge> pp = new PushRelabelMFImpl<Vertex, DefaultWeightedEdge>(graph, 0.5);
-            final Vertex sink_ = initialSink;
-            final Vertex source_ = initialSource;
             double maxFlow = pp.calculateMinCut(initialSource, initialSink);
             Set<Bit> minCut = pp.getCutEdges().stream().map(e -> graph.getEdgeSource(e).bit).collect(Collectors.toSet());
-
-            /*DOTExporter<Vertex, DefaultWeightedEdge> export=new DOTExporter<>(v -> v.bit.bitNo + "",
-                    v -> {
-                        if (v == sink_){
-                            return "sink";
-                        }
-                        if (v == source_){
-                            return "source";
-                        }
-                        return v.bit.toString();
-                    },
-                    e -> graph.getEdgeWeight(e) + "");
-            try {
-                export.exportGraph(graph, new FileWriter("graph.dot"));
-            }catch (IOException e){}*/
-
-            // Problem: if some of the sink nodes or source nodes have weight different than 1, then this should be noted
+            // Problem: if soome of the sink nodes or source nodes have weight different than 1, then this should be noted
             double flow = Math.min(Math.round(maxFlow), Math.min(weightSum(sourcesAndSinks.sources), weightSum(sourcesAndSinks.sinks)));
             if (flow > infty / 2){
                 flow = Double.POSITIVE_INFINITY;
@@ -234,8 +189,8 @@ public class MinCut {
         switch (algo) {
             case GRAPHT_PP:
                 return new GraphTPP(sourcesAndSinks, weights).compute();
-            case RC2:
-                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new RC2Solver<>(false)).compute();
+            /*case RC2:
+                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new RC2Solver<>(false)).compute();*/
             case OPENWBO:
                 return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new OpenWBOSolver<>(false)).compute();
         }

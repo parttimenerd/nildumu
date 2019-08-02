@@ -192,7 +192,7 @@ l output int o = fib(h);
                         "     while (l) {\n" +
                         "        res = res + fib(h);\n" +
                         "     }\n" +
-                        "     l output int o = fib(h);", handler)).leaks(32).run();
+                        "     l output int o = fib(h);", handler)).leaks(32).benchLeakageComputationAlgorithms().run();
     }
 
     /**
@@ -252,7 +252,7 @@ l output int o = fib(h);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"basic", "handler=summary;reduction=basic;bot=basic;dot=tmp2"})
+    @ValueSource(strings = {"basic", "handler=summary;reduction=basic;bot=basic"})
     public void testNestedMethodCalls_smaller3(String handler){
         Context.LOG.setLevel(Level.FINE);
         parse("int f(int x) {\n" +
@@ -351,7 +351,7 @@ l output int o = fib(h);
                 "	return a + 1;\n" +
                 "} f(1)" ;
         System.err.println(Parser.process(program).toPrettyString());
-        parse(program, MethodInvocationHandler.parse("handler=summary;maxiter=2;bot=basic;dot=dots23.dot"));
+        parse(program, MethodInvocationHandler.parse("handler=summary;maxiter=2;bot=basic"));
     }
 
     @RepeatedTest(value = 3)
@@ -384,7 +384,7 @@ l output int o = fib(h);
                 "l output int o = f2(h);";
         ProgramNode node = Parser.process(program);
         Context.LOG.setLevel(Level.FINE);
-        Context c1 = Processor.process(node, Context.Mode.LOOP, MethodInvocationHandler.parse("handler=summary;dot=dots1"));
+        Context c1 = Processor.process(node, Context.Mode.LOOP, MethodInvocationHandler.parse("handler=summary"));
         Context.LOG.setLevel(Level.INFO);
         //node = Parser.process(program);
         //Context c2 = Processor.process(node, MethodInvocationHandler.parse("handler=summary"));

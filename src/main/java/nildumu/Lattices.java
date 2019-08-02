@@ -1548,7 +1548,7 @@ public class Lattices {
          */
         public double entropy(){
             if (hasInterval()){
-                return Math.log(Intervals.countPattern(interval, asConstraints()));
+                return Util.log2(Intervals.countPattern(interval, asConstraints()));
             }
             return this.stream().filter(Bit::isAtLeastUnknown).count();
         }

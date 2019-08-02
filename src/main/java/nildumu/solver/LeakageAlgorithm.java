@@ -106,12 +106,13 @@ public class LeakageAlgorithm extends MinCut.Algorithm {
                     Interval interval = b.value().getInterval();
                     if (!interToVar.containsKey(interval)){
                         Lattices.Bit x = bl.forceCreateXBit();
+                        x.value(new Lattices.Value().description(interval.toString())).valueIndex(1);
                         Variable var = v(x, Type.IS_INTERVAL);
                         interToVar.put(interval, var);
                         varToInter.put(var, interval);
-                        interToWeight.put(interval, Util.log2(b.value().numberOfDistinctBits()));
+                        interToWeight.put(interval, b.value().entropy());
                     }
-                    vars.add(v(b, Type.INTERVAL));
+                    vars.add(interToVar.get(interval));
                 }
                 solver.addOrImplication(v(b, Type.EITHER), vars.toArray(new Variable[0]));
                 for (Lattices.Bit dep : b.deps()) {
@@ -137,12 +138,6 @@ public class LeakageAlgorithm extends MinCut.Algorithm {
         }
         for (Map.Entry<Interval, Variable> entry : interToVar.entrySet()) {
             solver.addWeight(entry.getValue(), interToWeight.get(entry.getKey()));
-        }
-
-        try {
-            ((PMSATSolver<Variable>)solver).writeInWDIMACSFormat(new OutputStreamWriter(System.out));
-        } catch (IOException e) {
-            e.printStackTrace();
         }
 
         Solver.Result<Variable> result = solver.solve().get();

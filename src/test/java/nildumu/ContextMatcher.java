@@ -102,6 +102,26 @@ public class ContextMatcher {
             return this;
         }
 
+        /**
+         * Only uses leakage computation algorithms that support intervals.
+         */
+        public LeakageMatcher numberOfOutputs(Lattices.Sec<?> attackerSec, int outputs){
+            for (MinCut.Algo algo : MinCut.Algo.values()) {
+                if (!algo.supportsIntervals()){
+                    continue;
+                }
+                builder.add(() -> {
+                    MinCut.ComputationResult comp = MinCut.compute(context, attackerSec, algo);
+                    int actualOutputs = (int)Math.round(Math.pow(2, comp.maxFlow));
+                    assertEquals(outputs, actualOutputs, () -> {
+                        return String.format("The calculated number of outputs to an attacker of level %s should be %d, but is %d, using %s",
+                                attackerSec, outputs, actualOutputs, algo);
+                    });
+                });
+            }
+            return this;
+        }
+
         public LeakageMatcher leaks(String attackerSec, double leakage){
             return leaks(context.sl.parse(attackerSec), leakage);
         }
@@ -138,10 +158,33 @@ public class ContextMatcher {
     }
 
     /**
+     * Only uses leakage computation algorithms that support intervals.
+     */
+    public ContextMatcher numberOfOutputs(int outputs){
+        return leakage(l -> l.numberOfOutputs(context.sl.bot(), outputs));
+    }
+
+    /**
      * Supports "inf"
      */
     public ContextMatcher leaks(String leakage){
         return leakage(l -> l.leaks(context.sl.bot(), leakage.equals("inf") ? Context.INFTY : Double.parseDouble(leakage)));
+    }
+
+    public ContextMatcher benchLeakageComputationAlgorithms(){
+        for (MinCut.Algo algo : MinCut.Algo.values()) {
+            builder.add(() -> {
+                List<Integer> times = IntStream.range(0, 10).mapToObj(i -> {
+                    long start = System.currentTimeMillis();
+                    MinCut.compute(context, context.sl.bot(), algo);
+                    return (int)(System.currentTimeMillis() - start);
+                }).collect(Collectors.toList());
+                double mean = times.stream().mapToInt(i -> i).sum() * 1.0 / times.size();
+                double std = Math.sqrt(1.0 / times.size() * times.stream().mapToInt(i -> i).mapToDouble(i -> (mean - i) * (mean - i)).sum());
+                System.out.printf("Using %25s took %10.3fms +- %10.3fms\n", algo, mean, std);
+            });
+        }
+        return this;
     }
 
     public ContextMatcher leaksAtLeast(int leakage){
