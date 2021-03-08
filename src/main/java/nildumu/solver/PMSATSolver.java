@@ -115,7 +115,7 @@ public abstract class PMSATSolver<V> extends Solver<V> {
     @Override
     public void addAndImplication(V a, V... andedVariables) {
         for (V andedVariable : andedVariables) {
-            addOrImplication(a, andedVariables);
+            addOrImplication(a, andedVariable);
         }
     }
 

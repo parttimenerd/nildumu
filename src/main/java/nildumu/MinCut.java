@@ -176,7 +176,7 @@ public class MinCut {
             PushRelabelMFImpl<Vertex, DefaultWeightedEdge> pp = new PushRelabelMFImpl<Vertex, DefaultWeightedEdge>(graph, 0.5);
             double maxFlow = pp.calculateMinCut(initialSource, initialSink);
             Set<Bit> minCut = pp.getCutEdges().stream().map(e -> graph.getEdgeSource(e).bit).collect(Collectors.toSet());
-            // Problem: if soome of the sink nodes or source nodes have weight different than 1, then this should be noted
+            // Problem: if some of the sink nodes or source nodes have weight different than 1, then this should be noted
             double flow = Math.min(Math.round(maxFlow), Math.min(weightSum(sourcesAndSinks.sources), weightSum(sourcesAndSinks.sinks)));
             if (flow > infty / 2){
                 flow = Double.POSITIVE_INFINITY;

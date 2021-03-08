@@ -341,7 +341,7 @@ l output int o = fib(h);
                 "     }\n" +
                 "     l output int o = fib(h); ";
         System.err.println(Parser.process(program, false).toPrettyString());
-       parse(program, MethodInvocationHandler.parse("handler=call_string;maxrec=1;bot=summary_mc"));
+       parse(program, MethodInvocationHandler.parse("handler=inlining;maxrec=1;bot=summary"));
     }
 
     @Test
