@@ -1,12 +1,16 @@
 package nildumu.eval;
 
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.*;
-
-import nildumu.*;
+import nildumu.Lattices;
+import nildumu.Parser;
 import nildumu.Parser.ProgramNode;
 import swp.util.Pair;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Wrapper around a nildumu test program
@@ -205,8 +209,9 @@ public class TestProgram implements Comparable<TestProgram> {
 
             @Override
             public String visit(Parser.ReturnStatementNode returnStatement) {
+                assert returnStatement.expressions.size() == 1;
                 return String.format("return (%s)(%s);", integerTypeStr,
-                        formatExpression(returnStatement.expression));
+                        formatExpression(returnStatement.expressions.get(0)));
             }
 
 

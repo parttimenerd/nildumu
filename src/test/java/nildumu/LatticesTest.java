@@ -1,20 +1,23 @@
 package nildumu;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import swp.util.Pair;
 
 import java.util.HashSet;
 import java.util.function.BiPredicate;
 import java.util.stream.Stream;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import swp.util.Pair;
-
-import static nildumu.Lattices.BasicSecLattice.*;
+import static nildumu.Lattices.BasicSecLattice.HIGH;
+import static nildumu.Lattices.BasicSecLattice.LOW;
 import static nildumu.Lattices.bl;
 import static nildumu.Lattices.bs;
-import static nildumu.util.Util.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static nildumu.util.Util.p;
+import static nildumu.util.Util.set;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for all the basic lattices. These lattices are the foundation of the whole analysis, they should
@@ -72,8 +75,12 @@ public class LatticesTest {
     public class ValueLatticeTest {
         @Test
         public void testParsing(){
+            Lattices.Bit zero = bl.create(Lattices.B.ZERO);
+            Lattices.Bit one = bl.create(Lattices.B.ONE);
             assertParsingCorrect(Lattices.ValueLattice.get(), Lattices.Value::valueEquals,
-                    p("0b00", new Lattices.Value(bl.create(Lattices.B.ZERO), bl.create(Lattices.B.ZERO))));
+                    p("0b00", new Lattices.Value(zero, zero)));
+            assertParsingCorrect(Lattices.ValueLattice.get(), Lattices.Value::valueEquals,
+                    p("0b0{2}1", new Lattices.Value(one, zero, zero)));
         }
     }
 

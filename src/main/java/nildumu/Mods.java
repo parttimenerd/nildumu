@@ -1,14 +1,19 @@
 package nildumu;
 
-import java.util.*;
-import java.util.stream.*;
-
 import nildumu.intervals.Interval;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static nildumu.Lattices.Bit;
 
 /**
  * A simple set of modifications
+ * <p>
+ * todo: implement alternatives handling
  */
 public class Mods {
 

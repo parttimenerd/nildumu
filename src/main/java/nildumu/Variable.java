@@ -1,6 +1,7 @@
 package nildumu;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Known as <em>Definition</em> in the compiler lab.
@@ -10,7 +11,7 @@ public class Variable {
     /**
      * The name of the variable
      */
-    final String name;
+    public final String name;
     /**
      * Is this variable an public output variable, through which information gets potentially leaked?
      */

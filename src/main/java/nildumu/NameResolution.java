@@ -2,10 +2,7 @@ package nildumu;
 
 import swp.util.Pair;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static nildumu.Parser.*;
@@ -20,7 +17,7 @@ import static nildumu.util.Util.p;
 public class NameResolution implements Parser.NodeVisitor<Object> {
 
     public static class WrongNumberOfArgumentsError extends NildumuError {
-        public WrongNumberOfArgumentsError(MethodInvocationNode invocation, String msg){
+        public WrongNumberOfArgumentsError(MethodInvocationNode invocation, String msg) {
             super(String.format("%s: %s", invocation, msg));
         }
     }
@@ -28,25 +25,50 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
     private SymbolTable symbolTable;
     private final ProgramNode program;
     private final Set<Variable> appendVariables;
+    private final Map<MJNode, SymbolTable.Scope> scopePerNode;
+    private final boolean captureScopes;
 
     public NameResolution(ProgramNode program) {
+        this(program, false);
+    }
+
+    /**
+     * @param captureScopes capture the scope each node belongs to?
+     */
+    public NameResolution(ProgramNode program, boolean captureScopes) {
         this.program = program;
         this.symbolTable = new SymbolTable();
         this.appendVariables = new HashSet<>();
+        this.scopePerNode = new HashMap<>();
+        this.captureScopes = captureScopes;
     }
 
-    public void resolve(){
+    public void resolve() {
         program.accept(this);
+    }
+
+    /**
+     * only valid if captureScopes == true, returns the scope that each node belongs to
+     */
+    public Map<MJNode, SymbolTable.Scope> getScopePerNode() {
+        assert captureScopes;
+        return Collections.unmodifiableMap(scopePerNode);
+    }
+
+    private void captureScope(MJNode node) {
+        scopePerNode.put(node, symbolTable.getCurrentScope());
     }
 
     @Override
     public Object visit(Parser.MJNode node) {
+        captureScope(node);
         visitChildrenDiscardReturn(node);
         return null;
     }
 
     @Override
     public Object visit(ProgramNode program) {
+        captureScope(program);
         Map<String, Variable> appendToVar = new HashMap<>();
         program.globalBlock.children().forEach(n -> ((MJNode)n).accept(new NodeVisitor<Object>() {
             @Override
@@ -93,12 +115,14 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(AppendOnlyVariableDeclarationNode appendDecl) {
+        captureScope(appendDecl);
         symbolTable.insert(appendDecl.variable, appendDecl.definition);
         return null;
     }
 
     @Override
     public Object visit(VariableDeclarationNode variableDeclaration) {
+        captureScope(variableDeclaration);
         if (symbolTable.isDirectlyInCurrentScope(variableDeclaration.variable)){
             throw new MJError(String.format("Variable %s already defined in scope", variableDeclaration.variable));
         }
@@ -114,9 +138,23 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(VariableAssignmentNode assignment) {
+        captureScope(assignment);
         symbolTable.throwIfNotInCurrentScope(assignment.variable);
         assignment.definition = symbolTable.lookup(assignment.variable);
-        if (assignment.expression != null){
+        if (assignment.expression != null) {
+            assignment.expression.accept(this);
+        }
+        return null;
+    }
+
+    @Override
+    public Object visit(MultipleVariableAssignmentNode assignment) {
+        captureScope(assignment);
+        assignment.definitions = assignment.variables.stream().map(v -> {
+            symbolTable.throwIfNotInCurrentScope(v);
+            return symbolTable.lookup(v);
+        }).collect(Collectors.toList());
+        if (assignment.expression != null) {
             assignment.expression.accept(this);
         }
         return null;
@@ -124,6 +162,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(VariableAccessNode variableAccess) {
+        captureScope(variableAccess);
         symbolTable.throwIfNotInCurrentScope(variableAccess.ident);
         variableAccess.definition = symbolTable.lookup(variableAccess.ident);
         return null;
@@ -131,6 +170,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(BlockNode block) {
+        captureScope(block);
         symbolTable.enterScope();
         visitChildrenDiscardReturn(block);
         symbolTable.leaveScope();
@@ -139,6 +179,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(MethodNode method) {
+        captureScope(method);
         SymbolTable oldSymbolTable = symbolTable;
         symbolTable = new SymbolTable();
         symbolTable.enterScope();
@@ -163,6 +204,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(ParameterNode parameter) {
+        captureScope(parameter);
         if (symbolTable.isDirectlyInCurrentScope(parameter.name)) {
             throw new MJError(String.format("A parameter with the name %s already is already defined for the method", parameter.name));
         }
@@ -174,6 +216,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(MethodInvocationNode methodInvocation) {
+        captureScope(methodInvocation);
         if (!program.hasMethod(methodInvocation.method)){
             throw new MJError(String.format("%s: No such method %s", methodInvocation, methodInvocation.method));
         }
@@ -185,20 +228,22 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         }
         methodInvocation.globalDefs = methodInvocation.globals.globalVarSSAVars.entrySet().stream()
                 .collect(Collectors.toMap(e -> symbolTable.lookup(e.getKey()), e -> p(symbolTable.lookup(e.getValue().first),
-                    symbolTable.lookup(e.getValue().second))));
+                        symbolTable.lookup(e.getValue().second))));
         return null;
     }
 
     @Override
     public Object visit(WhileStatementNode whileStatement) {
+        captureScope(whileStatement);
         whileStatement.getPreCondVarAss().forEach(this::visit);
         whileStatement.conditionalExpression.accept(this);
-        visitChildrenDiscardReturn(whileStatement.body);
+        visit(whileStatement.body);
         return null;
     }
 
     @Override
     public Object visit(IfStatementNode ifStatement) {
+        captureScope(ifStatement);
         ifStatement.conditionalExpression.accept(this);
         ifStatement.ifBlock.accept(this);
         ifStatement.elseBlock.accept(this);
@@ -207,6 +252,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
     @Override
     public Object visit(PhiNode phi) {
+        captureScope(phi);
         phi.controlDeps.forEach(e -> e.accept(this));
         phi.joinedVariables.forEach(e -> e.accept(this));
         visit((ExpressionNode)phi);

@@ -2,16 +2,15 @@ package nildumu;
 
 import nildumu.solver.LeakageAlgorithm;
 import nildumu.solver.OpenWBOSolver;
-import nildumu.solver.RC2Solver;
+import nildumu.util.DefaultMap;
 import org.jgrapht.alg.flow.PushRelabelMFImpl;
-import org.jgrapht.graph.*;
+import org.jgrapht.graph.DefaultWeightedEdge;
+import org.jgrapht.graph.SimpleDirectedWeightedGraph;
+import swp.util.Pair;
 
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import nildumu.util.*;
-import swp.util.Pair;
 
 import static nildumu.Context.INFTY;
 import static nildumu.Lattices.*;
@@ -24,17 +23,17 @@ import static nildumu.Lattices.*;
  */
 public class MinCut {
 
-    public static Algo usedAlgo = Algo.GRAPHT_PP;
+    public static Algo usedAlgo = Algo.OPENWBO;
 
     public enum Algo {
         GRAPHT_PP("JGraphT Preflow-Push", false),
         //RC2("RC2 PMSAT solver", true),
-        OPENWBO("Open-WBO PMSAT solver", true);
+        OPENWBO("Open-WBO PMSAT", true);
 
         public final String description;
         public final boolean supportsIntervals;
 
-        Algo(String description, boolean supportsIntervals){
+        Algo(String description, boolean supportsIntervals) {
             this.description = description;
             this.supportsIntervals = supportsIntervals;
         }
@@ -192,9 +191,10 @@ public class MinCut {
             /*case RC2:
                 return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new RC2Solver<>(false)).compute();*/
             case OPENWBO:
-                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new OpenWBOSolver<>(false)).compute();
+                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new OpenWBOSolver<>(false), sourcesAndSinks.context.inIntervalMode()).compute();
+            default:
+                throw new NildumuError("Unknown algo");
         }
-        return null;
     }
 
     public static ComputationResult compute(Context context, Sec<?> sec, Algo algo){

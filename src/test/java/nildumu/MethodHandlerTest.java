@@ -1,5 +1,6 @@
 package nildumu;
 
+import nildumu.mih.MethodInvocationHandler;
 import org.junit.jupiter.api.Test;
 
 public class MethodHandlerTest {

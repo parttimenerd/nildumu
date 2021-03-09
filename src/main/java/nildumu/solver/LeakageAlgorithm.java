@@ -4,11 +4,7 @@ import nildumu.Context;
 import nildumu.Lattices;
 import nildumu.MinCut;
 import nildumu.intervals.Interval;
-import nildumu.util.Util;
-import swp.Config;
 
-import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -70,11 +66,15 @@ public class LeakageAlgorithm extends MinCut.Algorithm {
 
     private final Supplier<Solver<Variable>> solverSupplier;
 
+    private final boolean inIntervalMode;
+
     public LeakageAlgorithm(Context.SourcesAndSinks sourcesAndSinks,
                             Function<Lattices.Bit, Double> weights,
-                            Supplier<Solver<Variable>> solverSupplier) {
+                            Supplier<Solver<Variable>> solverSupplier,
+                            boolean inIntervalMode) {
         super(sourcesAndSinks, weights);
         this.solverSupplier = solverSupplier;
+        this.inIntervalMode = inIntervalMode;
     }
 
     @Override
@@ -102,9 +102,9 @@ public class LeakageAlgorithm extends MinCut.Algorithm {
                         return;
                     }
                 //}
-                if (b.value() != null && b.value().hasInterval()){
+                if (b.value() != null && b.value().hasInterval() && inIntervalMode) {
                     Interval interval = b.value().getInterval();
-                    if (!interToVar.containsKey(interval)){
+                    if (!interToVar.containsKey(interval)) {
                         Lattices.Bit x = bl.forceCreateXBit();
                         x.value(new Lattices.Value().description(interval.toString())).valueIndex(1);
                         Variable var = v(x, Type.IS_INTERVAL);

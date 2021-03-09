@@ -145,7 +145,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     @Override
     public VisRet visit(VariableAssignmentNode assignment) {
         if (assignment.expression instanceof VariableAccessNode){
-            VariableAccessNode variableAccess = (VariableAccessNode)assignment.expression;
+            VariableAccessNode variableAccess = (VariableAccessNode) assignment.expression;
             assignment.expression = new VariableAccessNode(assignment.expression.location, resolve(variableAccess.ident));
         } else {
             assignment.expression.accept(this);
@@ -156,14 +156,23 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     @Override
+    public VisRet visit(MultipleVariableAssignmentNode assignment) {
+        assignment.expression.accept(this);
+        return new VisRet(true,
+                new MultipleVariableAssignmentNode(assignment.location,
+                        assignment.variables.stream().map(this::create).toArray(String[]::new),
+                        assignment.expression));
+    }
+
+    @Override
     public VisRet visit(BlockNode block) {
         return visit(block, false);
     }
 
     public VisRet visit(BlockNode block, boolean assignGlobalVariables) {
         List<StatementNode> blockPartNodes = new ArrayList<>();
-        for (StatementNode child : block.statementNodes){
-            if (child instanceof BlockNode){
+        for (StatementNode child : block.statementNodes) {
+            if (child instanceof BlockNode) {
                 pushNewVariablesScope();
             }
             VisRet ret = child.accept(this);

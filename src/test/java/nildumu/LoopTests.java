@@ -1,10 +1,13 @@
 package nildumu;
 
+import nildumu.mih.MethodInvocationHandler;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static java.time.Duration.ofMillis;
 import static nildumu.Processor.process;
@@ -34,14 +37,15 @@ public class LoopTests {
      * </code>
      */
     @Test
-    public void testBasicLoop(){
-        parse("h input int h = 0b0u;\n" +
+    public void testBasicLoop() {
+        String program = "h input int h = 0b0u;\n" +
                 "int x = 0;\n" +
                 "while (h == 0){\n" +
                 "\tx = x + 1;\n" +
                 "}\n" +
-                "l output int o = x;")
-                .leaks(1).run();
+                "l output int o = x;";
+        parse(program, true).leaks(1).run();
+        parse(program).leaks(1).run();
     }
 
     /**
@@ -55,13 +59,15 @@ public class LoopTests {
      * </code>
      */
     @Test
-    public void testBasicLoop_condensed(){
-        parse("h input int h = 0b0u;\n" +
+    public void testBasicLoop_condensed() {
+        String program = "h input int h = 0b0u;\n" +
                 "int x = 0;\n" +
                 "while (h == 0){\n" +
                 "\tx = x | 0b11;\n" +
                 "}\n" +
-                "l output int o = x;")
+                "l output int o = x;";
+        parse(program, true).bit("o[1]", "u").leaks(1).run();
+        parse(program)
                 //.bit("x3[2]", "u")
                 //.bit("x2[1]", "u")
                 .bit("o[1]", "u")
@@ -79,21 +85,25 @@ public class LoopTests {
     }
 
     @Test
-    public void testBasicLoop3(){
-        parse("h input int h = 0bu;\n" +
+    public void testBasicLoop3() {
+        String program = "h input int h = 0bu;\n" +
                 "while (h){\n" +
                 "\th = h;\n" +
                 "}\n" +
-                "l output int o = h").leaks(1).val("o", "0bu").run();
+                "l output int o = h";
+        parse(program, true).leaks(1).val("o", "0bu").run();
+        parse(program).leaks(1).val("o", "0bu").run();
     }
 
     @Test
-    public void testBasicLoop3_condensed(){
-        parse("h input int h = 0bu;\n" +
+    public void testBasicLoop3_condensed() {
+        String program = "h input int h = 0bu;\n" +
                 "while (h){\n" +
                 "\th = 1;\n" +
                 "}\n" +
-                "l output int o = h").leaks(1).run();
+                "l output int o = h";
+        parse(program, true).leaks(1).run();
+        parse(program).leaks(1).run();
     }
 
     /**
@@ -146,16 +156,19 @@ public class LoopTests {
      * </code>
      */
     @Test
-    public void testBasicLoop4_condensed(){
+    public void testBasicLoop4_condensed() {
         Lattices.Bit.toStringGivesBitNo = true;
-        assertTimeoutPreemptively(ofMillis(1000000), () ->
-                parse("bit_width 2;\n" +
-                "h input int h = 0b0u;\n" +
-                "l input int l = 0bu;\n" +
-                "while (l){\n" +
-                "  h = [2](h[2] | h[1]);\n" +
-                "}\n" +
-                "l output int o = h;").leaks(1).run());
+        assertTimeoutPreemptively(ofMillis(1000000), () -> {
+            String program = "bit_width 2;\n" +
+                    "h input int h = 0b0u;\n" +
+                    "l input int l = 0bu;\n" +
+                    "while (l){\n" +
+                    "  h = [2](h[2] | h[1]);\n" +
+                    "}\n" +
+                    "l output int o = h;";
+            parse(program, true).leaks(1).run();
+            parse(program).leaks(1).run();
+        });
     }
 
     /**
@@ -171,15 +184,18 @@ public class LoopTests {
      */
     @ParameterizedTest
     @ValueSource(ints = {1, 2, 10})
-    public void testBasicLoop4_condensed2(int secretSize){
-        assertTimeoutPreemptively(ofMillis(1000000), () ->
-                parse(String.format("bit_width %d;\n", secretSize) +
-                        String.format("h input int h = 0b%s;\n", iter("u", secretSize)) +
-                        "l input int l = 0bu;\n" +
-                        "while (l){\n" +
-                        "  h = [2](h[2] | h[1]);\n" +
-                        "}\n" +
-                        "l output int o = h;").leaks(secretSize).run());
+    public void testBasicLoop4_condensed2(int secretSize) {
+        assertTimeoutPreemptively(ofMillis(1000000), () -> {
+            String program = String.format("bit_width %d;\n", secretSize) +
+                    String.format("h input int h = 0b%s;\n", iter("u", secretSize)) +
+                    "l input int l = 0bu;\n" +
+                    "while (l){\n" +
+                    "  h = [2](h[2] | h[1]);\n" +
+                    "}\n" +
+                    "l output int o = h;";
+            parse(program, true).leaks(secretSize).run();
+            parse(program).leaks(secretSize).run();
+        });
     }
 
     /**
@@ -197,16 +213,19 @@ public class LoopTests {
      */
     @Test
     public void testBasicLoopNested() {
-        assertTimeoutPreemptively(ofMillis(1000000), () ->
-                parse("     bit_width 2;\n" +
-                        "     h input int h = 0b0u;\n" +
-                        "     l input int l = 0bu;\n" +
-                        "     while (l){\n" +
-                        "        while (l){\n" +
-                        "            h = [2](h[2] | h[1]);\n" +
-                        "        }\n" +
-                        "     }\n" +
-                        "     l output int o = h;").leaks(1).run());
+        assertTimeoutPreemptively(ofMillis(1000000), () -> {
+            String program = "     bit_width 2;\n" +
+                    "     h input int h = 0b0u;\n" +
+                    "     l input int l = 0bu;\n" +
+                    "     while (l){\n" +
+                    "        while (l){\n" +
+                    "            h = [2](h[2] | h[1]);\n" +
+                    "        }\n" +
+                    "     }\n" +
+                    "     l output int o = h;";
+            parse(program, true).leaks(1).run();
+            parse(program).leaks(1).run();
+        });
     }
 
     /*@Test
@@ -221,32 +240,36 @@ public class LoopTests {
     }*/
 
     @Test
-    public void testElectronicPurseCondensed(){
-        parse("h input int h = 0buu;\n" +
+    public void testElectronicPurseCondensed() {
+        String program = "h input int h = 0buu;\n" +
                 "int z = 0;\n" +
                 "while (h != 1){\n" +
                 "    h = h + 1;\n" +
                 "    z = z + 1;\n" +
                 "}\n" +
-                "l output int o = z;").leaks(2).run();
+                "l output int o = z;";
+        parse(program, true).leaks(2).run();
+        parse(program).leaks(2).run();
     }
 
     @Test
-    public void testElectronicPurseCondensed2(){
+    public void testElectronicPurseCondensed2() {
         Context.LOG.setLevel(Level.FINE);
-        parse("h input int h = 0buuu;\n" +
+        String program = "h input int h = 0buuu;\n" +
                 "int z = 0;\n" +
                 "while (h != 0){\n" +
                 "    h = h - 1;\n" +
                 "    z = h;\n" +
                 "}\n" +
-                "l output int o = z;").leaks(3).run();
+                "l output int o = z;";
+        parse(program, true).leaks(3).run();
+        parse(program).leaks(3).run();
         Context.LOG.setLevel(Level.INFO);
     }
 
-    //@Test
-    public void testBinarySearch(){
-        parse("h input int I = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
+    @Test
+    public void testBinarySearch() {
+        String program = "h input int I = 0bu{32};\n" +
                 "\n" +
                 "int BITS = 16;\n" +
                 "\n" +
@@ -256,21 +279,80 @@ public class LoopTests {
                 "int i = 0;\n" +
                 "\n" +
                 "while (i < BITS){\n" +
-                "    m = 1<<(31-i);\n" +
+                "    m = 1<<(30-i);\n" +
                 "    if (O + m <= I) {\n" +
                 "        O = O + m;\n" +
                 "    }\n" +
                 "    i = i + 1;\n" +
                 "}\n" +
-                "l output int o = O;").leaks(32).run();
+                "l output int o = O;";
+        parse(program, true).leaks(32).run(); // over approximate
+        parse(program, true, 10).leaks(32).run(); // over approximate
+        parse(program, true, 40).leaks(16).run(); // enough unroll
     }
 
-    //@Test
-    public void testBinarySearch_condensed(){
-        Context.LOG.setLevel(Level.FINE);
-        parse("h input int I = 0buuuuuuu;\n" +
+    @Test
+    @Disabled("just the plain old loop mode")
+    public void testBinarySearchWithBasicLoopMode() {
+        String program = "h input int I = 0bu{5};\n" +
+                "int O = 0;\n" +
+                "while (O != I){\n" +
+                "    if (O != I) {\n" +
+                "        O = O + 1;\n" +
+                "    }\n" +
+                "}\n" +
+                "l output int o = O;";
+        parse(program).val("o", "0bu{5}").leaks(5).run();
+    }
+
+    @Test
+    public void testBinarySearch_condensedABitLarger2() {
+        String program = "h input int I = 0bu{4};\n" +
+                "int BITS = 2;\n" +
+                "int O = 0;\n" +
+                "int m = 0;\n" +
+                "int i = 0;\n" +
+                "while (i < 2){\n" +
+                "    m = 1<<(2-i);\n" +
+                "    if (O + m <= I) {\n" +
+                "        O = O + m;\n" +
+                "    }\n" +
+                "    i = i + 1;\n" +
+                "}\n" +
+                "l output int o = O;";
+        parse(program, true).leaks(2).run();
+        parse(program).leaks(2).run();
+    }
+
+    @Test
+    public void testBinarySearch_condensedWithoutLoop() {
+        String program = "h input int I = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
+                "int O = 0;\n" +
                 "\n" +
-                "int BITS = 3;\n" +
+                "int m = 0;\n" +
+                "int i = 0;\n" +
+                "\n" +
+                "    m = 1<<(30-i);\n" +
+                "    if (O + m <= I) {\n" +
+                "        O = O + m;\n" +
+                "    }\n" +
+                "    i = i + 1;\n" +
+                "l output int o = O;";
+        parse(program, true).leaks(1).run();
+        parse(program).leaks(1).run();
+    }
+
+    /**
+     * Should leak unrolls - 1 bits of information if unrolls < inlining (here 10) else 32
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3, 20, 100})
+    public void testBinarySearch_condensed(int unrolls) {
+        final int inlining = 10;
+        parse("  bit_width 32; " +
+                "h input int I = 0bu{32};\n" +
+                "\n" +
+                "int BITS = " + unrolls + ";\n" +
                 "\n" +
                 "int O = 0;\n" +
                 "\n" +
@@ -284,12 +366,60 @@ public class LoopTests {
                 "    }\n" +
                 "    i = i + 1;\n" +
                 "}\n" +
-                "l output int o = O;").leaks(32).run();
+                "l output int o = O;", true, inlining).leaks(unrolls + 1 > inlining ? 32 : unrolls - 1).run();
+    }
+
+    @Test
+    public void testBinarySearch_condensed2() {
+        String program = "bit_width 3; " +
+                "int o = 0;\n" +
+                "int m = 0;\n" +
+                "int i = 0;\n" +
+                "\n" +
+                "while (i != 1){\n" +
+                "    m = i;\n" +
+                "       o = o + m;\n" +
+                "    i = i + 1;\n" +
+                "}\nint x = i;";
+        parse(program, true).val("x", 1).run();
+        parse(program).val("x", "0buuu").run();
         Context.LOG.setLevel(Level.INFO);
     }
 
-    ContextMatcher parse(String program){
-        System.out.println(" ##SSA " + Parser.process(program).toPrettyString());
-        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse("summary"), false));
+    ContextMatcher parse(String program) {
+        return parse(program, false);
+    }
+
+    ContextMatcher parse(String program, boolean transformLoops) {
+        return parse(program, transformLoops, "handler=inlining;maxrec=5;bot=summary");
+    }
+
+    ContextMatcher parse(String program, boolean transformLoops, int inlining) {
+        return parse(program, transformLoops, String.format("handler=inlining;maxrec=%d;bot=summary", inlining));
+    }
+
+    ContextMatcher parse(String program, boolean transformLoops, String mih) {
+        Logger.getGlobal().setLevel(Level.WARNING);
+        //System.out.println(" ##SSA " + Parser.process(program, false, transformLoops).toPrettyString());
+        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih), false, transformLoops));
+    }
+
+
+    @Test
+    public void testTransformedLoop() {
+        parse("use_sec basic;\n" +
+                "bit_width 4;\n" +
+                "int i = 0;\n" +
+                "while (i != 1){ i = i + 1; }\n" +
+                "int x = i;", true).val("x", "1").run();
+    }
+
+    @Test
+    public void testTransformedLoop2() {
+        parse("use_sec basic;\n" +
+                "bit_width 4;\n" +
+                "int i = 0;\n" +
+                "while (i < 1){ i = i + 1; }\n" +
+                "int x = i;", true).val("x", "1").run();
     }
 }

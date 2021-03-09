@@ -114,6 +114,11 @@
             <version>5.7.1</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>1.0</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -163,6 +168,24 @@
 
         <plugins>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>ideauidesigner-maven-plugin</artifactId>
+                <version>1.0-beta-1</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>javac2</goal>
+                        </goals>
+                    </execution>
+                </executions>
+
+                <configuration>
+                    <fork>true</fork>
+                    <debug>true</debug>
+                    <failOnError>true</failOnError>
+                </configuration>
+            </plugin>
+            <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>2.3.2</version>
                 <executions>
@@ -196,7 +219,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-clean-plugin</artifactId>
-                <version>2.4.1</version>
+                <version>2.5</version>
                 <executions>
                     <execution>
                         <id>default-clean</id>
@@ -229,7 +252,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>2.3.2</version>
+                <version>2.4</version>
                 <executions>
                     <execution>
                         <id>default-jar</id>
@@ -277,7 +300,7 @@
 
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.19.1</version>
+                <version>3.0.0-M5</version>
                 <executions>
                     <execution>
                         <id>default-test</id>
@@ -287,12 +310,7 @@
                         </goals>
                     </execution>
                 </executions>
-                <configuration>
-                    <excludes>
-                        <exclude/>
-                    </excludes>
-                </configuration>
-                <dependencies>
+                <!--<dependencies>
                     <dependency>
                         <groupId>org.junit.platform</groupId>
                         <artifactId>junit-platform-surefire-provider</artifactId>
@@ -303,7 +321,7 @@
                         <artifactId>junit-jupiter-engine</artifactId>
                         <version>5.7.1</version>
                     </dependency>
-                </dependencies>
+                </dependencies>-->
             </plugin>
             <plugin>
                 <artifactId>maven-install-plugin</artifactId>
@@ -333,7 +351,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-site-plugin</artifactId>
-                <version>3.0</version>
+                <version>3.5.1</version>
                 <executions>
                     <execution>
                         <id>default-site</id>

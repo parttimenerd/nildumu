@@ -1,27 +1,38 @@
 package nildumu.ui;
 
-import com.intellij.uiDesigner.core.*;
-
-import org.fife.ui.autocomplete.*;
-import org.fife.ui.rsyntaxtextarea.*;
-import org.fife.ui.rtextarea.RTextScrollPane;
-
-import java.awt.*;
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
-import java.util.List;
-import java.util.logging.Level;
-import java.util.stream.*;
-
-import javax.swing.*;
-import javax.swing.event.*;
-import javax.swing.table.*;
-import javax.swing.text.BadLocationException;
-
+import com.formdev.flatlaf.FlatLightLaf;
+import com.intellij.uiDesigner.core.GridConstraints;
+import com.intellij.uiDesigner.core.GridLayoutManager;
 import nildumu.*;
+import nildumu.mih.MethodInvocationHandler;
+import org.fife.ui.autocomplete.*;
+import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
+import org.fife.ui.rsyntaxtextarea.SquiggleUnderlineHighlightPainter;
+import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
+import org.fife.ui.rtextarea.RTextScrollPane;
 import swp.LocatedSWPException;
 import swp.lexer.Location;
+
+import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.JTableHeader;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
+import javax.swing.text.BadLocationException;
+import java.awt.*;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static nildumu.Lattices.*;
 import static nildumu.util.Util.p;
@@ -47,11 +58,12 @@ public class BasicUI {
         rootPanel.setLayout(new GridLayoutManager(2, 1, new Insets(0, 0, 0, 0), -1, -1));
         final JSplitPane splitPane1 = new JSplitPane();
         splitPane1.setContinuousLayout(false);
-        splitPane1.setDividerLocation(613);
+        splitPane1.setDividerLocation(700);
         splitPane1.setOneTouchExpandable(true);
         rootPanel.add(splitPane1, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(200, 200), null, 0, false));
         final JSplitPane splitPane2 = new JSplitPane();
         splitPane2.setContinuousLayout(true);
+        splitPane2.setDividerLocation(375);
         splitPane2.setOrientation(0);
         splitPane1.setLeftComponent(splitPane2);
         final JTabbedPane tabbedPane1 = new JTabbedPane();
@@ -70,6 +82,14 @@ public class BasicUI {
         ssaArea.setEditable(false);
         ssaArea.setText("");
         rTextScrollPane1.setViewportView(ssaArea);
+        final RTextScrollPane rTextScrollPane2 = new RTextScrollPane();
+        tabbedPane1.addTab("Without loops", rTextScrollPane2);
+        withoutLoopsArea = new RSyntaxTextArea();
+        withoutLoopsArea.setAnimateBracketMatching(false);
+        withoutLoopsArea.setCodeFoldingEnabled(true);
+        withoutLoopsArea.setEditable(false);
+        withoutLoopsArea.setText("");
+        rTextScrollPane2.setViewportView(withoutLoopsArea);
         final JPanel panel2 = new JPanel();
         panel2.setLayout(new GridLayoutManager(1, 1, new Insets(0, 0, 0, 0), -1, -1));
         tabbedPane1.addTab("Output", panel2);
@@ -109,13 +129,14 @@ public class BasicUI {
         inputArea.setCodeFoldingEnabled(true);
         inputArea.setPaintMarkOccurrencesBorder(true);
         inputArea.setPaintMatchedBracketPair(true);
+        inputArea.setText("");
         inputScrollArea.setViewportView(inputArea);
         final JPanel panel5 = new JPanel();
         panel5.setLayout(new GridLayoutManager(1, 9, new Insets(0, 0, 0, 0), -1, -1));
         panel3.add(panel5, new GridConstraints(0, 0, 1, 9, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         storeSelectComboBox = new JComboBox();
         storeSelectComboBox.setEditable(true);
-        Font storeSelectComboBoxFont = this.$$$getFont$$$(null, -1, -1, storeSelectComboBox.getFont(), 1);
+        Font storeSelectComboBoxFont = this.$$$getFont$$$(null, -1, -1, storeSelectComboBox.getFont());
         if (storeSelectComboBoxFont != null) storeSelectComboBox.setFont(storeSelectComboBoxFont);
         final DefaultComboBoxModel defaultComboBoxModel1 = new DefaultComboBoxModel();
         storeSelectComboBox.setModel(defaultComboBoxModel1);
@@ -128,21 +149,21 @@ public class BasicUI {
         panel6.setLayout(new BorderLayout(0, 0));
         panel3.add(panel6, new GridConstraints(2, 0, 1, 9, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final JPanel panel7 = new JPanel();
-        panel7.setLayout(new GridLayoutManager(1, 6, new Insets(0, 0, 0, 0), -1, -1));
+        panel7.setLayout(new GridLayoutManager(1, 7, new Insets(0, 0, 0, 0), -1, -1));
         panel6.add(panel7, BorderLayout.NORTH);
         runButton = new JButton();
         runButton.setText("\uD83E\uDC92");
         runButton.setToolTipText("Request processing of the program");
-        panel7.add(runButton, new GridConstraints(0, 2, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(10, -1), null, 0, false));
+        panel7.add(runButton, new GridConstraints(0, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(10, -1), null, 0, false));
         stopButton = new JButton();
-        stopButton.setText("\u23F9");
-        panel7.add(stopButton, new GridConstraints(0, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, 1, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(10, -1), null, 0, false));
+        stopButton.setText("⏹");
+        panel7.add(stopButton, new GridConstraints(0, 4, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, 1, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(10, -1), null, 0, false));
         modeComboBox = new JComboBox();
-        panel7.add(modeComboBox, new GridConstraints(0, 5, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel7.add(modeComboBox, new GridConstraints(0, 6, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         autoRunCheckBox = new JCheckBox();
-        autoRunCheckBox.setText("\u2B94");
+        autoRunCheckBox.setText("⮔");
         autoRunCheckBox.setToolTipText("Auto run the processing of the program");
-        panel7.add(autoRunCheckBox, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel7.add(autoRunCheckBox, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         transformPlusCheckBox = new JCheckBox();
         transformPlusCheckBox.setText("+ → |");
         transformPlusCheckBox.setMnemonic('|');
@@ -150,7 +171,11 @@ public class BasicUI {
         panel7.add(transformPlusCheckBox, new GridConstraints(0, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final JLabel label1 = new JLabel();
         label1.setText("Mode");
-        panel7.add(label1, new GridConstraints(0, 4, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel7.add(label1, new GridConstraints(0, 5, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        transformLoopsCheckBox = new JCheckBox();
+        transformLoopsCheckBox.setEnabled(false);
+        transformLoopsCheckBox.setText("loop → recursion");
+        panel7.add(transformLoopsCheckBox, new GridConstraints(0, 2, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final JPanel panel8 = new JPanel();
         panel8.setLayout(new GridLayoutManager(2, 1, new Insets(0, 0, 0, 0), -1, -1));
         panel6.add(panel8, BorderLayout.CENTER);
@@ -191,7 +216,7 @@ public class BasicUI {
         final JPanel panel10 = new JPanel();
         panel10.setLayout(new BorderLayout(0, 0));
         splitPane1.setRightComponent(panel10);
-        panel10.add(dotPanel.rootPanel, BorderLayout.CENTER);
+        panel10.add(dotPanel.$$$getRootComponent$$$(), BorderLayout.CENTER);
         parserErrorLabel = new JLabel();
         parserErrorLabel.setText("Label");
         rootPanel.add(parserErrorLabel, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
@@ -200,7 +225,7 @@ public class BasicUI {
     /**
      * @noinspection ALL
      */
-    private Font $$$getFont$$$(String fontName, int style, int size, Font currentFont, int bla) {
+    private Font $$$getFont$$$(String fontName, int style, int size, Font currentFont) {
         if (currentFont == null) return null;
         String resultName;
         if (fontName == null) {
@@ -255,6 +280,8 @@ public class BasicUI {
     private JComboBox fontSizeMultiplierComboBox;
     private JLabel bitWidthLabel;
     private DotPanel dotPanel;
+    private JCheckBox transformLoopsCheckBox;
+    private RSyntaxTextArea withoutLoopsArea;
     private JButton launchDotsButton;
     private Context context = null;
     private DocumentListener documentListener;
@@ -313,6 +340,8 @@ public class BasicUI {
         inputScrollArea.setFoldIndicatorEnabled(true);
         ssaArea.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVA);
         ssaArea.setMarkOccurrences(true);
+        withoutLoopsArea.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVA);
+        withoutLoopsArea.setMarkOccurrences(true);
         CompletionProvider provider = createCompletionProvider();
         AutoCompletion ac = new AutoCompletion(provider);
         ac.install(inputArea);
@@ -323,6 +352,11 @@ public class BasicUI {
         transformPlusCheckBox.addActionListener(e -> {
             processRefreshTimer.request();
             setVarContent("lastTransformPlus", transformPlusCheckBox.isSelected() + "");
+        });
+        transformLoopsCheckBox.setSelected(getVarContent("lastTransformLoops", "true").equals("true"));
+        transformLoopsCheckBox.addActionListener(e -> {
+            processRefreshTimer.request();
+            setVarContent("lastTransformLoops", transformLoopsCheckBox.isSelected() + "");
         });
         for (Context.Mode mode : Context.Mode.values()) {
             modeComboBox.addItem(mode);
@@ -463,12 +497,12 @@ public class BasicUI {
             DotRegistry.get().disable();
         }
         try {
-            Parser.ProgramNode programNode = Parser.process(program, transformPlusCheckBox.isSelected());
-            ssaArea.setText(programNode.toPrettyString());
-            bitWidthLabel.setText(programNode.context.maxBitWidth + "");
+            Parser.ProgramNode programNode = process(program);
+            setMiscInfo(program, programNode);
             Context.Mode mode = (Context.Mode) modeComboBox.getSelectedItem();
             long time = System.currentTimeMillis();
-            Context c = Processor.process(program, mode, MethodInvocationHandler.parse(methodHandlerSelectionComboxBox.getSelectedItem().toString()), transformPlusCheckBox.isSelected());
+            Context c = Processor.process(program, mode, MethodInvocationHandler.parse(methodHandlerSelectionComboxBox.getSelectedItem().toString()),
+                    transformPlusCheckBox.isSelected(), transformLoopsCheckBox.isSelected());
             if (context == null || c.sl != context.sl) {
                 context = c;
             }
@@ -542,6 +576,10 @@ public class BasicUI {
         }
     }
 
+    Parser.ProgramNode process(String program) {
+        return Parser.process(program, transformPlusCheckBox.isSelected(), transformLoopsCheckBox.isSelected());
+    }
+
     void parse() {
         parserErrorLabel.setText("");
         String program = inputArea.getText();
@@ -557,9 +595,8 @@ public class BasicUI {
             inputArea.getHighlighter().removeHighlight(nodeSelectHighlightTag);
         }
         try {
-            Parser.ProgramNode programNode = Parser.process(program, transformPlusCheckBox.isSelected());
-            ssaArea.setText(programNode.toPrettyString());
-            bitWidthLabel.setText(programNode.context.maxBitWidth + "");
+            Parser.ProgramNode programNode = process(program);
+            setMiscInfo(program, programNode);
         } catch (LocatedSWPException e) {
             parserErrorLabel.setText(e.getMessage());
             Location errorLocation = e.errorToken.location;
@@ -581,6 +618,17 @@ public class BasicUI {
             parserErrorLabel.setText(e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private void setMiscInfo(String program, Parser.ProgramNode programNode) {
+        ssaArea.setText(programNode.toPrettyString());
+        try {
+            Parser.ProgramNode p = (Parser.ProgramNode) Parser.generator.parse(program);
+            LoopTransformer.process(p);
+            withoutLoopsArea.setText(p.toPrettyString());
+        } catch (Exception ex) {
+        }
+        bitWidthLabel.setText(programNode.context.maxBitWidth + "");
     }
 
     private static class SecWrapper {
@@ -611,7 +659,7 @@ public class BasicUI {
 
     private void updateLeakageTable(Context context) {
         List<Sec<?>> secLevels = new ArrayList<>((Set<Sec<?>>) context.sl.elements());
-        Map<Sec<?>, MinCut.ComputationResult> compRes = context.computeLeakage((MinCut.Algo)minCutAlgoComboBox.getSelectedItem());
+        Map<Sec<?>, MinCut.ComputationResult> compRes = context.computeLeakage((MinCut.Algo) minCutAlgoComboBox.getSelectedItem());
         leakageTable.setTableHeader(new JTableHeader());
         leakageTable.setModel(new AbstractTableModel() {
 
@@ -856,6 +904,7 @@ public class BasicUI {
     }
 
     public static void main(String[] args) {
+        FlatLightLaf.install();
         JFrame frame = new JFrame();
         BasicUI ui = new BasicUI();
         frame.getContentPane().add(ui.rootPanel);
@@ -863,7 +912,6 @@ public class BasicUI {
         frame.setSize(1500, 800);
         frame.setVisible(true);
         //ui.setProgram("h input int l = 0b0u; l output int o = l;");
-        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         while (frame.isVisible()) {
             try {
                 Thread.sleep(100);

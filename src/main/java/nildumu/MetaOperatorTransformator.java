@@ -1,11 +1,12 @@
 package nildumu;
 
-import java.util.*;
-import java.util.function.*;
-import java.util.stream.Collectors;
-
 import nildumu.util.DefaultMap;
 import swp.util.Pair;
+
+import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static nildumu.Lattices.vl;
 import static nildumu.Parser.*;
@@ -325,7 +326,8 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     @Override
     public MJNode visit(ReturnStatementNode returnStatement){
         if (returnStatement.hasReturnExpression()){
-            return new ReturnStatementNode(replace(returnStatement.expression));
+            return new ReturnStatementNode(returnStatement.location, returnStatement.expressions.stream()
+                    .map(this::replace).collect(Collectors.toList()));
         }
         return new ReturnStatementNode(returnStatement.location);
     }

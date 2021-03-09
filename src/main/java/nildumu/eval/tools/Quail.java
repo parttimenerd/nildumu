@@ -1,13 +1,18 @@
 package nildumu.eval.tools;
 
-import java.io.IOException;
-import java.nio.file.*;
-import java.time.Duration;
-import java.util.*;
-import java.util.stream.*;
-
 import nildumu.Parser;
 import nildumu.eval.*;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Uses the Quail tool, https://project.inria.fr/quail/
@@ -171,7 +176,7 @@ public class Quail extends AbstractTool {
             public String visit(Parser.ReturnStatementNode returnStatement) {
                 assert false;
                 return String.format("return (%s)(%s);", integerTypeStr,
-                        formatExpression(returnStatement.expression));
+                        formatExpression(returnStatement.expressions.get(0)));
             }
         });
     }

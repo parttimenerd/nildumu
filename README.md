@@ -39,6 +39,7 @@ program
   using the syntax `X input int VAR_NAME = INPUT_LITERAL`
     - `INPUT_LITERAL` can be a signed integer literal or a binary literal
       (`0b…`) where bits can also be specified as `u` (statically unknown)
+        - `ɑ{n}` repeats a bit ɑ n times
     - this the only case where variability can be introduced
     - typically unknown bits of high input variables are considered the
       secret
@@ -112,7 +113,8 @@ All configurations and inputs are stored continously in the
       if-statement and doesn't take into account that conditions fixate
       specific bits in the then- and the else-branch of if-statements
    - `extended`: takes the last point into account
-   - `loop`: full support of the whole language
+   - `loop`: full support of the whole language, contains still bugs, it is advised
+     to enable the transformation of loops to recursion
 - the big combobox below
    - it allows to select and configure the method handler the handles
      the method invocations

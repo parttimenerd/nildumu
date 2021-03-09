@@ -1,16 +1,22 @@
 package nildumu;
 
-import org.junit.*;
-import org.junit.jupiter.api.*;
+import nildumu.mih.MethodInvocationHandler;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.*;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.logging.Level;
 import java.util.stream.Stream;
 
 import static java.time.Duration.ofSeconds;
-import static nildumu.Parser.*;
+import static nildumu.Parser.MethodNode;
+import static nildumu.Parser.ProgramNode;
 import static nildumu.Processor.process;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,14 +33,36 @@ public class FunctionTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "int bla(){}", "int bla1(int blub){}", "int bla1r(int blub){ return blub }" })
-    public void testFunctionDefinition(String program){
+    @ValueSource(strings = {"int bla1r(int blub){ return blub; }", "int bla(){}", "int bla1(int blub){}"})
+    public void testFunctionDefinition(String program) {
         parse(program);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"int bla(){} bla()", "int bla(int i){} bla(1)", "int bla(int i, int j){} bla(1,2)"})
-    public void testBasicFunctionCall(String program){
+    @ValueSource(strings = {"int bla1_1(int blub){ return blub, blub }",
+            "int bla1_1(int blub, int blub2){ return blub, blub, blub2 }"})
+    public void testFunctionDefinitionWithMultipleReturnValues(String program) {
+        parse(program);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'int bla1_1(int blub){ return blub, blub + 2 } int x; int y; x, y = bla1_1(1);', '1', '3'",
+            "'int bla1_1(int blub){ return blub - 2, blub - 3 } int x; int y; x, y = bla1_1(1);', '-1', '-2'",
+            "'int bla1_1(int blub){ return blub, blub } int x; int y; x, y = bla1_1(1);', '1', '1'",
+    })
+    public void testBasicFunctionCallWithMultipleReturns(String program, String valX, String valY) {
+        Context.LOG.setLevel(Level.FINE);
+        parse(program, "inlining", 20).val("x1", valX).val("y1", valY).run();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "int bla(int i){} bla(1)",
+            "int bla(){} bla()",
+            "int bla(int i, int j){} bla(1,2)"
+    })
+    public void testBasicFunctionCall(String program) {
         parse(program);
     }
 

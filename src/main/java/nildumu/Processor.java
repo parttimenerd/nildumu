@@ -1,17 +1,16 @@
 package nildumu;
 
+import nildumu.mih.MethodInvocationHandler;
+import nildumu.util.DefaultMap;
+import swp.util.Pair;
+
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import nildumu.util.DefaultMap;
-import swp.util.Pair;
-
-import static nildumu.Lattices.B.*;
 import static nildumu.Lattices.*;
-import static nildumu.Operator.EQUALS;
-import static nildumu.Operator.LESS;
-import static nildumu.Operator.UNEQUALS;
+import static nildumu.Lattices.B.*;
+import static nildumu.Operator.*;
 import static nildumu.Parser.*;
 
 public class Processor {
@@ -22,24 +21,32 @@ public class Processor {
         return process(program, Context.Mode.BASIC);
     }
 
-    public static Context process(String program, Context.Mode mode){
+    public static Context process(String program, Context.Mode mode) {
         return process(program, mode, MethodInvocationHandler.createDefault());
     }
 
-    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler){
+    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler) {
         return process(program, mode, handler, transformPlus);
     }
 
-    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, boolean transformPlus){
-        return process(Parser.process(program, transformPlus), mode, handler);
+    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, boolean transformPlus) {
+        return process(program, mode, handler, transformPlus, false);
     }
 
-    public static Context process(ProgramNode node, MethodInvocationHandler handler){
+    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, boolean transformPlus, boolean transformLoops) {
+        return process(Parser.process(program, transformPlus, transformLoops), mode, handler);
+    }
+
+    public static Context processWithTransformedLoops(String program, Context.Mode mode, MethodInvocationHandler handler) {
+        return process(program, mode, handler, true, true);
+    }
+
+    public static Context process(ProgramNode node, MethodInvocationHandler handler) {
         handler.setup(node);
         return process(node.context.forceMethodInvocationHandler(handler), node);
     }
 
-    public static Context process(ProgramNode node, Context.Mode mode, MethodInvocationHandler handler){
+    public static Context process(ProgramNode node, Context.Mode mode, MethodInvocationHandler handler) {
         node.context.mode(mode);
         handler.setup(node);
         return process(node.context.forceMethodInvocationHandler(handler), node);
@@ -112,8 +119,17 @@ public class Processor {
             }
 
             @Override
+            public Boolean visit(MultipleVariableAssignmentNode assignment) {
+                List<Value> values = context.nodeValue(assignment.expression).split(assignment.definitions.size());
+                for (int i = 0; i < values.size(); i++) {
+                    context.setVariableValue(assignment.definitions.get(i), values.get(i), assignment.expression);
+                }
+                return false;
+            }
+
+            @Override
             public Boolean visit(OutputVariableDeclarationNode outputDecl) {
-                visit((VariableAssignmentNode)outputDecl);
+                visit((VariableAssignmentNode) outputDecl);
                 context.addOutputValue(context.sl.parse(outputDecl.secLevel), context.getVariableValue(outputDecl.definition));
                 return false;
             }
@@ -297,8 +313,16 @@ public class Processor {
 
             @Override
             public Boolean visit(ReturnStatementNode returnStatement) {
-                if (returnStatement.hasReturnExpression()){
-                    context.setReturnValue(context.nodeValue(returnStatement.expression));
+                if (returnStatement.hasReturnExpression()) {
+                    if (returnStatement.expressions.size() == 1) {
+                        context.setReturnValue(context.nodeValue(returnStatement.expressions.get(0)));
+                    } else {
+                        // combine expressions
+                        Value retVal = Value.combine(returnStatement.expressions.stream()
+                                .map(context::nodeValue)
+                                .collect(Collectors.toList()));
+                        context.setReturnValue(retVal);
+                    }
                 }
                 return false;
             }

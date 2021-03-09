@@ -1,18 +1,24 @@
 package nildumu;
 
+import nildumu.intervals.Interval;
+import nildumu.mih.MethodInvocationHandler;
+import nildumu.util.DefaultMap;
+import nildumu.util.Util;
+import swp.util.Pair;
+
 import java.util.*;
-import java.util.function.*;
-import java.util.logging.*;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import nildumu.intervals.Interval;
-import nildumu.util.*;
-import swp.util.Pair;
-
 import static nildumu.Lattices.*;
 import static nildumu.Parser.*;
-import static nildumu.util.DefaultMap.ForbiddenAction.*;
+import static nildumu.util.DefaultMap.ForbiddenAction.FORBID_DELETIONS;
+import static nildumu.util.DefaultMap.ForbiddenAction.FORBID_VALUE_UPDATES;
 
 /**
  * The context contains the global state and the global functions from the thesis.
@@ -184,6 +190,7 @@ public class Context {
 
             @Override
             public void handleValueUpdate(DefaultMap<MJNode, Value> map, MJNode key, Value value) {
+                assert value.isNotEmpty();
                 if (vl.mapBits(map.get(key), value, (a, b) -> a != b).stream().anyMatch(p -> p)){
                     nodeValueUpdateCount++;
                 }
@@ -290,6 +297,11 @@ public class Context {
 
     private final DefaultMap<Bit, ModsCreator> replMap = new DefaultMap<>((map, bit) -> {
         return ((c, b, a) -> choose(b, a) == a ? new Mods(b, a) : Mods.empty());
+    });
+
+    // bit -> chosen -> not chosen
+    private final DefaultMap<Bit, DefaultMap<Bit, Bit>> alternatives = new DefaultMap<Bit, DefaultMap<Bit, Bit>>((map, bit) -> {
+        return new DefaultMap<Bit, Bit>(new HashMap<>(), DefaultMap.ForbiddenAction.FORBID_VALUE_UPDATES);
     });
 
     /*-------------------------- loop mode specific -------------------------------*/
@@ -448,6 +460,7 @@ public class Context {
     }
 
     public Value nodeValue(MJNode node, Value value){
+        assert value.isNotEmpty();
         return frame.nodeValueState.nodeValueMap.put(node, value);
     }
 
@@ -588,16 +601,17 @@ public class Context {
         }*/
         boolean somethingChanged = false;
         int i = 1;
-        for (; i <= Math.min(oldValue.size(), newValue.size()); i++){
+        for (; i <= Math.min(oldValue.size(), newValue.size()); i++) {
             somethingChanged = merge(oldValue.get(i), newValue.get(i));
         }
-        for (; i <= newValue.size(); i++){
+        for (; i <= newValue.size(); i++) {
             oldValue.add(newValue.get(i));
             somethingChanged = true;
         }
-        if (oldValue.hasInterval()){
+        if (oldValue.hasInterval() && inIntervalMode()) {
+            assert newValue.hasInterval();
             oldValue.interval.start = Math.min(oldValue.interval.start, newValue.interval.start);
-            oldValue.interval.start = Math.min(oldValue.interval.end, newValue.interval.end);
+            oldValue.interval.end = Math.min(oldValue.interval.end, newValue.interval.end);
         }
         return somethingChanged;
     }
@@ -789,14 +803,17 @@ public class Context {
         Util.Box<Boolean> replacedABit = new Util.Box<>(false);
         Value newValue = value.stream().map(b -> {
             Bit r = replace(b, branch);
-            if (r != b){
+            if (r != b) {
                 replacedABit.val = true;
             }
             return r;
         }).collect(Value.collector());
-        Interval inter = replace(value.interval, branch);
-        newValue.setInterval(inter);
-        if (replacedABit.val || inter != value.interval){
+        if (value.hasInterval()) {
+            Interval inter = replace(value.interval, branch);
+            newValue.setInterval(inter);
+            replacedABit.val = replacedABit.val || inter != value.interval;
+        }
+        if (replacedABit.val) {
             newValue.bits.forEach(b -> b.value(newValue));
             return newValue;
         }
@@ -859,21 +876,25 @@ public class Context {
         return b;
     }
 
-    public Bit notChosen(Bit a, Bit b){
-        if (choose(a, b) == b){
+    public Bit notChosen(Bit a, Bit b) {
+        if (choose(a, b) == b) {
             return a;
         }
         return b;
     }
 
+    public void registerChooseDecision(Bit resultBit, Bit chosen, Bit notChosen) {
+        alternatives.get(resultBit).put(chosen, notChosen);
+    }
+
     /* -------------------------- loop mode specific -------------------------------*/
 
-    public double weight(Bit bit){
+    public double weight(Bit bit) {
         double weight = weightMap.getOrDefault(bit, 1d);
-        if (bit.val() == bs.N){
+        if (bit.val() == bs.N) {
             weight = Math.max(Util.log2(3), weight);
         }
-        if (bit.val() == bs.S){
+        if (bit.val() == bs.S) {
             weight = INFTY;
         }
         return weight;

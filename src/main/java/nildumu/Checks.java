@@ -231,6 +231,16 @@ public class Checks {
             }
 
             @Override
+            public Object visit(MultipleVariableAssignmentNode variableAssignment) {
+                visitChildrenDiscardReturn(variableAssignment);
+                if (variableAssignment.definitions != null) {
+                    validVariables.addAll(variableAssignment.definitions);
+                }
+                validExpressions.add(variableAssignment.expression);
+                return null;
+            }
+
+            @Override
             public Object visit(MethodNode method) {
                 method.globalDefs.values().stream().forEach(p -> validVariables.add(p.first));
                 visitChildrenDiscardReturn(method);
@@ -279,6 +289,18 @@ public class Checks {
                     check(assignment.definition);
                     if (!(assignment instanceof VariableDeclarationNode)) {
                         check(assignment.expression);
+                    }
+                });
+            }
+
+            @Override
+            public ErrorPipe visit(MultipleVariableAssignmentNode assignment) {
+                return process(assignment, () -> {
+                    visitChildrenDiscardReturn(assignment);
+                    if (assignment.definitions == null) {
+                        error("Not evaluated expression %s", assignment);
+                    } else {
+                        assignment.definitions.forEach(this::check);
                     }
                 });
             }

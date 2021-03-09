@@ -1,5 +1,6 @@
 package nildumu;
 
+import nildumu.mih.BitGraph;
 import nildumu.util.Lazy;
 
 import java.util.Map;
@@ -18,16 +19,16 @@ import static nildumu.util.Lazy.l;
 @SuppressWarnings("ALL")
 public class PrintHistory {
 
-    static class HistoryEntry {
-        final Optional<HistoryEntry> prev;
-        final Map<Variable, HistoryPerGlobalEntry> map;
+    public static class HistoryEntry {
+        public final Optional<HistoryEntry> prev;
+        public final Map<Variable, HistoryPerGlobalEntry> map;
 
         HistoryEntry(Optional<HistoryEntry> prev, Map<Variable, HistoryPerGlobalEntry> map) {
             this.prev = prev;
             this.map = map;
         }
 
-        static HistoryEntry create(MethodInvocationHandler.BitGraph graph, Optional<HistoryEntry> prev){
+        public static HistoryEntry create(BitGraph graph, Optional<HistoryEntry> prev) {
             return create(graph.methodReturnValue.globals, prev, val -> val.stream()
                     .flatMap(b -> graph.calcReachableInputAndParameterBits(b).stream()).collect(Collectors.toSet()));
         }
@@ -45,7 +46,7 @@ public class PrintHistory {
 
     }
 
-    static class HistoryPerGlobalEntry {
+    public static class HistoryPerGlobalEntry {
 
         final Optional<HistoryPerGlobalEntry> prev;
         final Variable name;
@@ -73,13 +74,13 @@ public class PrintHistory {
             this.reachableBitsForDiff = l(reachabilityCalculator.apply(difference));
         }
 
-        ReduceResult<Lattices.AppendOnlyValue> reduceAppendOnly(BiConsumer<Bit, Double> weighter){
+        public ReduceResult<Lattices.AppendOnlyValue> reduceAppendOnly(BiConsumer<Bit, Double> weighter) {
             HistoryPerGlobalEntry currentHist = this;
             ReduceResult<Lattices.AppendOnlyValue> current = new ReduceResult<>(currentHist.value.clone(), false, true);
 
             if (!prev.isPresent() || prev.get().value.sizeWithoutEs() == 0 || // its the first round
-                value.sizeWithoutEs() == 0 // or the value is just empty
-                ){
+                    value.sizeWithoutEs() == 0 // or the value is just empty
+            ) {
                 return current;
             }
 
@@ -124,7 +125,7 @@ public class PrintHistory {
 
             // if the current variable is also related to input, then we know, that `s` may leak infinitely many bytes
             if (name.isAppendableInput()) {
-                s.deps().forEach(b -> weighter.accept(b, (double)Context.INFTY));
+                s.deps().forEach(b -> weighter.accept(b, (double) Context.INFTY));
             }
 
             // TODO: improve
@@ -133,27 +134,27 @@ public class PrintHistory {
         }
     }
 
-    static class ReduceResult<T> {
-        final T value;
-        final boolean addedAStarBit;
-        final boolean somethingChanged;
+    public static class ReduceResult<T> {
+        public final T value;
+        public final boolean addedAStarBit;
+        public final boolean somethingChanged;
 
-        ReduceResult(T value, boolean addedAStarBit, boolean somethingChanged) {
+        public ReduceResult(T value, boolean addedAStarBit, boolean somethingChanged) {
             this.value = value;
             this.addedAStarBit = addedAStarBit;
             this.somethingChanged = somethingChanged;
         }
 
-        ReduceResult(T value){
+        public ReduceResult(T value) {
             this(value, false, true);
         }
 
-        static ReduceResult<Map<Variable, AppendOnlyValue>> create(Map<Variable, ReduceResult<AppendOnlyValue>> val){
+        public static ReduceResult<Map<Variable, AppendOnlyValue>> create(Map<Variable, ReduceResult<AppendOnlyValue>> val) {
             return new ReduceResult<>((val.entrySet().stream().collect(Collectors.toMap(
                     Map.Entry::getKey,
                     e -> e.getValue().value
             ))), val.values().stream().map(v -> v.addedAStarBit).reduce((f, s) -> f && s).orElse(false),
-            val.values().stream().map(v -> v.somethingChanged).reduce((f, s) -> f && s).orElse(false));
+                    val.values().stream().map(v -> v.somethingChanged).reduce((f, s) -> f && s).orElse(false));
         }
 
         boolean finished(){

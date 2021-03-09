@@ -1,12 +1,15 @@
 package nildumu;
 
-import java.util.*;
-import java.util.function.BiPredicate;
-import java.util.stream.*;
-
 import nildumu.intervals.Interval;
+import nildumu.mih.MethodInvocationHandler;
 import nildumu.util.Util;
 import swp.util.Pair;
+
+import java.util.*;
+import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static nildumu.Context.v;
 import static nildumu.Lattices.*;
@@ -650,6 +653,9 @@ public interface Operator {
             if (i > 1) {
                 return ZERO;
             }
+            if (x.isConstant() && y.isConstant()) {
+                return x.singleValue() < y.singleValue() ? ONE : ZERO;
+            }
             Lattices.B val = U;
             DependencySet depBits = Stream.concat(x.stream(), y.stream()).filter(Bit::isUnknown).collect(DependencySet.collector());
             Bit a_n = x.signBit();
@@ -657,7 +663,7 @@ public interface Operator {
             B v_x_n = a_n.val();
             B v_y_n = b_n.val();
             Optional<Integer> differingNonConstantIndex = firstNonMatching(x, y, (c, d) -> x.isConstant() && c == d);
-            if (v_x_n.isConstant() && v_y_n.isConstant() && v_x_n != v_y_n) {
+            if (v_x_n.isConstant() && v_y_n.isConstant() && v_x_n != v_y_n) { // if signs differ
                 depBits = ds.empty();
                 if (v_x_n == ONE) { // x is negative
                     val = ONE;
@@ -955,7 +961,7 @@ public interface Operator {
                 }
             });
             c.getNewlyIntroducedInputs().putAll(ret.inputBits);
-            return ret.value;
+            return Value.combineOrZero(ret.values);
         }
 
         @Override
