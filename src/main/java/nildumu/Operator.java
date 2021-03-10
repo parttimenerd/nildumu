@@ -26,7 +26,10 @@ public interface Operator {
 
     static Bit wrapBit(Context c, Bit source) {
         Bit wrap = bl.create(source.val(), ds.create(source));
-        c.repl(wrap, ((con, b, a) -> con.choose(b, a) == a ? new Mods(b, a).add(c.repl(source).apply(con, source, a)) : Mods.empty()));
+        c.repl(wrap, ((con, b, a) -> {
+            Bit choose = con.choose(a, b);
+            return new Mods(con.notChosen(a, b), choose).add(c.repl(source).apply(con, source, choose));
+        }));
         return wrap;
     }
 
@@ -229,10 +232,10 @@ public interface Operator {
         }
 
         default Mods defaultOwnBitMod(Context c, Bit r, Bit a) {
-            if (r.isConstant() || c.choose(r, a) == r){
+            if (r.isConstant()) {
                 return Mods.empty();
             }
-            return new Mods(r, a);
+            return new Mods(c.notChosen(a, r), c.choose(a, r));
         }
 
         default Mods assumeUnused(Context c, Bit r, Bit a) {

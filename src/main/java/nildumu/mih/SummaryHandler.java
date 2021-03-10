@@ -98,44 +98,46 @@ public class SummaryHandler extends MethodInvocationHandler {
         MethodInvocationHandler handler = createHandler(m -> state.get(callGraph.callNode(m)).value);
         Util.Box<Integer> iteration = new Util.Box<>(0);
         Map<CallGraph.CallNode, PrintHistory.HistoryEntry> history = new HashMap<>();
-        methodGraphs = callGraph.worklist((node, s) -> {
-                    if (node.isMainNode || iteration.val > maxIterations) {
-                        return s.get(node);
+        c.withoutAlternativeRecording(con -> {
+            methodGraphs = callGraph.worklist((node, s) -> {
+                        if (node.isMainNode || iteration.val > maxIterations) {
+                            return s.get(node);
+                        }
+                        nodes.add(node);
+                        log(() -> String.format("Setup: Analyse %s", node.method.name));
+                        iteration.val += 1;
+                        BitGraph graph = methodIteration(program.context, callSites.get(node.method), handler, s.get(node).value.parameters);
+                        String name = String.format("%3d %s", iteration.val, node.method.name);
+                        if (dotFolder != null) {
+                            graph.writeDotGraph(dotFolder, name, true);
+                        }
+                        DotRegistry.get().store("summary", name,
+                                () -> () -> graph.createDotGraph("", true));
+                        BitGraph reducedGraph = reduce(c, graph);
+                        PrintHistory.HistoryEntry newHist = PrintHistory.HistoryEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty());
+                        PrintHistory.ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist, c);
+                        history.put(node, PrintHistory.HistoryEntry.create(furtherReducedGraph.value, newHist.prev));
+                        if (dotFolder != null) {
+                            graph.writeDotGraph(dotFolder, name + " [reduced]", false);
+                        }
+                        DotRegistry.get().store("summary", name + " [reduced]",
+                                () -> () -> furtherReducedGraph.value.createDotGraph("", false));
+                        return furtherReducedGraph;
+                    }, node -> {
+                        BitGraph graph = bot(program, node.method, callSites, usedMode);
+                        String name = String.format("%3d %s", iteration.val, node.method.name);
+                        if (dotFolder != null) {
+                            graph.writeDotGraph(dotFolder, name, false);
+                        }
+                        DotRegistry.get().store("summary", name,
+                                () -> () -> graph.createDotGraph("", false));
+                        return new PrintHistory.ReduceResult<>(graph);
                     }
-                    nodes.add(node);
-                    log(() -> String.format("Setup: Analyse %s", node.method.name));
-                    iteration.val += 1;
-                    BitGraph graph = methodIteration(program.context, callSites.get(node.method), handler, s.get(node).value.parameters);
-                    String name = String.format("%3d %s", iteration.val, node.method.name);
-                    if (dotFolder != null) {
-                        graph.writeDotGraph(dotFolder, name, true);
-                    }
-                    DotRegistry.get().store("summary", name,
-                            () -> () -> graph.createDotGraph("", true));
-                    BitGraph reducedGraph = reduce(c, graph);
-                    PrintHistory.HistoryEntry newHist = PrintHistory.HistoryEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty());
-                    PrintHistory.ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist, c);
-                    history.put(node, PrintHistory.HistoryEntry.create(furtherReducedGraph.value, newHist.prev));
-                    if (dotFolder != null) {
-                        graph.writeDotGraph(dotFolder, name + " [reduced]", false);
-                    }
-                    DotRegistry.get().store("summary", name + " [reduced]",
-                            () -> () -> furtherReducedGraph.value.createDotGraph("", false));
-                    return furtherReducedGraph;
-                }, node -> {
-                    BitGraph graph = bot(program, node.method, callSites, usedMode);
-                    String name = String.format("%3d %s", iteration.val, node.method.name);
-                    if (dotFolder != null) {
-                        graph.writeDotGraph(dotFolder, name, false);
-                    }
-                    DotRegistry.get().store("summary", name,
-                            () -> () -> graph.createDotGraph("", false));
-                    return new PrintHistory.ReduceResult<>(graph);
-                }
-                , node -> node.getCallers().stream().filter(n -> !n.isMainNode).collect(Collectors.toSet()),
-                state, (f, s) -> {
-                    return !s.addedAStarBit && !f.value.equals(s.value);
-                }).entrySet().stream().collect(Collectors.toMap(e -> e.getKey().method, e -> e.getValue().value));
+                    , node -> node.getCallers().stream().filter(n -> !n.isMainNode).collect(Collectors.toSet()),
+                    state, (f, s) -> {
+                        return !s.addedAStarBit && !f.value.equals(s.value);
+                    }).entrySet().stream().collect(Collectors.toMap(e -> e.getKey().method, e -> e.getValue().value));
+        });
         Context.log(() -> "Finish setup");
     }
 

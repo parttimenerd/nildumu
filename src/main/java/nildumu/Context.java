@@ -296,13 +296,15 @@ public class Context {
     /*-------------------------- extended mode specific -------------------------------*/
 
     private final DefaultMap<Bit, ModsCreator> replMap = new DefaultMap<>((map, bit) -> {
-        return ((c, b, a) -> choose(b, a) == a ? new Mods(b, a) : Mods.empty());
+        return ((c, b, a) -> new Mods(notChosen(b, a), choose(b, a)));
     });
 
-    // bit -> chosen -> not chosen
-    private final DefaultMap<Bit, DefaultMap<Bit, Bit>> alternatives = new DefaultMap<Bit, DefaultMap<Bit, Bit>>((map, bit) -> {
-        return new DefaultMap<Bit, Bit>(new HashMap<>(), DefaultMap.ForbiddenAction.FORBID_VALUE_UPDATES);
-    });
+    /**
+     * bits that state that either of its dependencies can be used for the current bit.
+     */
+    private final Set<Bit> alternativeBits = new HashSet<>();
+
+    private boolean recordAlternatives;
 
     /*-------------------------- loop mode specific -------------------------------*/
 
@@ -334,26 +336,32 @@ public class Context {
             this(Collections.emptyMap(), Collections.emptyMap());
         }
 
-        public Double getMaxInputEntropy(Sec<?> sec){
+        public Double getMaxInputEntropy(Sec<?> sec) {
             return maxInputEntropyPerSec.getOrDefault(sec, (double) INFTY);
         }
 
-        public Double getMaxOutputs(Sec<?> sec){
+        public Double getMaxOutputs(Sec<?> sec) {
             return maxOutputNumberPerSec.getOrDefault(sec, (double) INFTY);
         }
     }
 
     private final EntropyBounds entropyBounds;
 
-    public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds, State.OutputState outputState) {
+    public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds, State.OutputState outputState,
+                   boolean recordAlternatives) {
         this.sl = sl;
         this.maxBitWidth = maxBitWidth;
         this.entropyBounds = entropyBounds;
         resetFrames(outputState);
         ValueLattice.get().bitWidth = maxBitWidth;
+        this.recordAlternatives = recordAlternatives;
     }
 
-    public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds){
+    public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds, State.OutputState outputState) {
+        this(sl, maxBitWidth, entropyBounds, outputState, true);
+    }
+
+    public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds) {
         this(sl, maxBitWidth, entropyBounds, new State.OutputState());
     }
 
@@ -869,22 +877,31 @@ public class Context {
         return anchors.size();
     }
 
-    public Bit choose(Bit a, Bit b){
-        if (c1(a) <= c1(b) || a.isConstant()){
+    private Bit createChooseWrapBit(Bit chosen, Bit notChoosen) {
+        assert !chosen.isConstant();
+        Bit b = bl.create(chosen.val(), ds.create(chosen, notChoosen));
+        alternativeBits.add(b);
+        return b;
+    }
+
+    public Bit choose(Bit a, Bit b) {
+        if (a.isConstant() || (!recordAlternatives && c1(a) <= c1(b))) {
+            if (recordAlternatives && !a.isConstant()) {
+                return createChooseWrapBit(a, b);
+            }
             return a;
+        }
+        if (recordAlternatives && !b.isConstant()) {
+            return createChooseWrapBit(b, a);
         }
         return b;
     }
 
     public Bit notChosen(Bit a, Bit b) {
-        if (choose(a, b) == b) {
+        if (b.isConstant() || (!recordAlternatives && c1(a) > c1(b))) {
             return a;
         }
         return b;
-    }
-
-    public void registerChooseDecision(Bit resultBit, Bit chosen, Bit notChosen) {
-        alternatives.get(resultBit).put(chosen, notChosen);
     }
 
     /* -------------------------- loop mode specific -------------------------------*/
@@ -1000,21 +1017,45 @@ public class Context {
         return frame.callPath;
     }
 
-    public int numberOfMethodFrames(){
+    public int numberOfMethodFrames() {
         return frames.size();
     }
 
-    public int numberOfinfiniteWeightNodes(){
+    public int numberOfinfiniteWeightNodes() {
         return weightMap.size();
     }
 
-    public void resetFrames(State.OutputState outputState){
+    public boolean isAlternativeBit(Bit bit) {
+        return recordAlternatives && alternativeBits.contains(bit);
+    }
+
+    public void withoutAlternativeRecording(Consumer<Context> consumer) {
+        boolean prev = recordAlternatives;
+        recordAlternatives = false;
+        consumer.accept(this);
+        recordAlternatives = prev;
+    }
+
+    public Context setRecordAlternatives(boolean recordAlternatives) {
+        this.recordAlternatives = recordAlternatives;
+        return this;
+    }
+
+    public boolean recordsAlternatives() {
+        return recordAlternatives;
+    }
+
+    public boolean hasAlternatives() {
+        return recordAlternatives && alternativeBits.size() > 0;
+    }
+
+    public void resetFrames(State.OutputState outputState) {
         frames.clear();
         frames.push(new Frame(new CallPath(), new HashSet<>(), new State(outputState)));
         frame = frames.peek();
     }
 
-    public void resetFrames(){
+    public void resetFrames() {
         resetFrames(frame != null ? frame.state.outputState : new State.OutputState());
     }
 

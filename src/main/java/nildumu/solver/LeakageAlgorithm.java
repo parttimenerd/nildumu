@@ -87,7 +87,6 @@ public class LeakageAlgorithm extends MinCut.Algorithm {
         Map<Interval, Variable> interToVar = new HashMap<>();
         Map<Variable, Interval> varToInter = new HashMap<>();
         Map<Interval, Double> interToWeight = new HashMap<>();
-
         for (Lattices.Bit bit : sourcesAndSinks.sources){
             bl.walkBits(bit, b -> {
                 List<Variable> vars = new ArrayList<>(3);
@@ -115,8 +114,13 @@ public class LeakageAlgorithm extends MinCut.Algorithm {
                     vars.add(interToVar.get(interval));
                 }
                 solver.addOrImplication(v(b, Type.EITHER), vars.toArray(new Variable[0]));
+                Variable bdBit = v(b, Type.DEPENDENCIES);
                 for (Lattices.Bit dep : b.deps()) {
-                    solver.addOrImplication(v(b, Type.DEPENDENCIES), v(dep, Type.EITHER));
+                    if (sourcesAndSinks.context.isAlternativeBit(dep)) {
+                        solver.addOrImplication(bdBit, dep.deps().stream().map(d -> v(d, Type.EITHER)).toArray(Variable[]::new));
+                    } else {
+                        solver.addOrImplication(bdBit, v(dep, Type.EITHER));
+                    }
                 }
                 if (b.value() != null){
                     values.add(b.value());

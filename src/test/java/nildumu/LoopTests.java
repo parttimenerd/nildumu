@@ -3,14 +3,14 @@ package nildumu;
 import nildumu.mih.MethodInvocationHandler;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static java.time.Duration.ofMillis;
-import static nildumu.Processor.process;
+import static nildumu.Processor.*;
 import static nildumu.util.Util.iter;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
@@ -140,7 +140,7 @@ public class LoopTests {
             parse("h input int h = 0b0u;\n" +
                     "while (h == h){\n" +
                     "\th = h + 1;\n" +
-                    "}\n");
+                    "}\n l output int o = h", true).leaks(1).run();
         });
     }
 
@@ -325,6 +325,7 @@ public class LoopTests {
     }
 
     @Test
+    @Timeout(3)
     public void testBinarySearch_condensedWithoutLoop() {
         String program = "h input int I = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
                 "int O = 0;\n" +
@@ -382,7 +383,7 @@ public class LoopTests {
                 "    i = i + 1;\n" +
                 "}\nint x = i;";
         parse(program, true).val("x", 1).run();
-        parse(program).val("x", "0buuu").run();
+        //parse(program).val("x", "0buuu").run();
         Context.LOG.setLevel(Level.INFO);
     }
 
@@ -399,9 +400,10 @@ public class LoopTests {
     }
 
     ContextMatcher parse(String program, boolean transformLoops, String mih) {
-        Logger.getGlobal().setLevel(Level.WARNING);
+        Context.LOG.setLevel(Level.WARNING);
         //System.out.println(" ##SSA " + Parser.process(program, false, transformLoops).toPrettyString());
-        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih), false, transformLoops));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih),
+                (transformLoops ? TRANSFORM_LOOPS : 0) | RECORD_ALTERNATIVES));
     }
 
 

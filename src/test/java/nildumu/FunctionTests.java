@@ -428,11 +428,11 @@ l output int o = fib(h);
     }
 
     static ContextMatcher parse(String program, String handler){
-        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(handler)));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(handler), 0));
     }
 
     static ContextMatcher parse(String program, MethodInvocationHandler handler) {
-        return new ContextMatcher(process(program, Context.Mode.LOOP, handler));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, handler, 0));
     }
 
     static ContextMatcher parse(String program, String handler, int bitWidth) {

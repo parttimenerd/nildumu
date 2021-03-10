@@ -17,28 +17,25 @@ public class Processor {
 
     public static boolean transformPlus = false;
 
-    public static Context process(String program){
+    public static final int TRANSFORM_PLUS = 0b01;
+    public static final int TRANSFORM_LOOPS = 0b010;
+    public static final int RECORD_ALTERNATIVES = 0b0100;
+
+    public static boolean containsOpt(int opts, int opt) {
+        return (opts & opt) != 0;
+    }
+
+    public static Context process(String program) {
         return process(program, Context.Mode.BASIC);
     }
 
     public static Context process(String program, Context.Mode mode) {
-        return process(program, mode, MethodInvocationHandler.createDefault());
+        return process(program, mode, MethodInvocationHandler.createDefault(), 0);
     }
 
-    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler) {
-        return process(program, mode, handler, transformPlus);
-    }
-
-    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, boolean transformPlus) {
-        return process(program, mode, handler, transformPlus, false);
-    }
-
-    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, boolean transformPlus, boolean transformLoops) {
-        return process(Parser.process(program, transformPlus, transformLoops), mode, handler);
-    }
-
-    public static Context processWithTransformedLoops(String program, Context.Mode mode, MethodInvocationHandler handler) {
-        return process(program, mode, handler, true, true);
+    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, int opts) {
+        return process(Parser.process(program, containsOpt(opts, TRANSFORM_PLUS), containsOpt(opts, TRANSFORM_LOOPS)),
+                mode, handler, containsOpt(opts, RECORD_ALTERNATIVES));
     }
 
     public static Context process(ProgramNode node, MethodInvocationHandler handler) {
@@ -47,7 +44,12 @@ public class Processor {
     }
 
     public static Context process(ProgramNode node, Context.Mode mode, MethodInvocationHandler handler) {
-        node.context.mode(mode);
+        return process(node, mode, handler, false);
+    }
+
+    public static Context process(ProgramNode node, Context.Mode mode, MethodInvocationHandler handler,
+                                  boolean recordAlternatives) {
+        node.context.mode(mode).setRecordAlternatives(recordAlternatives);
         handler.setup(node);
         return process(node.context.forceMethodInvocationHandler(handler), node);
     }

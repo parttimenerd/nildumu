@@ -12,8 +12,6 @@ import static nildumu.Lattices.Bit;
 
 /**
  * A simple set of modifications
- * <p>
- * todo: implement alternatives handling
  */
 public class Mods {
 

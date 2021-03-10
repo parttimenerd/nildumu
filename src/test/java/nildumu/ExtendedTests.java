@@ -1,7 +1,9 @@
 package nildumu;
 
+import nildumu.mih.MethodInvocationHandler;
 import org.junit.jupiter.api.Test;
 
+import static nildumu.Processor.RECORD_ALTERNATIVES;
 import static nildumu.Processor.process;
 
 /**
@@ -43,15 +45,24 @@ public class ExtendedTests {
                 "}").val("x2", "0b01").run();
     }
 
+    @Test
+    public void testImplicitFlowWithVariableEquals() {
+        parse("h input int h = 0bu{5};\n" +
+                "int x = h * 2;\n" +
+                "if (h == x){\n" +
+                "    x = h;\n" +
+                "} else {x = 0; } l output int o = x").leaks(4).run();
+    }
+
     /**
      bit_width 32;
      int O4; int O3; int O2; int O1;
      h input int S = 0buu;
      int O = 0;
      if ((S == 0)) {
-        O1 = 0;
+     O1 = 0;
      } else {
-        O3 = 1;
+     O3 = 1;
      }
      O4 = phi(O1, O3);
      l output int o = O4;
@@ -160,6 +171,6 @@ public class ExtendedTests {
     }
 
     public ContextMatcher parse(String program){
-        return new ContextMatcher(process(program, Context.Mode.EXTENDED));
+        return new ContextMatcher(process(program, Context.Mode.EXTENDED, MethodInvocationHandler.createDefault(), RECORD_ALTERNATIVES));
     }
 }

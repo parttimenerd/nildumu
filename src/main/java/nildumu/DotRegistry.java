@@ -198,7 +198,11 @@ public class DotRegistry {
                 parts.add("inf");
             }
             parts.add(b.uniqueId());
-            parts.add(b.toString().replace("<", "&lt;"));
+            if (context.isAlternativeBit(b)) {
+                parts.add("either");
+            } else {
+                parts.add(b.toString().replace("<", "&lt;"));
+            }
             return Records.of((String[])parts.toArray(new String[0]));
         };
         Map<Bit, MutableNode> nodes = new DefaultMap<>((map, b) -> {

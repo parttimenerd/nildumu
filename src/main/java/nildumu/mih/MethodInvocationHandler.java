@@ -138,7 +138,7 @@ public abstract class MethodInvocationHandler {
     }
 
     public static String getDefaultPropString() {
-        return "handler=inlining;maxrec=2;bot=basic";
+        return "handler=inlining;maxrec=5;bot=summary";
     }
 
     public void setup(ProgramNode program) {

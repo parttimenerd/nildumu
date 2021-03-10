@@ -11,10 +11,12 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
+import static nildumu.Processor.*;
+
 /**
  * Runs the program on the command line
  */
-@Parameters(commandDescription="Basic quantitative information flow analysis")
+@Parameters(commandDescription = "Basic quantitative information flow analysis")
 public class Main {
 
     private static class AlgoConverter implements IStringConverter<MinCut.Algo> {
@@ -30,14 +32,23 @@ public class Main {
         }
     }
 
-    @Parameter(names="--handler", description="Method invocation handler configuration, see README")
+    @Parameter(names = "--handler", description = "Method invocation handler configuration, see README")
     private String handler = "handler=call_string;bot=summary";
 
-    @Parameter(description="program file to analyze", converter = PathConverter.class, required = true)
+    @Parameter(description = "program file to analyze", converter = PathConverter.class, required = true)
     private String programPath;
 
-    @Parameter(names="--algo", description="Used leakage computation algorithm", converter=AlgoConverter.class)
-    private MinCut.Algo algo = MinCut.Algo.GRAPHT_PP;
+    @Parameter(names = "--algo", description = "Used leakage computation algorithm", converter = AlgoConverter.class)
+    private MinCut.Algo algo = MinCut.Algo.OPENWBO;
+
+    @Parameter(names = {"-tp", "--transformPlus"}, arity = 1)
+    boolean transformPlus = true;
+
+    @Parameter(names = {"-tl", "--transformLoops"}, arity = 1)
+    boolean transformLoops = true;
+
+    @Parameter(names = {"-ra", "--recordAlternatives"}, arity = 1)
+    boolean recordAlternatives = true;
 
     public static void main(String[] args) {
         Main main = new Main();
@@ -46,9 +57,15 @@ public class Main {
         DotRegistry.get().disable();
 
         try {
+            if (!main.algo.supportsAlternatives && main.recordAlternatives){
+                System.err.printf("Disabling the recording of alternatives as %s does not support it\n", main.algo);
+                main.recordAlternatives = false;
+            }
+            int opts = (main.transformPlus ? TRANSFORM_PLUS : 0) | (main.transformLoops ? TRANSFORM_LOOPS : 0) |
+                    (main.recordAlternatives ? RECORD_ALTERNATIVES : 0);
             Context context =
-                    Processor.process(String.join("\n",Files.readAllLines(Paths.get(main.programPath))),
-                            Context.Mode.LOOP , MethodInvocationHandler.parse(main.handler));
+                    Processor.process(String.join("\n", Files.readAllLines(Paths.get(main.programPath))),
+                            Context.Mode.LOOP, MethodInvocationHandler.parse(main.handler), opts);
             System.out.println("Leakage: " + context.computeLeakage(main.algo).get(Lattices.BasicSecLattice.LOW).maxFlow);
         } catch (IOException e) {
             e.printStackTrace();

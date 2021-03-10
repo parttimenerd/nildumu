@@ -26,16 +26,18 @@ public class MinCut {
     public static Algo usedAlgo = Algo.OPENWBO;
 
     public enum Algo {
-        GRAPHT_PP("JGraphT Preflow-Push", false),
-        //RC2("RC2 PMSAT solver", true),
-        OPENWBO("Open-WBO PMSAT", true);
+        GRAPHT_PP("JGraphT Preflow-Push", false, false),
+        //RC2("RC2 PMSAT solver", true, false),
+        OPENWBO("Open-WBO PMSAT", true, true);
 
         public final String description;
         public final boolean supportsIntervals;
+        public final boolean supportsAlternatives;
 
-        Algo(String description, boolean supportsIntervals) {
+        Algo(String description, boolean supportsIntervals, boolean supportsAlternatives) {
             this.description = description;
             this.supportsIntervals = supportsIntervals;
+            this.supportsAlternatives = supportsAlternatives;
         }
 
         @Override
@@ -111,6 +113,7 @@ public class MinCut {
 
         protected GraphTPP(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights) {
             super(sourcesAndSinks, weights);
+            assert !sourcesAndSinks.context.recordsAlternatives();
         }
 
         private double infty(){
@@ -187,6 +190,9 @@ public class MinCut {
     public static ComputationResult compute(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights, Algo algo){
         switch (algo) {
             case GRAPHT_PP:
+                if (sourcesAndSinks.context.recordsAlternatives()) {
+                    throw new NildumuError(String.format("Algo %s cannot be used when recording alternatives", algo));
+                }
                 return new GraphTPP(sourcesAndSinks, weights).compute();
             /*case RC2:
                 return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new RC2Solver<>(false)).compute();*/

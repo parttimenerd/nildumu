@@ -2,9 +2,12 @@ package nildumu;
 
 import org.junit.jupiter.api.function.Executable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
-import java.util.stream.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static nildumu.Lattices.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -90,14 +93,27 @@ public class ContextMatcher {
 
         public LeakageMatcher leaks(Lattices.Sec<?> attackerSec, double leakage){
             for (MinCut.Algo algo : MinCut.Algo.values()) {
-                builder.add(() -> {
+                Executable inner = () -> {
                     MinCut.ComputationResult comp = MinCut.compute(context, attackerSec, algo);
                     assertEquals(leakage, comp.maxFlow, () -> {
                         return String.format("The calculated leakage for an attacker of level %s should be %f, leaking %s, using %s",
                                 attackerSec, leakage, comp.minCut.stream().map(Lattices.Bit::toString).collect(Collectors.joining(", ")),
                                 algo);
                     });
-                });
+                };
+                if (!algo.supportsAlternatives && context.recordsAlternatives()) {
+                    builder.add(() -> {
+                        boolean prev = context.recordsAlternatives();
+                        try {
+                            context.setRecordAlternatives(false);
+                            inner.execute();
+                        } finally {
+                            context.setRecordAlternatives(prev);
+                        }
+                    });
+                } else {
+                    builder.add(inner);
+                }
             }
             return this;
         }
