@@ -7,6 +7,7 @@ import swp.util.Pair;
 
 import java.util.*;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -15,6 +16,7 @@ import static nildumu.Context.v;
 import static nildumu.Lattices.*;
 import static nildumu.Lattices.B.*;
 import static nildumu.util.Util.log2;
+import static nildumu.util.Util.p;
 
 public interface Operator {
 
@@ -928,18 +930,18 @@ public interface Operator {
         }
     }
 
-    class SelectBit extends UnaryOperator {
+    class SelectBit extends BinaryOperator {
 
-        final int index;
-
-        public SelectBit(int index) {
-            super(String.format("·[%d]", index));
-            this.index = index;
+        public SelectBit() {
+            super("·[·]");
         }
 
         @Override
-        Value compute(Context c, Value argument) {
-            return new Value(argument.get(index));
+        Value compute(Context c, Value first, Value second) {
+            if (!second.isConstant()) {
+                throw new NildumuError("Only constant indices supported for bit select operators");
+            }
+            return new Value(first.get(second.asInt()));
         }
     }
 
@@ -953,6 +955,9 @@ public interface Operator {
 
         @Override
         public Value compute(Context c, List<Value> arguments) {
+            if (callSite.definition.isPredefined()){
+                return ((Parser.PredefinedMethodNode)callSite.definition).apply(arguments);
+            }
             Map<Variable, AppendOnlyValue> globals = callSite.globalDefs.entrySet().stream()
                     .collect(Collectors.toMap(Map.Entry::getKey, e -> c.getVariableValue(e.getValue().first).asAppendOnly()));
             MethodInvocationHandler.MethodReturnValue ret = c.methodInvocationHandler().analyze(c, callSite, arguments, globals);

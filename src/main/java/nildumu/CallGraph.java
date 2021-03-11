@@ -121,6 +121,9 @@ public class CallGraph {
 
         @Override
         public Set<MethodNode> visit(MethodInvocationNode methodInvocation) {
+            if (methodInvocation.definition.isPredefined()){
+                return Collections.emptySet();
+            }
             return Stream.concat(Stream.of(methodInvocation.definition), methodInvocation.arguments.accept(this).stream()).collect(Collectors.toSet());
         }
 
@@ -155,10 +158,14 @@ public class CallGraph {
                 Stream.concat(Stream.of(mainNode), usedMethods.stream().map(CallNode::new))
                         .collect(Collectors.toMap(n -> n.method, n -> n));
         methodToNode
-                .forEach((key, value) -> key
-                        .body
-                        .accept(new CallFinderNode())
-                        .forEach(m -> value.call(methodToNode.get(m))));
+                .forEach((key, value) -> {
+                    if (!key.isPredefined()) {
+                        key
+                                .body
+                                .accept(new CallFinderNode())
+                                .forEach(m -> value.call(methodToNode.get(m)));
+                    }
+                });
         dominators = dominators(mainNode);
         loopDepths = calcLoopDepth(mainNode, dominators);
         DotRegistry.get().store("summary", "call-graph",

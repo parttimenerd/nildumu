@@ -236,12 +236,6 @@ public class Quail extends AbstractTool {
                 assert false;
                 return variableAccess.ident;
             }
-
-            @Override
-            public String visit(Parser.SingleUnaryOperatorNode unaryOperator) {
-                assert false;
-                return null;
-            }
         });
     }
 }

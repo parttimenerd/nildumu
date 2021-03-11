@@ -121,6 +121,11 @@ public class Processor {
             }
 
             @Override
+            public Boolean visit(ArrayAssignmentNode assignment) {
+                throw new NildumuError("Array assignments not supported in processor. Requires preprocessing.");
+            }
+
+            @Override
             public Boolean visit(MultipleVariableAssignmentNode assignment) {
                 List<Value> values = context.nodeValue(assignment.expression).split(assignment.definitions.size());
                 for (int i = 0; i < values.size(); i++) {

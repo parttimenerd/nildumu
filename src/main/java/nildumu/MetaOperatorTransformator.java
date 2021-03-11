@@ -54,7 +54,8 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
             }
 
             ExpressionNode wrap(ExpressionNode expr){
-                return new BinaryOperatorNode(new SingleUnaryOperatorNode(expr, SELECT_OP, 1), new IntegerLiteralNode(expr.location, vl.parse(1)), EQUALS);
+                return new BinaryOperatorNode(new BracketedAccessOperatorNode(expr, new IntegerLiteralNode(expr.location, vl.parse(1))),
+                        new IntegerLiteralNode(expr.location, vl.parse(1)), EQUALS);
             }
         });
         replacedMap.put(expression, repl(tmpExpr));
@@ -121,10 +122,11 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
         ExpressionNode result = zero;
         ExpressionNode carry = zero;
         for (int i = 1; i <= maxBitWidth; i++){
-            Pair<ExpressionNode, ExpressionNode> rCarry = fullAdder(new SingleUnaryOperatorNode(node.left, SELECT_OP, i),
-                    new SingleUnaryOperatorNode(node.right, SELECT_OP, i), carry);
+            Pair<ExpressionNode, ExpressionNode> rCarry = fullAdder(new BracketedAccessOperatorNode(node.left,
+                            new IntegerLiteralNode(node.location, vl.parse(i))),
+                    new BracketedAccessOperatorNode(node.right, new IntegerLiteralNode(node.location, vl.parse(i))), carry);
             carry = rCarry.second;
-            result = binop(BOR, result, new SingleUnaryOperatorNode(rCarry.first, PLACE_OP, i));
+            result = binop(BOR, result, new BitPlaceOperatorNode(rCarry.first, i));
         }
         return result;
     }
@@ -156,13 +158,19 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
             }
 
             @Override
-            public ExpressionNode visit(SingleUnaryOperatorNode unaryOperator) {
-                return replace(new SingleUnaryOperatorNode(visitAndReplace(unaryOperator.expression), unaryOperator.operator, unaryOperator.index));
+            public ExpressionNode visit(BitPlaceOperatorNode unaryOperator) {
+                return replace(new BitPlaceOperatorNode(visitAndReplace(unaryOperator.expression), unaryOperator.index));
             }
 
             @Override
             public ExpressionNode visit(BinaryOperatorNode binaryOperator) {
                 return replace(new BinaryOperatorNode(visitAndReplace(binaryOperator.left), visitAndReplace(binaryOperator.right), binaryOperator.operator));
+            }
+
+            @Override
+            public ExpressionNode visit(BracketedAccessOperatorNode bracketedAccess) {
+                return replace(new BracketedAccessOperatorNode(visitAndReplace(bracketedAccess.left),
+                                                               visitAndReplace(bracketedAccess.right)));
             }
 
             @Override
@@ -209,6 +217,13 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
                 assignment.expression = assignment.expression.accept(this);
                 return null;
             }
+
+            @Override
+            public ExpressionNode visit(ArrayAssignmentNode assignment) {
+                assignment.expression = assignment.expression.accept(this);
+                assignment.arrayIndex = assignment.arrayIndex.accept(this);
+                return null;
+            }
         });
         replacedMap.put(node, replExpr);
         return replExpr;
@@ -243,6 +258,14 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     @Override
     public MJNode visit(VariableAssignmentNode assignment){
         VariableAssignmentNode node = new VariableAssignmentNode(assignment.location, assignment.variable, replace(assignment.expression));
+        node.definition = assignment.definition;
+        return node;
+    }
+
+    @Override
+    public MJNode visit(ArrayAssignmentNode assignment){
+        VariableAssignmentNode node = new ArrayAssignmentNode(assignment.location, assignment.variable,
+                replace(assignment.arrayIndex), replace(assignment.expression));
         node.definition = assignment.definition;
         return node;
     }

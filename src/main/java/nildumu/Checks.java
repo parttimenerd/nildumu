@@ -231,6 +231,15 @@ public class Checks {
             }
 
             @Override
+            public Object visit(ArrayAssignmentNode variableAssignment) {
+                visitChildrenDiscardReturn(variableAssignment);
+                validVariables.add(variableAssignment.definition);
+                validExpressions.add(variableAssignment.arrayIndex);
+                validExpressions.add(variableAssignment.expression);
+                return null;
+            }
+
+            @Override
             public Object visit(MultipleVariableAssignmentNode variableAssignment) {
                 visitChildrenDiscardReturn(variableAssignment);
                 if (variableAssignment.definitions != null) {
@@ -290,6 +299,16 @@ public class Checks {
                     if (!(assignment instanceof VariableDeclarationNode)) {
                         check(assignment.expression);
                     }
+                });
+            }
+
+            @Override
+            public ErrorPipe visit(ArrayAssignmentNode assignment) {
+                return process(assignment, () -> {
+                    visitChildrenDiscardReturn(assignment);
+                    check(assignment.definition);
+                    check(assignment.arrayIndex);
+                    check(assignment.expression);
                 });
             }
 

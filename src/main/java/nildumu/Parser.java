@@ -86,21 +86,24 @@ public class Parser implements Serializable {
         LPAREN("\\("),
         RPAREN("\\)"),
         LBRACKET("\\["),
+        LBBRACKET("\\[\\["),
         RBRACKET("\\]"),
+        RBBRACKET("\\]\\]"),
         ARROW("\\->", "->"),
         APPEND("@"),
         SEMICOLON("(\\;|\\n)+", ";"),
-        INTEGER_LITERAL("(([1-9][0-9]*)|0)|(0b[01e]*)|(\\-([1-9][0-9]*))"),
-        INPUT_LITERAL("(0b([01ux]((\\{[0-9]+\\})?))+)"),
+        INTEGER_LITERAL("(([1-9][0-9]*)|0)|(0b([01e]((\\{([0-9]+)\\})?))*)|(\\-([1-9][0-9]*))"),
+        INPUT_LITERAL("(0b([01ux]((\\{([0-9]+)\\})?))+)"),
         IDENT("[A-Za-z_][A-Za-z0-9_]*"),
         LCURLY("\\{"),
         RCURLY("\\}"),
         COLON(":"),
         COMMA("[,]", ","),
         DOT("\\.", "."),
-        INDEX("\\[[1-9][0-9]*\\]"),
-        SELECT_OP("\\[s[1-9][0-9]*\\]"),
-        PLACE_OP("\\[p[1-9][0-9]*\\]");
+        BIT_INDEX(""),
+        BIT_SELECT_OP(""),
+        BIT_PLACE_OP(""),
+        BRACKET_ACCESS_OP("");
 
         private final String description;
         private final String representation;
@@ -135,17 +138,17 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static final Generator generator = Generator.getCachedIfPossible("stuff/in2", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static final Generator generator = Generator.getCachedIfPossible("stuff/ihrtsd345sddsdfewiod", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
                 builder.addRule("program", "use_sec? bit_width? lines", asts -> {
-                    SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>) asts.get(0)).get(0).wrapped;
-                    int declaredBitWidth = asts.get(1).children().isEmpty() ? -1 : ((ListAST<WrapperNode<Integer>>) asts.get(1)).get(0).wrapped;
-                    /*
-                     * Calc bit width
-                     */
-                    List<MJNode> topLevelNodes = asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped;
-                    int lowerBitWidthBound = topLevelNodes.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
+                            SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>) asts.get(0)).get(0).wrapped;
+                            int declaredBitWidth = asts.get(1).children().isEmpty() ? -1 : ((ListAST<WrapperNode<Integer>>) asts.get(1)).get(0).wrapped;
+                            /*
+                             * Calc bit width
+                             */
+                            List<MJNode> topLevelNodes = asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped;
+                            int lowerBitWidthBound = topLevelNodes.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
 
                                 @Override
                                 public Integer visit(MJNode node) {
@@ -157,7 +160,7 @@ public class Parser implements Serializable {
                                     int bitWidth = literal.value.size();
                                     if (bitWidth > declaredBitWidth && declaredBitWidth != -1){
                                         //Token literalToken = literal.getMatchedTokens().get(0);
-                                        System.err.println(String.format("Declared bit width of %d is lower than the bit width of literal %s", declaredBitWidth, bitWidth));
+                                        //System.err.println(String.format("Declared bit width of %d is lower than the bit width of literal %s, only use for arrays", declaredBitWidth, bitWidth));
                                     }
                                     return bitWidth;
                                 }
@@ -335,6 +338,7 @@ public class Parser implements Serializable {
                         .addRule("block_statement_w_semi", "print_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "input_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "tmp_input_decl_statement SEMICOLON", asts -> asts.get(0))
+                        .addRule("block_statement_w_semi", "array_assignment_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "block")
                         .addRule("block_statement", "statement", asts -> asts.get(0))
                         .addRule("block_statement", "var_decl", asts -> asts.get(0))
@@ -345,6 +349,7 @@ public class Parser implements Serializable {
                         .addRule("block_statement", "print_statement", asts -> asts.get(0))
                         .addRule("block_statement", "input_statement")
                         .addRule("block_statement", "tmp_input_decl_statement")
+                        .addRule("block_statement", "array_assignment_statement")
                         .addRule("block_statement", "block")
                         .addRule("var_decl", "INT ident", asts -> {
                             return new VariableDeclarationNode(
@@ -381,7 +386,12 @@ public class Parser implements Serializable {
                             return new CustomAST<List<String>>(Stream.concat(Stream.of(asts.get(0).getMatchedString()),
                                     ((CustomAST<List<String>>) asts.get(2)).value.stream()).collect(Collectors.toList()));
                         })
-                        .addRule("while_statement", "WHILE (LBRACKET assignments RBRACKET)? LPAREN expression RPAREN block_statement", asts -> {
+                        .addRule("array_assignment_statement", "ident LBRACKET expression RBRACKET EQUAL_SIGN expression", asts -> {
+                            return new ArrayAssignmentNode(asts.getStartLocation(),
+                                    asts.get(0).getMatchedString(), asts.get(2).<ExpressionNode>as(),
+                                    asts.get(5).<ExpressionNode>as());
+                        })
+                        .addRule("while_statement", "WHILE (LBBRACKET assignments RBBRACKET)? LPAREN expression RPAREN block_statement", asts -> {
                             ListAST pres = (ListAST)asts.get(1);
                             return new WhileStatementNode(
                                     asts.getStartLocation(),
@@ -436,10 +446,6 @@ public class Parser implements Serializable {
                                             child = (ExpressionNode)asts.get(1);
                                             opToken = asts.get(0).getMatchedTokens().get(0);
                                         }
-                                        if (op == INDEX){
-                                            String opTokenStr = opToken.value;
-                                            return new SingleUnaryOperatorNode(child, exprIsLeft ? SELECT_OP : PLACE_OP, Integer.parseInt(opTokenStr.substring(1, opTokenStr.length() - 1)));
-                                        }
                                         return new UnaryOperatorNode(child, op);
                                     })
                                     .closeLayer()
@@ -454,8 +460,15 @@ public class Parser implements Serializable {
                                     .binaryLayer(LEFT_SHIFT, RIGHT_SHIFT)
                                     .binaryLayer(PLUS, MINUS)
                                     .binaryLayer(MULTIPLY, DIVIDE, MODULO)
-                                    .unaryLayerLeft(INVERT, MINUS, TILDE, INDEX)
-                                    .unaryLayerRight(INDEX);
+                                    .custom("expression LBRACKET expression RBRACKET", asts -> {
+                                        return new BracketedAccessOperatorNode((ExpressionNode)asts.get(0),
+                                                (ExpressionNode)asts.get(2));
+                                    })
+                                    .unaryLayerLeft(INVERT, MINUS, TILDE)
+                                    .custom("LBRACKET INTEGER_LITERAL RBRACKET expression", asts -> {
+                                        return new BitPlaceOperatorNode((ExpressionNode)asts.get(3),
+                                                vl.parse(asts.get(1).getMatchedString()).asInt());
+                                    });
                         })
                         .addRule("postfix_expression", "primary_expression")
                         .addEitherRule("postfix_expression", "method_invocation")
@@ -501,10 +514,11 @@ public class Parser implements Serializable {
                             return new IntegerLiteralNode(asts.getStartLocation(), val);
                         })
                         .addRule("primary_expression", "var_access")
-                        .addRule("var_access", "ident", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
+                        .addRule("primary_expression", "array_access")
                         .addRule("primary_expression", "LPAREN expression RPAREN", asts -> {
                             return asts.get(1);
                         })
+                        .addRule("var_access", "ident", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
                         .addRule("input_literal", "INPUT_LITERAL|INTEGER_LITERAL", asts -> {
                             /*List<Bit> rev = asts.get(0).<ListAST<?>>as().stream().map(s -> new Bit(B.U.parse(s.getMatchedString().substring(1)))).collect(Collectors.toList());
                             Collections.reverse(rev);
@@ -514,7 +528,7 @@ public class Parser implements Serializable {
                             return new IntegerLiteralNode(asts.getStartLocation(), val);
                         })
                         .addRule("globals", "", asts -> new GlobalVariablesNode(new Location(0, 0), new HashMap<>()))
-                        .addRule("globals", "LBRACKET globals_ RBRACKET", asts -> asts.get(1))
+                        .addRule("globals", "LBBRACKET globals_ RBBRACKET", asts -> asts.get(1))
                         .addRule("globals_", "", asts -> new GlobalVariablesNode(new Location(0, 0), new HashMap<>()))
                         .addRule("globals_", "global", asts -> {
                             Map<String, Pair<String, String>> globs = new HashMap<>();
@@ -649,6 +663,10 @@ public class Parser implements Serializable {
             return visit((StatementNode) assignment);
         }
 
+        default R visit(ArrayAssignmentNode assignment) {
+            return visit((VariableAssignmentNode) assignment);
+        }
+
         default R visit(MultipleVariableAssignmentNode assignment) {
             return visit((StatementNode) assignment);
         }
@@ -725,8 +743,12 @@ public class Parser implements Serializable {
             return visit((ExpressionNode)unaryOperator);
         }
 
-        default R visit(SingleUnaryOperatorNode unaryOperator){
-            return visit((UnaryOperatorNode)unaryOperator);
+        default R visit(BracketedAccessOperatorNode bracketedAccess){
+            return visit((BinaryOperatorNode) bracketedAccess);
+        }
+
+        default R visit(BitPlaceOperatorNode bitPlacement){
+            return visit((UnaryOperatorNode)bitPlacement);
         }
 
         default R visit(PrimaryExpressionNode primaryExpression){
@@ -775,6 +797,10 @@ public class Parser implements Serializable {
         }
 
         default R visit(VariableDeclarationNode variableDeclaration) {
+            return visit((VariableAssignmentNode) variableDeclaration);
+        }
+
+        default R visit(ArrayAssignmentNode variableDeclaration) {
             return visit((VariableAssignmentNode) variableDeclaration);
         }
 
@@ -874,8 +900,12 @@ public class Parser implements Serializable {
             return visit((ExpressionNode)primaryExpression);
         }
 
-        default R visit(SingleUnaryOperatorNode unaryOperator){
-            return visit((UnaryOperatorNode)unaryOperator);
+        default R visit(BracketedAccessOperatorNode bracketedAccess){
+            return visit((BinaryOperatorNode) bracketedAccess);
+        }
+
+        default R visit(BitPlaceOperatorNode bitPlacement){
+            return visit((UnaryOperatorNode)bitPlacement);
         }
 
         default R visit(MethodInvocationNode methodInvocation){
@@ -935,8 +965,13 @@ public class Parser implements Serializable {
             return visit((ExpressionNode)unaryOperator, argument);
         }
 
-        default R visit(SingleUnaryOperatorNode unaryOperator, A argument){
-            return visit((UnaryOperatorNode)unaryOperator, argument);
+
+        default R visit(BracketedAccessOperatorNode bracketedAccess, A argument){
+            return visit((BinaryOperatorNode) bracketedAccess, argument);
+        }
+
+        default R visit(BitPlaceOperatorNode bitPlacement, A argument){
+            return visit((UnaryOperatorNode)bitPlacement, argument);
         }
 
         default R visit(PrimaryExpressionNode primaryExpression, A argument){
@@ -1316,7 +1351,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return String.format("int %s[%s](%s)", name, globals, parameters);
+            return String.format("int %s[[%s]](%s)", name, globals, parameters);
         }
 
         @Override
@@ -1357,9 +1392,13 @@ public class Parser implements Serializable {
             return hasReturnValue() ? ((ReturnStatementNode) body.getLastStatementOrNull()).expressions.size() : 0;
         }
 
+        public int getNumberOfParameters() {
+            return parameters.size();
+        }
+
         @Override
         public String toPrettyString(String indent, String incr) {
-            return indent + String.format("int %s[%s](%s){\n%s\n}\n", name, globals, parameters, body.toPrettyString(indent + incr, incr, false));
+            return indent + String.format("int %s[[%s]](%s){\n%s\n}\n", name, globals, parameters, body.toPrettyString(indent + incr, incr, false));
         }
 
         /**
@@ -1378,6 +1417,82 @@ public class Parser implements Serializable {
             Set<String> set = new HashSet<>(getDefinedVariables());
             set.removeAll(inner.getDefinedVariables());
             return set;
+        }
+
+        public boolean isPredefined() { return false; }
+    }
+
+    public static class PredefinedMethodNode extends MethodNode {
+
+        private final static Map<String, PredefinedMethodNode> predefinedMethods = new HashMap<>();
+        static {
+            predefinedMethods.put("length",
+                    new PredefinedMethodNode("length", 1, l -> {throw new NildumuError("not supported");}));
+        }
+
+        public static boolean isPredefined(String methodName) { return predefinedMethods.containsKey(methodName); }
+
+        public static PredefinedMethodNode getPredefined(String methodName) {
+            assert isPredefined(methodName);
+            return predefinedMethods.get(methodName);
+        }
+
+        private final int parameterCount;
+        private final Function<List<Value>, Value> function;
+
+        public PredefinedMethodNode(String name, int parameterCount, Function<List<Value>, Value> function) {
+            super(new Location(0, 0), name, null, null, null);
+            this.parameterCount = parameterCount;
+            this.function = function;
+        }
+
+        @Override
+        public int getNumberOfParameters() {
+            return parameterCount;
+        }
+
+        public Value apply(List<Value> arguments) {
+            if (arguments.size() != parameterCount) {
+                throw new NildumuError(String.format("Not enought parameters for method %s", name));
+            }
+            return function.apply(arguments);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("int %s(%s)", name, parameters);
+        }
+
+        @Override
+        public String type() {
+            return "method";
+        }
+
+        @Override
+        public List<BaseAST> children() {
+            return new ArrayList<>();
+        }
+        @Override
+        public String shortType() {
+            return "sm";
+        }
+
+        @Override
+        public String getTextualId() {
+            return "sm:" + name;
+        }
+
+        public boolean hasReturnValue() {
+            return true;
+        }
+
+        public int getNumberOfReturnValues() {
+            return hasReturnValue() ? 1 : 0;
+        }
+
+        @Override
+        public boolean isPredefined() {
+            return true;
         }
     }
 
@@ -2073,6 +2188,76 @@ public class Parser implements Serializable {
     }
 
     /**
+     * A variable assignment
+     */
+    public static class ArrayAssignmentNode extends VariableAssignmentNode {
+        public ExpressionNode arrayIndex;
+
+        public ArrayAssignmentNode(Location location, String variable, ExpressionNode arrayIndex, ExpressionNode expression) {
+            super(location, variable, expression);
+            this.arrayIndex = arrayIndex;
+        }
+
+        public ArrayAssignmentNode(Location location, Variable variable, ExpressionNode arrayIndex, ExpressionNode expression) {
+            super(location, variable, expression);
+            this.arrayIndex = arrayIndex;
+        }
+
+        @Override
+        public String type() {
+            return "array_assignment_statement";
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s[%s] = %s;", definition == null ? variable : definition.name, arrayIndex, expression);
+        }
+
+        @Override
+        public BlockPartNode[] getBlockParts() {
+            return new BlockPartNode[]{arrayIndex, expression};
+        }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R> R accept(StatementVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public List<BaseAST> children() {
+            if (expression != null){
+                return Arrays.asList(arrayIndex, expression);
+            }
+            return Collections.singletonList(arrayIndex);
+        }
+
+        @Override
+        public String getTextualId() {
+            return shortType() + ":" + (definition != null ? definition.name : variable) + location.toString();
+        }
+
+        @Override
+        public String shortType() {
+            return "aa";
+        }
+
+        @Override
+        public String toPrettyString(String indent, String incr) {
+            return indent + toString();
+        }
+
+        @Override
+        public Set<String> getDefinedVariables() {
+            return Collections.emptySet();
+        }
+    }
+
+    /**
      * Assigment that assigns multiple variables (that are already defined) to the value of a return statement
      */
     public static class MultipleVariableAssignmentNode extends StatementNode {
@@ -2230,7 +2415,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return String.format("while [%s] (%s) %s", preCondVarAss.stream()
+            return String.format("while [[%s]] (%s) %s", preCondVarAss.stream()
                     .map(MJNode::toString).collect(Collectors.joining(" ")),
                     conditionalExpression, body);
         }
@@ -2270,7 +2455,7 @@ public class Parser implements Serializable {
         public String toPrettyString(String indent, String incr) {
             String pres = preCondVarAss.stream()
                     .map(MJNode::toString).collect(Collectors.joining(" "));
-            return String.format("%swhile %s (%s) {\n%s\n%s}", indent, pres.isEmpty() ? "" : "[" + pres + "]",
+            return String.format("%swhile %s (%s) {\n%s\n%s}", indent, pres.isEmpty() ? "" : "[[" + pres + "]]",
                     conditionalExpression, body.toPrettyString(indent + incr, incr), indent);
         }
 
@@ -2827,39 +3012,28 @@ public class Parser implements Serializable {
         }
     }
 
-    public static class SingleUnaryOperatorNode extends UnaryOperatorNode {
+    /**
+     * Implements the bit place operator. It only works for constant indices, as it is primarily intended to be used
+     * to create circuits.
+     */
+    public static class BitPlaceOperatorNode extends UnaryOperatorNode {
 
         public final int index;
 
-        public SingleUnaryOperatorNode(ExpressionNode expression, LexerTerminal operator, int index) {
-            super(expression, operator, operator == PLACE_OP ? new Operator.PlaceBit(index) : new Operator.SelectBit(index));
-            if (operator != PLACE_OP && operator != SELECT_OP){
-                throw new UnsupportedOperationException(operator.toString());
-            }
+        public BitPlaceOperatorNode(ExpressionNode expression, int index) {
+            super(expression, BIT_PLACE_OP, new Operator.PlaceBit(index));
             assert index > 0;
             this.index = index;
         }
 
         @Override
         public String toString() {
-            switch (operator){
-                case PLACE_OP:
-                    return String.format("[%d]%s", index, expression);
-                case SELECT_OP:
-                    return String.format("%s[%d]", expression, index);
-            }
-            return "";
+            return String.format("[%d]%s", index, expression);
         }
 
         @Override
         public String shortType() {
-            switch (operator){
-                case PLACE_OP:
-                    return String.format("[%d]·", index);
-                case SELECT_OP:
-                    return String.format("·[%d]", index);
-            }
-            return "";
+            return String.format("[%d]·", index);
         }
 
         @Override
@@ -2875,6 +3049,53 @@ public class Parser implements Serializable {
         @Override
         public <R,A> R accept(ExpressionVisitorWArgs<R, A> visitor, A argument){
             return visitor.visit(this, argument);
+        }
+
+        @Override
+        public String toPrettyString(String indent, String incr) {
+            return indent + String.format("[%d]%s", index, expression.toPrettyString());
+        }
+    }
+
+    public static class BracketedAccessOperatorNode extends BinaryOperatorNode {
+
+        public BracketedAccessOperatorNode(ExpressionNode left, ExpressionNode right) {
+            super(left, right, BRACKET_ACCESS_OP);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s[%s]", left, right);
+        }
+
+        @Override
+        public String toPrettyString(String indent, String incr) {
+            return indent + String.format("%s[%s]", left.toPrettyString(), right.toPrettyString());
+        }
+
+        @Override
+        public String shortType() {
+            return String.format("·[·]");
+        }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R> R accept(ExpressionVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R,A> R accept(ExpressionVisitorWArgs<R, A> visitor, A argument){
+            return visitor.visit(this, argument);
+        }
+
+        @Override
+        public Operator getOperator() {
+            return new Operator.SelectBit();
         }
     }
 
@@ -3073,7 +3294,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return String.format("%s[%s](%s)", method, globals, arguments);
+            return String.format("%s[[%s]](%s)", method, globals, arguments);
         }
 
         @Override

@@ -148,6 +148,16 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
     }
 
     @Override
+    public Object visit(ArrayAssignmentNode assignment) {
+        captureScope(assignment);
+        symbolTable.throwIfNotInCurrentScope(assignment.variable);
+        assignment.definition = symbolTable.lookup(assignment.variable);
+        assignment.arrayIndex.accept(this);
+        assignment.expression.accept(this);
+        return null;
+    }
+
+    @Override
     public Object visit(MultipleVariableAssignmentNode assignment) {
         captureScope(assignment);
         assignment.definitions = assignment.variables.stream().map(v -> {
@@ -217,13 +227,20 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
     @Override
     public Object visit(MethodInvocationNode methodInvocation) {
         captureScope(methodInvocation);
+        MethodNode method;
         if (!program.hasMethod(methodInvocation.method)){
-            throw new MJError(String.format("%s: No such method %s", methodInvocation, methodInvocation.method));
+            if (PredefinedMethodNode.isPredefined(methodInvocation.method)){
+                method = PredefinedMethodNode.getPredefined(methodInvocation.method);
+            } else {
+                throw new MJError(String.format("%s: No such method %s", methodInvocation, methodInvocation.method));
+            }
+        } else {
+            method = program.getMethod(methodInvocation.method);
         }
-        MethodNode method = program.getMethod(methodInvocation.method);
+
         methodInvocation.definition = method;
         visitChildrenDiscardReturn(methodInvocation);
-        if (methodInvocation.arguments.size() != method.parameters.size()){
+        if (methodInvocation.arguments.size() != method.getNumberOfParameters()){
             throw new WrongNumberOfArgumentsError(methodInvocation, String.format("Expected %d arguments got %d", method.parameters.size(), methodInvocation.arguments.size()));
         }
         methodInvocation.globalDefs = methodInvocation.globals.globalVarSSAVars.entrySet().stream()

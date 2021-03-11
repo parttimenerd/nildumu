@@ -307,12 +307,6 @@ public class TestProgram implements Comparable<TestProgram> {
             }
 
             @Override
-            public String visit(Parser.SingleUnaryOperatorNode unaryOperator) {
-                assert false;
-                return null;
-            }
-
-            @Override
             public String visit(Parser.PrimaryExpressionNode primaryExpression) {
                 return primaryExpression.toString();
             }

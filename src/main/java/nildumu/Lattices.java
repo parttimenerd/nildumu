@@ -1082,7 +1082,7 @@ public class Lattices {
             }
         }
 
-        public Bit addDependencies(Collection<Bit> newDependencies){
+        public Bit addDependencies(Iterable<Bit> newDependencies){
             newDependencies.forEach(this::addDependency);
             return this;
         }
@@ -1154,7 +1154,7 @@ public class Lattices {
 
     public static class ValueLattice implements Lattice<Value> {
 
-        public int bitWidth = Integer.MAX_VALUE;
+        public int bitWidth = 32;
 
         private static final ValueLattice lattice = new ValueLattice();
 
@@ -1455,7 +1455,7 @@ public class Lattices {
         }
 
         public String toLiteralString(){
-            if (isConstant()){
+            if (isConstant() && bits.size() <= vl.bitWidth){
                 return Integer.toString(asInt());
             }
             List<Bit> reversedBits = new ArrayList<>(bits);
@@ -1621,6 +1621,14 @@ public class Lattices {
 
         public boolean isNotEmpty() {
             return bits.size() > 0;
+        }
+
+        /**
+         * Add deps to each bit and returns the current value
+         */
+        public Value addDeps(Iterable<Bit> deps) {
+            bits.forEach(b -> b.addDependencies(deps));
+            return this;
         }
     }
 

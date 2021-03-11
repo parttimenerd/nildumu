@@ -1,5 +1,6 @@
 package nildumu;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -57,6 +58,7 @@ public class AppendTests {
         parse("bit_width 2; h input int h = 0buu; if (h){print(0)}").leaks(1).run();
     }
 
+    @Disabled
     @ParameterizedTest
     @CsvSource({
             "'while (1) { print(0) }', 0",
@@ -154,6 +156,7 @@ public class AppendTests {
         //parse(runProgram).leaks(leakage).run();
     }
 
+    @Disabled
     @ParameterizedTest
     @CsvSource({
             "'int a = 0; while (l){ a = input(); }', 0",
@@ -272,6 +275,7 @@ public class AppendTests {
         parse(runProgram).leaks(leakage).run();
     }
 
+    @Disabled
     @ParameterizedTest
     @CsvSource({
             "'int a = 0; while (l_input()){ a = input(); }', 0",

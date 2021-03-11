@@ -22,6 +22,11 @@ public class BasicTests {
     }
 
     @Test
+    public void testParsingRepeatedBitNotation2() {
+        parse("int l = 0b0{2};").val("l", "0b00").run();
+    }
+
+    @Test
     public void testParser2() {
         process("if (1) {}");
     }
@@ -36,6 +41,11 @@ public class BasicTests {
     public void testSimpleAssignment(){
         parse("int x = 1").val("x", 1).run();
         parse("int x = -10").val("x", -10).run();
+    }
+
+    @Test
+    public void testBitSelect() {
+        parse("int x = 0b001; int y = x[1]").val("y", -1).run();
     }
 
     @Test
@@ -174,7 +184,7 @@ public class BasicTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"while (a == h){}", "while [] (a == h) {}", "while [a = phi(a, b)] (a == h) {}"})
+    @ValueSource(strings = {"while (a == h){}", "while [[]] (a == h) {}", "while [[a = phi(a, b)]] (a == h) {}"})
     public void testWhileParsing(String program){
         Parser.generator.parse(program);
     }

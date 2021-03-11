@@ -17,6 +17,7 @@ import java.util.stream.Stream;
 import static java.time.Duration.ofSeconds;
 import static nildumu.Parser.MethodNode;
 import static nildumu.Parser.ProgramNode;
+import static nildumu.Processor.TRANSFORM_LOOPS;
 import static nildumu.Processor.process;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -432,7 +433,7 @@ l output int o = fib(h);
     }
 
     static ContextMatcher parse(String program, MethodInvocationHandler handler) {
-        return new ContextMatcher(process(program, Context.Mode.LOOP, handler, 0));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, handler, TRANSFORM_LOOPS));
     }
 
     static ContextMatcher parse(String program, String handler, int bitWidth) {
