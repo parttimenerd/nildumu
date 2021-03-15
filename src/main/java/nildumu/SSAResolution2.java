@@ -1,5 +1,6 @@
 package nildumu;
 
+import nildumu.typing.Types;
 import swp.util.Pair;
 
 import java.util.*;
@@ -11,8 +12,9 @@ import static nildumu.util.Util.p;
 /**
  * Does the conversion of a non SSA to a SSA AST,
  * introduces new phi-nodes and variables
- *
- * Version 2: comes in before (!) the name resolution and transforms the program in a program with
+ * <p>
+ * Version 2: comes in before (!) the name resolution and transforms the program in a program with,
+ * but comes after the TypeTransformation (and therefore only deals with ints)
  * Phi-Nodes. This program should then be pretty-printed and processed again (without SSA resolution)
  */
 public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
@@ -80,7 +82,9 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     private final Set<String> appendValueVariables;
 
-    public SSAResolution2(MethodNode method) {
+    private final Types types;
+
+    public SSAResolution2(Types types, MethodNode method) {
         reverseMapping = new HashMap<>();
         versionCount = new HashMap<>();
         scopes = new Stack<>();
@@ -89,6 +93,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         appendValueVariables = new HashSet<>();
         conditionalScopes = new Stack<>();
         conditionalScopes.push(new Scope());
+        this.types = types;
     }
 
     public List<String> resolve(MJNode node){
@@ -198,7 +203,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         Map<String, String> filtered = new HashMap<>();
         scopes.peek().newVariables.forEach((o, n) -> {
             if (scopes.peek().definedVariables.contains(o)){
-                block.prependVariableDeclaration(n, appendValueVariables.contains(o));
+                block.prependVariableDeclaration(n, types.INT, appendValueVariables.contains(o));
                 reverseMapping.remove(n);
                 introducedVariables.remove(n);
             } else {
@@ -279,7 +284,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     public static void process(SSAResolution2 parent, MethodNode method) {
-        SSAResolution2 resolution = new SSAResolution2(method);
+        SSAResolution2 resolution = new SSAResolution2(parent.types, method);
         resolution.pushNewVariablesScope();
         Map<String, String> pre = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, v -> {
             resolution.appendValueVariables.add(v);
@@ -289,16 +294,16 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         resolution.resolve(method.parameters);
         List<String> createdVars = resolution.resolve(method.body);
         createdVars.stream().filter(v -> !pre.values().contains(v))
-                .forEach(v -> method.body.prependVariableDeclaration(v, resolution.appendValueVariables.contains(resolution.resolveOrigin(v))));
+                .forEach(v -> method.body.prependVariableDeclaration(v, parent.types.INT, resolution.appendValueVariables.contains(resolution.resolveOrigin(v))));
         Map<String, String> post = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, resolution::resolve));
         parent.appendOnlyVariables.forEach(v -> method.globals.globalVarSSAVars.put(v, p(pre.get(v), post.get(v))));
     }
 
     public static void process(ProgramNode program){
-        SSAResolution2 resolution = new SSAResolution2(null);
+        SSAResolution2 resolution = new SSAResolution2(program.types, null);
         resolution.pushNewVariablesScope();
         resolution.resolveGlobalBlock(program.globalBlock)
-                .forEach(v -> program.globalBlock.prependVariableDeclaration(v, resolution.appendValueVariables.contains(v)));
+                .forEach(v -> program.globalBlock.prependVariableDeclaration(v, program.types.INT, resolution.appendValueVariables.contains(v)));
         program.methods().forEach(m -> SSAResolution2.process(resolution, m));
     }
 

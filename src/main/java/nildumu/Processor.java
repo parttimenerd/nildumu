@@ -34,7 +34,7 @@ public class Processor {
     }
 
     public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, int opts) {
-        return process(Parser.process(program, containsOpt(opts, TRANSFORM_PLUS), containsOpt(opts, TRANSFORM_LOOPS)),
+        return process(Parser.process(program, containsOpt(opts, TRANSFORM_PLUS)),
                 mode, handler, containsOpt(opts, RECORD_ALTERNATIVES));
     }
 
@@ -321,15 +321,7 @@ public class Processor {
             @Override
             public Boolean visit(ReturnStatementNode returnStatement) {
                 if (returnStatement.hasReturnExpression()) {
-                    if (returnStatement.expressions.size() == 1) {
-                        context.setReturnValue(context.nodeValue(returnStatement.expressions.get(0)));
-                    } else {
-                        // combine expressions
-                        Value retVal = Value.combine(returnStatement.expressions.stream()
-                                .map(context::nodeValue)
-                                .collect(Collectors.toList()));
-                        context.setReturnValue(retVal);
-                    }
+                    context.setReturnValue(context.nodeValue(returnStatement.expression));
                 }
                 return false;
             }

@@ -176,7 +176,7 @@ public class Quail extends AbstractTool {
             public String visit(Parser.ReturnStatementNode returnStatement) {
                 assert false;
                 return String.format("return (%s)(%s);", integerTypeStr,
-                        formatExpression(returnStatement.expressions.get(0)));
+                        formatExpression(returnStatement.expression));
             }
         });
     }

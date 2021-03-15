@@ -148,6 +148,7 @@ public class CallGraph {
                         new MethodNode(
                                 new Location(0, 0),
                                 "$main$",
+                                program.types.INT,
                                 new ParametersNode(new Location(0, 0), Collections.emptyList()),
                                 program.globalBlock,
                                 new GlobalVariablesNode(new Location(0, 0), new HashMap<>())),

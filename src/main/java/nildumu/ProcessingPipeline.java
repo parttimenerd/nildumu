@@ -1,0 +1,72 @@
+package nildumu;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+
+import static nildumu.ProcessingPipeline.Stage.wrap;
+
+/**
+ * Models the pipeline of processing which consists of multiple phases that consume and produce
+ * {@link Parser.ProgramNode} instances
+ */
+public class ProcessingPipeline {
+
+    @FunctionalInterface
+    public interface Stage {
+        Parser.ProgramNode process(Parser.ProgramNode program);
+
+        default String process(String program) {
+            return process((Parser.ProgramNode) Parser.generator.parse(program)).toPrettyString();
+        }
+
+        static Stage wrap(Consumer<Parser.ProgramNode> func) {
+            return program -> {
+                func.accept(program);
+                return program;
+            };
+        }
+    }
+
+    private final List<Stage> stages;
+
+    private ProcessingPipeline(List<Stage> stages) {
+        this.stages = stages;
+    }
+
+    private ProcessingPipeline(Stage... stages) {
+        this.stages = Arrays.asList(stages);
+    }
+
+    public static ProcessingPipeline create() {
+        return create(false, true);
+    }
+
+    public static ProcessingPipeline create(boolean transformPlus, boolean transformLoops) {
+        return new ProcessingPipeline(wrap(LoopTransformer::process),
+                wrap(SSAResolution2::process),
+                program -> new MetaOperatorTransformator(program.context.maxBitWidth, transformPlus).process(program));
+    }
+
+    public static ProcessingPipeline createTillBeforeTypeResolution() {
+        return new ProcessingPipeline(wrap(LoopTransformer::process));
+    }
+
+    public Parser.ProgramNode process(String program) {
+        return process(program, true);
+    }
+
+    public Parser.ProgramNode process(String program, boolean resetCounters) {
+        for (Stage stage : stages) {
+            if (resetCounters) {
+                Parser.MJNode.resetIdCounter();
+                Lattices.Bit.resetNumberOfCreatedBits();
+            }
+            program = stage.process(program);
+        }
+        Parser.ProgramNode programNode = (Parser.ProgramNode) Parser.generator.parse(program);
+        new NameResolution(programNode).resolve();
+        return programNode;
+    }
+
+}

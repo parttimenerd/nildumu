@@ -13,6 +13,9 @@ import static nildumu.Parser.*;
 import static nildumu.Parser.LexerTerminal.*;
 import static nildumu.util.Util.p;
 
+/**
+ * Only runs after the type transformation
+ */
 public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
 
     private final int maxBitWidth;
@@ -21,8 +24,6 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     private final DefaultMap<ExpressionNode, ExpressionNode> replacedMap = new DefaultMap<>((map, node) -> repl(node));
 
     private final DefaultMap<ConditionalStatementNode, ConditionalStatementNode> replacedCondStmtsMap = new DefaultMap<>((map, stmt) -> stmt);
-
-    private final Map<WhileStatementNode, WhileStatementNode> whileStmtMap = new HashMap<>();
 
     MetaOperatorTransformator(int maxBitWidth, boolean transformPlus) {
         this.maxBitWidth = maxBitWidth;
@@ -170,7 +171,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
             @Override
             public ExpressionNode visit(BracketedAccessOperatorNode bracketedAccess) {
                 return replace(new BracketedAccessOperatorNode(visitAndReplace(bracketedAccess.left),
-                                                               visitAndReplace(bracketedAccess.right)));
+                        visitAndReplace(bracketedAccess.right)));
             }
 
             @Override
@@ -224,6 +225,16 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
                 assignment.arrayIndex = assignment.arrayIndex.accept(this);
                 return null;
             }
+
+            @Override
+            public ExpressionNode visit(ArrayLiteralNode primaryExpression) {
+                return new ArrayLiteralNode(primaryExpression.location, primaryExpression.elements.stream().map(e -> e.accept(this)).collect(Collectors.toList()));
+            }
+
+            @Override
+            public ExpressionNode visit(TupleLiteralNode primaryExpression) {
+                return new TupleLiteralNode(primaryExpression.location, primaryExpression.elements.stream().map(e -> e.accept(this)).collect(Collectors.toList()));
+            }
         });
         replacedMap.put(node, replExpr);
         return replExpr;
@@ -272,7 +283,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
 
     @Override
     public MJNode visit(VariableDeclarationNode variableDeclaration){
-        VariableDeclarationNode node = new VariableDeclarationNode(variableDeclaration.location, variableDeclaration.variable, replace(variableDeclaration.expression),
+        VariableDeclarationNode node = new VariableDeclarationNode(variableDeclaration.location, variableDeclaration.variable, variableDeclaration.getVarType(), replace(variableDeclaration.expression),
                 variableDeclaration.hasAppendValue);
         node.definition = variableDeclaration.definition;
         return node;
@@ -280,28 +291,28 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
 
     @Override
     public MJNode visit(OutputVariableDeclarationNode decl){
-        OutputVariableDeclarationNode node = new OutputVariableDeclarationNode(decl.location, decl.variable, replace(decl.expression), decl.secLevel);
+        OutputVariableDeclarationNode node = new OutputVariableDeclarationNode(decl.location, decl.variable, decl.getVarType(), replace(decl.expression), decl.secLevel);
         node.definition = decl.definition;
         return node;
     }
 
     @Override
     public MJNode visit(InputVariableDeclarationNode decl){
-        InputVariableDeclarationNode node = new InputVariableDeclarationNode(decl.location, decl.variable, (IntegerLiteralNode) replace(decl.expression), decl.secLevel);
+        InputVariableDeclarationNode node = new InputVariableDeclarationNode(decl.location, decl.variable, decl.getVarType(), (IntegerLiteralNode) replace(decl.expression), decl.secLevel);
         node.definition = decl.definition;
         return node;
     }
 
     @Override
     public MJNode visit(TmpInputVariableDeclarationNode decl){
-        TmpInputVariableDeclarationNode node = new TmpInputVariableDeclarationNode(decl.location, decl.variable, (IntegerLiteralNode) replace(decl.expression), decl.secLevel);
+        TmpInputVariableDeclarationNode node = new TmpInputVariableDeclarationNode(decl.location, decl.variable, decl.getVarType(), (IntegerLiteralNode) replace(decl.expression), decl.secLevel);
         node.definition = decl.definition;
         return node;
     }
 
     @Override
     public MJNode visit(AppendOnlyVariableDeclarationNode decl){
-        AppendOnlyVariableDeclarationNode node = new AppendOnlyVariableDeclarationNode(decl.location, decl.variable, decl.secLevel, decl.isInput);
+        AppendOnlyVariableDeclarationNode node = new AppendOnlyVariableDeclarationNode(decl.location, decl.variable, decl.getVarType(), decl.secLevel, decl.isInput);
         node.definition = decl.definition;
         return node;
     }
@@ -349,8 +360,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     @Override
     public MJNode visit(ReturnStatementNode returnStatement){
         if (returnStatement.hasReturnExpression()){
-            return new ReturnStatementNode(returnStatement.location, returnStatement.expressions.stream()
-                    .map(this::replace).collect(Collectors.toList()));
+            return new ReturnStatementNode(returnStatement.location, replace(returnStatement.expression));
         }
         return new ReturnStatementNode(returnStatement.location);
     }

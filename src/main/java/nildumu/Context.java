@@ -885,8 +885,10 @@ public class Context {
     }
 
     public Bit choose(Bit a, Bit b) {
-        if (a.isConstant() || (!recordAlternatives && c1(a) <= c1(b))) {
-            if (recordAlternatives && !a.isConstant()) {
+        int ac = c1(a);
+        int bc = c1(b);
+        if (a.isConstant() || ac <= bc) {
+            if (recordAlternatives && !a.isConstant() && ac != 0) {
                 return createChooseWrapBit(a, b);
             }
             return a;
@@ -898,7 +900,7 @@ public class Context {
     }
 
     public Bit notChosen(Bit a, Bit b) {
-        if (b.isConstant() || (!recordAlternatives && c1(a) > c1(b))) {
+        if (b.isConstant() || c1(a) >= c1(b)) {
             return a;
         }
         return b;

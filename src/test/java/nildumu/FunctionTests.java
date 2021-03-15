@@ -1,8 +1,8 @@
 package nildumu;
 
 import nildumu.mih.MethodInvocationHandler;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -17,19 +17,18 @@ import java.util.stream.Stream;
 import static java.time.Duration.ofSeconds;
 import static nildumu.Parser.MethodNode;
 import static nildumu.Parser.ProgramNode;
-import static nildumu.Processor.TRANSFORM_LOOPS;
 import static nildumu.Processor.process;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class FunctionTests {
 
-    @BeforeClass
-    public void setUp(){
+    @BeforeAll
+    public static void setUp() {
         Processor.transformPlus = true;
     }
 
-    @AfterClass
-    public void tearDown(){
+    @AfterAll
+    public static void tearDown() {
         Processor.transformPlus = false;
     }
 
@@ -40,17 +39,17 @@ public class FunctionTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"int bla1_1(int blub){ return blub, blub }",
-            "int bla1_1(int blub, int blub2){ return blub, blub, blub2 }"})
+    @ValueSource(strings = {"(int, int) bla1_1(int blub){ return (blub, blub) }",
+            "(int, int, int) bla1_1(int blub, int blub2){ return (blub, blub, blub2) }"})
     public void testFunctionDefinitionWithMultipleReturnValues(String program) {
         parse(program);
     }
 
     @ParameterizedTest
     @CsvSource({
-            "'int bla1_1(int blub){ return blub, blub + 2 } int x; int y; x, y = bla1_1(1);', '1', '3'",
-            "'int bla1_1(int blub){ return blub - 2, blub - 3 } int x; int y; x, y = bla1_1(1);', '-1', '-2'",
-            "'int bla1_1(int blub){ return blub, blub } int x; int y; x, y = bla1_1(1);', '1', '1'",
+            "'(int, int) bla1_1(int blub){ return (blub, blub + 2) } int x; int y; x, y = *bla1_1(1);', '1', '3'",
+            "'(int, int) bla1_1(int blub){ return (blub - 2, blub - 3) } int x; int y; x, y = *bla1_1(1);', '-1', '-2'",
+            "'(int, int) bla1_1(int blub){ return (blub, blub) } int x; int y; x, y = *bla1_1(1);', '1', '1'",
     })
     public void testBasicFunctionCallWithMultipleReturns(String program, String valX, String valY) {
         Context.LOG.setLevel(Level.FINE);
@@ -102,16 +101,17 @@ l output int o = fib(h);
     @ParameterizedTest
     @MethodSource("handlers")
     public void testFibonacci(String handler){
+        Context.LOG.setLevel(Level.WARNING);
         assertTimeoutPreemptively(ofSeconds(5), () -> parse("bit_width 2;\n" +
-"h input int h = 0b0u;\n" +
-"int fib(int a){\n" +
-"	int r = 1;\n" +
-"	if (a > 1){\n" +
-"		r = fib(a - 1) + fib(a - 2);\n" +
-"	}\n" +
-"	return r;\n" +
-"}\n" +
-"l output int o = fib(h);", handler)).leaks(1).run();
+                "h input int h = 0b0u;\n" +
+                "int fib(int a){\n" +
+                "	int r = 1;\n" +
+                "	if (a > 1){\n" +
+                "		r = fib(a - 1) + fib(a - 2);\n" +
+                "	}\n" +
+                "	return r;\n" +
+                "}\n" +
+                "l output int o = fib(h);", handler)).leaks(1).run();
     }
 
     @ParameterizedTest
@@ -181,18 +181,17 @@ l output int o = fib(h);
     @ParameterizedTest
     @MethodSource("handlers")
     public void testWeirdFibonacciTermination(String handler){
-        Context.LOG.setLevel(Level.INFO);
-        assertTimeoutPreemptively(ofSeconds(10000), () -> parse(
+        assertTimeoutPreemptively(ofSeconds(1), () -> parse(
                 "     h input int h = 0b0u;\n" +
-                "     l input int l = 0b0u;\n" +
-                "     int res = 0;\n" +
-                "     int fib(int a){\n" +
-                "         int r = 1;\n" +
-                "         while (a > 0){\n" +
-                "             if (a > 1){\n" +
-                "                r = r + fib(a - 1);\n" +
-                "             }\n" +
-                "         }\n" +
+                        "     l input int l = 0b0u;\n" +
+                        "     int res = 0;\n" +
+                        "     int fib(int a){\n" +
+                        "         int r = 1;\n" +
+                        "         while (a > 0){\n" +
+                        "             if (a > 1){\n" +
+                        "                r = r + fib(a - 1);\n" +
+                        "             }\n" +
+                        "         }\n" +
                 "         return r;\n" +
                 "     }\n" +
                 "     while (l) {\n" +
@@ -202,12 +201,11 @@ l output int o = fib(h);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"handler=inlining;maxrec=5;bot=summary"})
+    @ValueSource(strings = {"handler=inlining;maxrec=2;bot=summary"})
     public void testWeirdFibonacciTermination32(String handler){
-        Context.LOG.setLevel(Level.INFO);
         assertTimeoutPreemptively(ofSeconds(10000), () -> parse(
-                "     h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
-                        "     l input int l = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
+                "     h input int h = 0bu{32};\n" +
+                        "     l input int l = 0bu{32};\n" +
                         "     int res = 0;\n" +
                         "     int fib(int a){\n" +
                         "         int r = 1;\n" +
@@ -221,7 +219,7 @@ l output int o = fib(h);
                         "     while (l) {\n" +
                         "        res = res + fib(h);\n" +
                         "     }\n" +
-                        "     l output int o = fib(h);", handler)).leaks(32).benchLeakageComputationAlgorithms().run();
+                        "     l output int o = fib(h);", handler).leaks(32).benchLeakageComputationAlgorithms(3).run());
     }
 
     /**
@@ -433,7 +431,7 @@ l output int o = fib(h);
     }
 
     static ContextMatcher parse(String program, MethodInvocationHandler handler) {
-        return new ContextMatcher(process(program, Context.Mode.LOOP, handler, TRANSFORM_LOOPS));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, handler, 0));
     }
 
     static ContextMatcher parse(String program, String handler, int bitWidth) {

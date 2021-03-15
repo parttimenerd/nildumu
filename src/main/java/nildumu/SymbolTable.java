@@ -1,5 +1,7 @@
 package nildumu;
 
+import nildumu.typing.Type;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,6 +56,10 @@ public class SymbolTable {
         public List<String> filter(List<String> variables) {
             return variables.stream().filter(this::contains).collect(Collectors.toList());
         }
+
+        public List<Variable> filterVariables(List<Variable> variables) {
+            return variables.stream().filter(v -> contains(v.name)).collect(Collectors.toList());
+        }
     }
 
     private Scope current = null;
@@ -72,14 +78,19 @@ public class SymbolTable {
     void leaveScope() {
         current = current.parent;
     }
+
     boolean inCurrentScope(String name) {
         return current.defs.get(name) != null;
     }
 
-    void throwIfNotInCurrentScope(String name){
-        if (lookup(name) == null){
+    void throwIfNotInCurrentScope(String name) {
+        if (lookup(name) == null) {
             throw new Parser.MJError(String.format("Variable %s isn't defined in the current or parent scopes", name));
         }
+    }
+
+    Type lookupType(String name) {
+        return lookup(name).type;
     }
 
     boolean isDirectlyInCurrentScope(String name) {

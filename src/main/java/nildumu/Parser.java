@@ -1,5 +1,7 @@
 package nildumu;
 
+import nildumu.typing.Type;
+import nildumu.typing.Types;
 import nildumu.util.Util;
 import swp.SWPException;
 import swp.lexer.Lexer;
@@ -19,7 +21,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static nildumu.Checks.checkAndThrow;
 import static nildumu.Lattices.*;
 import static nildumu.Parser.LexerTerminal.*;
 import static nildumu.util.Util.p;
@@ -138,58 +139,59 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static final Generator generator = Generator.getCachedIfPossible("stuff/ihrtsd345sddsdfewiod", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static final Generator generator = Generator.getCachedIfPossible("stuff/ihrtsd345fgsddfgsdfewiod", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
+                Types types = new Types();
                 builder.addRule("program", "use_sec? bit_width? lines", asts -> {
-                            SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>) asts.get(0)).get(0).wrapped;
-                            int declaredBitWidth = asts.get(1).children().isEmpty() ? -1 : ((ListAST<WrapperNode<Integer>>) asts.get(1)).get(0).wrapped;
-                            /*
-                             * Calc bit width
-                             */
-                            List<MJNode> topLevelNodes = asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped;
-                            int lowerBitWidthBound = topLevelNodes.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
+                    SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>) asts.get(0)).get(0).wrapped;
+                    int declaredBitWidth = asts.get(1).children().isEmpty() ? -1 : ((ListAST<WrapperNode<Integer>>) asts.get(1)).get(0).wrapped;
+                    /*
+                     * Calc bit width
+                     */
+                    List<MJNode> topLevelNodes = asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped;
+                    int lowerBitWidthBound = topLevelNodes.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
 
-                                @Override
-                                public Integer visit(MJNode node) {
-                                    return visitChildren(node).stream().max(Integer::compare).orElse(0);
-                                }
+                        @Override
+                        public Integer visit(MJNode node) {
+                            return visitChildren(node).stream().max(Integer::compare).orElse(0);
+                        }
 
-                                @Override
-                                public Integer visit(IntegerLiteralNode literal) {
-                                    int bitWidth = literal.value.size();
+                        @Override
+                        public Integer visit(IntegerLiteralNode literal) {
+                            int bitWidth = literal.value.size();
                                     if (bitWidth > declaredBitWidth && declaredBitWidth != -1){
                                         //Token literalToken = literal.getMatchedTokens().get(0);
                                         //System.err.println(String.format("Declared bit width of %d is lower than the bit width of literal %s, only use for arrays", declaredBitWidth, bitWidth));
                                     }
-                                    return bitWidth;
-                                }
-                            })).max().orElse(0);
-                            int bitWidth = declaredBitWidth;
-                            if (declaredBitWidth == -1){
-                                bitWidth = lowerBitWidthBound;
-                            }
-                            ProgramNode node = new ProgramNode(new Context(secLattice, bitWidth));
-                            NodeVisitor visitor = new NodeVisitor<Object>(){
+                            return bitWidth;
+                        }
+                    })).max().orElse(0);
+                    int bitWidth = declaredBitWidth;
+                    if (declaredBitWidth == -1) {
+                        bitWidth = lowerBitWidthBound;
+                    }
+                    ProgramNode node = new ProgramNode(new Context(secLattice, bitWidth), types);
+                    NodeVisitor visitor = new NodeVisitor<Object>() {
 
-                                @Override
-                                public Object visit(MJNode node) {
-                                    return null;
-                                }
+                        @Override
+                        public Object visit(MJNode node) {
+                            return null;
+                        }
 
-                                @Override
-                                public Object visit(MethodNode method) {
-                                    node.addMethod(method);
-                                    return null;
-                                }
+                        @Override
+                        public Object visit(MethodNode method) {
+                            node.addMethod(method);
+                            return null;
+                        }
 
-                                @Override
-                                public Object visit(StatementNode statement) {
-                                    node.addGlobalStatement(statement);
-                                    return null;
-                                }
+                        @Override
+                        public Object visit(StatementNode statement) {
+                            node.addGlobalStatement(statement);
+                            return null;
+                        }
 
-                                @Override
+                        @Override
                                 public Object visit(InputVariableDeclarationNode inputDecl) {
                                     node.context.addInputValue(secLattice.parse(inputDecl.secLevel), ((IntegerLiteralNode)inputDecl.expression).value);
                                     visit((StatementNode)inputDecl);
@@ -240,61 +242,69 @@ public class Parser implements Serializable {
                             return new OutputVariableDeclarationNode(
                                     asts.get(0).getMatchedTokens().get(0).location,
                                     asts.get(3).getMatchedString(),
-                                    (ExpressionNode)asts.get(5),
+                                    types.INT,
+                                    (ExpressionNode) asts.get(5),
                                     asts.get(0).getMatchedString());
                         })
                         .addRule("input_decl_statement", "IDENT INPUT INT IDENT EQUAL_SIGN input_literal", asts -> {
                             return new InputVariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(3).getMatchedString(),
-                                    (IntegerLiteralNode)asts.get(5),
+                                    types.INT,
+                                    (IntegerLiteralNode) asts.get(5),
                                     asts.get(0).getMatchedString());
                         })
                         .addRule("tmp_input_decl_statement", "IDENT TMP_INPUT INT IDENT EQUAL_SIGN input_literal", asts -> {
                             return new TmpInputVariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(3).getMatchedString(),
-                                    (IntegerLiteralNode)asts.get(5),
+                                    types.INT,
+                                    (IntegerLiteralNode) asts.get(5),
                                     asts.get(0).getMatchedString());
                         })
                         .addRule("append_decl_statement", "IDENT APPEND_ONLY INT ident", asts -> {
                             return new AppendOnlyVariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(3).getMatchedString(),
+                                    types.INT,
                                     asts.get(0).getMatchedString());
                         })
                         .addRule("append_decl_statement", "IDENT APPEND_ONLY INPUT INT ident", asts -> {
                             return new AppendOnlyVariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(4).getMatchedString(),
+                                    types.INT,
                                     asts.get(0).getMatchedString(),
                                     true);
                         })
-                        .addRule("method", "INT ident LPAREN parameters RPAREN method_body", asts -> {
-                            return new MethodNode(asts.get(0).getMatchedTokens().get(0).location,
+                        .addRule("method", "type ident LPAREN parameters RPAREN method_body", asts -> {
+                            return new MethodNode(asts.get(0).<MJNode>as().location,
                                     asts.get(1).getMatchedString(),
-                                    (ParametersNode)asts.get(3), (BlockNode)asts.get(5),
+                                    ((TypeNode) asts.get(0)).type,
+                                    (ParametersNode) asts.get(3), (BlockNode) asts.get(5),
                                     new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
                         })
-                        .addRule("method", "INT ident globals LPAREN parameters RPAREN method_body", asts -> {
-                            return new MethodNode(asts.get(0).getMatchedTokens().get(0).location,
+                        .addRule("method", "type ident globals LPAREN parameters RPAREN method_body", asts -> {
+                            return new MethodNode(asts.get(0).<MJNode>as().location,
                                     asts.get(1).getMatchedString(),
-                                    (ParametersNode)asts.get(4), (BlockNode)asts.get(6),
-                                    (GlobalVariablesNode)asts.get(2));
+                                    ((TypeNode) asts.get(0)).type,
+                                    (ParametersNode) asts.get(4), (BlockNode) asts.get(6),
+                                    (GlobalVariablesNode) asts.get(2));
                         })
                         .addRule("parameters", "", asts -> new ParametersNode(new Location(0, 0), new ArrayList<>()))
                         .addRule("parameters", "parameter COMMA parameters", asts -> {
-                            ParameterNode param = (ParameterNode)asts.get(0);
+                            ParameterNode param = (ParameterNode) asts.get(0);
                             ParametersNode node = new ParametersNode(param.location, Utils.makeArrayList(param));
-                            node.parameterNodes.addAll(((ParametersNode)asts.get(2)).parameterNodes);
+                            node.parameterNodes.addAll(((ParametersNode) asts.get(2)).parameterNodes);
                             return node;
                         })
                         .addRule("parameters", "parameter", asts -> {
-                            ParameterNode param = (ParameterNode)asts.get(0);
+                            ParameterNode param = (ParameterNode) asts.get(0);
                             return new ParametersNode(param.location, Utils.makeArrayList(param));
                         })
-                        .addRule("parameter", "INT ident", asts -> {
-                            return new ParameterNode(asts.getStartLocation(), asts.get(1).getMatchedString());
+                        .addRule("parameter", "type ident", asts -> {
+                            return new ParameterNode(asts.get(0).<MJNode>as().location, ((TypeNode) asts.get(0)).type,
+                                    asts.get(1).getMatchedString());
                         })
                         .addEitherRule("statement", "block")
                         .addRule("expression_statement", "expression", asts -> {
@@ -351,19 +361,23 @@ public class Parser implements Serializable {
                         .addRule("block_statement", "tmp_input_decl_statement")
                         .addRule("block_statement", "array_assignment_statement")
                         .addRule("block_statement", "block")
-                        .addRule("var_decl", "INT ident", asts -> {
+                        .addRule("var_decl", "type ident", asts -> {
+                            Type type = ((TypeNode) asts.get(0)).type;
                             return new VariableDeclarationNode(
-                                    asts.getStartLocation(),
+                                    asts.get(0).<MJNode>as().location,
                                     asts.get(1).getMatchedString(),
+                                    type == types.AINT ? types.INT : type,
                                     null,
-                                    !asts.get(0).getMatchedString().equals("int"));
+                                    type == types.AINT);
                         })
-                        .addRule("var_decl", "INT ident EQUAL_SIGN (phi|expression)", asts -> {
+                        .addRule("var_decl", "type ident EQUAL_SIGN (phi|expression)", asts -> {
+                            Type type = ((TypeNode) asts.get(0)).type;
                             return new VariableDeclarationNode(
-                                    asts.getStartLocation(),
+                                    asts.get(0).<MJNode>as().location,
                                     asts.get(1).getMatchedString(),
+                                    type == types.AINT ? types.INT : type,
                                     (ExpressionNode) asts.get(3),
-                                    !asts.get(0).getMatchedString().equals("int"));
+                                    type == types.AINT);
                         })
                         .addRule("local_variable_assignment_statement", "ident EQUAL_SIGN (phi|expression)", asts -> {
                             return new VariableAssignmentNode(
@@ -371,16 +385,22 @@ public class Parser implements Serializable {
                                     asts.get(0).getMatchedString(),
                                     (ExpressionNode) asts.get(2));
                         })
-                        .addRule("local_variable_assignment_statement", "ident COMMA idents EQUAL_SIGN method_invocation", asts -> {
+                        .addRule("local_variable_assignment_statement", "ident EQUAL_SIGN unpack", asts -> {
+                            return new MultipleVariableAssignmentNode(
+                                    asts.getStartLocation(),
+                                    new String[]{asts.get(0).getMatchedString()},
+                                    (UnpackOperatorNode) asts.get(2));
+                        })
+                        .addRule("local_variable_assignment_statement", "ident COMMA idents EQUAL_SIGN unpack", asts -> {
                             return new MultipleVariableAssignmentNode(
                                     asts.getStartLocation(),
                                     Stream.concat(Stream.of(asts.get(0).getMatchedString()),
                                             ((CustomAST<List<String>>) asts.get(2)).value.stream())
                                             .collect(Collectors.toList()).toArray(new String[0]),
-                                    (MethodInvocationNode) asts.get(4));
+                                    (UnpackOperatorNode) asts.get(4));
                         })
                         .addRule("idents", "ident", asts -> {
-                            return new CustomAST<List<String>>(Collections.singletonList(asts.get(0).getMatchedString()));
+                            return new CustomAST<>(Collections.singletonList(asts.get(0).getMatchedString()));
                         })
                         .addRule("idents", "ident COMMA idents", asts -> {
                             return new CustomAST<List<String>>(Stream.concat(Stream.of(asts.get(0).getMatchedString()),
@@ -426,8 +446,8 @@ public class Parser implements Serializable {
                         .addRule("return_statement", "RETURN", asts -> {
                             return new ReturnStatementNode(asts.getStartLocation());
                         })
-                        .addRule("return_statement", "RETURN arguments", asts -> {
-                            return new ReturnStatementNode(asts.getStartLocation(), ((ArgumentsNode) asts.get(1)).arguments);
+                        .addRule("return_statement", "RETURN expression", asts -> {
+                            return new ReturnStatementNode(asts.getStartLocation(), (ExpressionNode) asts.get(1));
                         })
                         .addOperators("expression", "postfix_expression", operators -> {
                             operators.defaultBinaryAction((asts, op) -> {
@@ -477,17 +497,18 @@ public class Parser implements Serializable {
                                     (ArgumentsNode)asts.get(3), asts.get(1).as());
                         })
                         .addRule("method_invocation", "ident globals LPAREN expression RPAREN", asts -> {
-                            ExpressionNode arg = (ExpressionNode)asts.get(3);
+                            ExpressionNode arg = (ExpressionNode) asts.get(3);
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
                                     new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
                                     asts.get(1).as());
                         })
                         .addRule("method_invocation", "ident LPAREN arguments RPAREN", asts -> {
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
-                                    (ArgumentsNode)asts.get(2), new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
+                                    (ArgumentsNode) asts.get(2),
+                                    new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
                         })
-                        .addRule("method_invocation", "ident LPAREN expression RPAREN", asts -> {
-                            ExpressionNode arg = (ExpressionNode)asts.get(2);
+                        .addRule("method_invocation", "ident LPAREN tuple_element RPAREN", asts -> {
+                            ExpressionNode arg = (ExpressionNode) asts.get(2);
                             return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
                                     new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
                                     new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
@@ -497,15 +518,16 @@ public class Parser implements Serializable {
                                     asts.get(4).getMatchedString()));
                         })
                         .addRule("arguments", "", asts -> new ArgumentsNode(new Location(0, 0), new ArrayList<>()))
-                        .addRule("arguments", "expression", asts -> {
-                            return new ArgumentsNode(((ExpressionNode)asts.get(0)).location, Utils.makeArrayList((ExpressionNode)asts.get(0)));
+                        .addRule("arguments", "tuple_element", asts -> {
+                            return new ArgumentsNode(((ExpressionNode) asts.get(0)).location, Utils.makeArrayList((ExpressionNode) asts.get(0)));
                         })
-                        .addRule("arguments", "expression COMMA arguments", asts -> {
-                            List<ExpressionNode> args = Utils.makeArrayList((ExpressionNode)asts.get(0));
-                            ArgumentsNode argsNode = ((ArgumentsNode)asts.get(2));
+                        .addRule("arguments", "tuple_element COMMA arguments", asts -> {
+                            List<ExpressionNode> args = Utils.makeArrayList((ExpressionNode) asts.get(0));
+                            ArgumentsNode argsNode = ((ArgumentsNode) asts.get(2));
                             args.addAll(argsNode.arguments);
                             return new ArgumentsNode(argsNode.location, args);
                         })
+                        .addRule("unpack", "MULTIPLY postfix_expression", asts -> new UnpackOperatorNode(asts.get(1).as()))
                         .addRule("primary_expression", "FALSE", asts -> new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(0)))
                         .addRule("primary_expression", "TRUE", asts -> new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(1)))
                         .addRule("primary_expression", "INTEGER_LITERAL", asts -> {
@@ -518,6 +540,23 @@ public class Parser implements Serializable {
                         .addRule("primary_expression", "LPAREN expression RPAREN", asts -> {
                             return asts.get(1);
                         })
+                        .addRule("primary_expression", "tuple_expression")
+                        .addRule("primary_expression", "array_expression")
+                        .addRule("tuple_expression", "LPAREN tuple_inner RPAREN", asts -> {
+                            return new TupleLiteralNode(asts.getStartLocation(), ((TupleLiteralNode) asts.get(1)).elements);
+                        })
+                        .addRule("tuple_expression", "LPAREN tuple_element RPAREN", asts -> {
+                            return new TupleLiteralNode(asts.getStartLocation(), Collections.singletonList((ExpressionNode) asts.get(1)));
+                        })
+                        .addRule("tuple_inner", Arrays.asList(
+                                "tuple_element COMMA",
+                                "tuple_element (COMMA tuple_element)+"), asts -> {
+                            return new TupleLiteralNode(new Location(0, 0), asts.getAll(ExpressionNode.class));
+                        })
+                        .addRule("array_expression", "LCURLY tuple_inner RCURLY", asts -> {
+                            return new ArrayLiteralNode(asts.getStartLocation(), ((TupleLiteralNode) asts.get(1)).elements);
+                        })
+                        .addRule("tuple_element", "unpack | expression", asts -> (BaseAST) asts.getAll(ExpressionNode.class).get(0))
                         .addRule("var_access", "ident", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
                         .addRule("input_literal", "INPUT_LITERAL|INTEGER_LITERAL", asts -> {
                             /*List<Bit> rev = asts.get(0).<ListAST<?>>as().stream().map(s -> new Bit(B.U.parse(s.getMatchedString().substring(1)))).collect(Collectors.toList());
@@ -538,15 +577,37 @@ public class Parser implements Serializable {
                         })
                         .addRule("globals_", "global COMMA globals_", asts -> {
                             Utils.Triple<String, String, String> glob = asts.get(0).<WrapperNode<Utils.Triple<String, String, String>>>as().wrapped;
-                            GlobalVariablesNode globalNode = ((GlobalVariablesNode)asts.get(2));
+                            GlobalVariablesNode globalNode = ((GlobalVariablesNode) asts.get(2));
                             globalNode.globalVarSSAVars.put(glob.first, p(glob.second, glob.third));
-                            return new GlobalVariablesNode(((WrapperNode<?>)asts.get(0)).location, globalNode.globalVarSSAVars);
+                            return new GlobalVariablesNode(((WrapperNode<?>) asts.get(0)).location, globalNode.globalVarSSAVars);
                         })
+                        // globals only usable after the type transformation
                         .addRule("global", "ident ARROW ident ARROW ident", asts -> {
                             return new WrapperNode<>(asts.getStartLocation(),
                                     new Utils.Triple<>(asts.get(0).getMatchedString(), asts.get(2).getMatchedString(), asts.get(4).getMatchedString()));
                         })
-                        .addRule("ident", "IDENT|INPUT");
+                        .addRule("ident", "IDENT|INPUT")
+                        .addRule("type", "INT", asts -> new TypeNode(asts.getStartLocation(),
+                                types.INT))
+                        .addRule("type", "array_type")
+                        .addRule("type", "tuple_type")
+                        .addRule("type", "IDENT", asts -> {
+                            String type = asts.getMatchedString();
+                            if (!types.containsKey(type)) {
+                                throw new NildumuError(String.format("No such type %s", type));
+                            }
+                            return new TypeNode(asts.getStartLocation(), types.get(type));
+                        })
+                        .addRule("array_type", "type LBRACKET INTEGER_LITERAL RBRACKET", asts -> {
+                            Type subType = asts.get(0).<TypeNode>as().type;
+                            int length = vl.parse(asts.get(2).getMatchedString()).asInt();
+                            return new TypeNode(asts.get(0).<MJNode>as().location,
+                                    types.getOrCreateFixedArrayType(subType, Collections.singletonList(length)));
+                        })
+                        .addRule("tuple_type", "LPAREN type (COMMA type)* RPAREN", asts -> {
+                            List<Type> elementTypes = (List<Type>) asts.getAll("type").stream().map(a -> ((TypeNode) a).type).collect(Collectors.toList());
+                            return new TypeNode(asts.getStartLocation(), types.getOrCreateTupleType(elementTypes));
+                        });
             }, "program");
 
     /**
@@ -575,7 +636,7 @@ public class Parser implements Serializable {
     }
 
     public static ProgramNode process(String input) {
-        return process(input, true);
+        return process(input, false);
     }
 
     /**
@@ -591,29 +652,7 @@ public class Parser implements Serializable {
      * Currently does a name resolution and converts the result into SSA form
      */
     public static ProgramNode process(String input, boolean transformPlus, boolean transformLoops) {
-        Parser.MJNode.resetIdCounter();
-        Lattices.Bit.resetNumberOfCreatedBits();
-        if (transformLoops) {
-            ProgramNode programNode = (Parser.ProgramNode) generator.parse(input);
-            LoopTransformer.process(programNode);
-            return process(programNode.toPrettyString(), transformPlus, false);
-        }
-        Parser.ProgramNode programNode = (Parser.ProgramNode) generator.parse(input);
-        SSAResolution2.process(programNode);
-        input = programNode.toPrettyString();
-        Parser.MJNode.resetIdCounter();
-        Lattices.Bit.resetNumberOfCreatedBits();
-        Parser.ProgramNode resolvedProgram = (Parser.ProgramNode) Parser.generator.parse(input);
-        new NameResolution(resolvedProgram).resolve();
-        //checkAndThrow(resolvedProgram);
-        Parser.ProgramNode transformedProgram = new MetaOperatorTransformator(resolvedProgram.context.maxBitWidth, transformPlus).process(resolvedProgram);
-        checkAndThrow(transformedProgram);
-        input = transformedProgram.toPrettyString();
-        Parser.MJNode.resetIdCounter();
-        Lattices.Bit.resetNumberOfCreatedBits();
-        resolvedProgram = (Parser.ProgramNode) Parser.generator.parse(input);
-        new NameResolution(resolvedProgram).resolve();
-        return resolvedProgram;
+        return ProcessingPipeline.create(transformPlus, transformLoops).process(input);
     }
 
     /**
@@ -727,50 +766,66 @@ public class Parser implements Serializable {
             return visit((StatementNode)whileEndStatement);
         }
 
-        default R visit(VariableAccessNode variableAccess){
-            return visit((PrimaryExpressionNode)variableAccess);
+        default R visit(VariableAccessNode variableAccess) {
+            return visit((PrimaryExpressionNode) variableAccess);
         }
 
-        default R visit(ParameterAccessNode variableAccess){
-            return visit((VariableAccessNode)variableAccess);
+        default R visit(ParameterAccessNode variableAccess) {
+            return visit((VariableAccessNode) variableAccess);
         }
 
-        default R visit(BinaryOperatorNode binaryOperator){
-            return visit((ExpressionNode)binaryOperator);
+        default R visit(BinaryOperatorNode binaryOperator) {
+            return visit((ExpressionNode) binaryOperator);
         }
 
-        default R visit(UnaryOperatorNode unaryOperator){
-            return visit((ExpressionNode)unaryOperator);
+        default R visit(UnaryOperatorNode unaryOperator) {
+            return visit((ExpressionNode) unaryOperator);
         }
 
-        default R visit(BracketedAccessOperatorNode bracketedAccess){
+        default R visit(UnpackOperatorNode unpackOperator) {
+            return visit((UnaryOperatorNode) unpackOperator);
+        }
+
+        default R visit(BracketedAccessOperatorNode bracketedAccess) {
             return visit((BinaryOperatorNode) bracketedAccess);
         }
 
-        default R visit(BitPlaceOperatorNode bitPlacement){
-            return visit((UnaryOperatorNode)bitPlacement);
+        default R visit(BitPlaceOperatorNode bitPlacement) {
+            return visit((UnaryOperatorNode) bitPlacement);
         }
 
-        default R visit(PrimaryExpressionNode primaryExpression){
-            return visit((ExpressionNode)primaryExpression);
+        default R visit(PrimaryExpressionNode primaryExpression) {
+            return visit((ExpressionNode) primaryExpression);
         }
 
-        default R visit(ExpressionStatementNode expressionStatement){
-            return visit((StatementNode)expressionStatement);
+        default R visit(TupleLiteralNode primaryExpression) {
+            return visit((PrimaryExpressionNode) primaryExpression);
         }
 
-        default R visit(ReturnStatementNode returnStatement){
+        default R visit(ArrayLiteralNode primaryExpression) {
+            return visit((PrimaryExpressionNode) primaryExpression);
+        }
+
+        default R visit(ExpressionStatementNode expressionStatement) {
+            return visit((StatementNode) expressionStatement);
+        }
+
+        default R visit(ReturnStatementNode returnStatement) {
             return visit((StatementNode) returnStatement);
+        }
+
+        default R visit(TypeNode typeNode) {
+            return visit((MJNode) typeNode);
         }
 
         /**
          * Visit all direct children with the visitor and return the results
          */
-        default List<R> visitChildren(MJNode node){
+        default List<R> visitChildren(MJNode node) {
             try {
                 return node.children().stream().map(c -> ((MJNode) c).accept(this)).collect(Collectors.toList());
-            } catch (NullPointerException ex){
-                return  null;
+            } catch (NullPointerException ex) {
+                return null;
             }
         }
 
@@ -872,40 +927,52 @@ public class Parser implements Serializable {
 
         R visit(ExpressionNode expression);
 
-        default R visit(PhiNode phi){
-            return visit((ExpressionNode)phi);
+        default R visit(PhiNode phi) {
+            return visit((ExpressionNode) phi);
         }
 
-        default R visit(VariableAccessNode variableAccess){
-            return visit((PrimaryExpressionNode)variableAccess);
+        default R visit(VariableAccessNode variableAccess) {
+            return visit((PrimaryExpressionNode) variableAccess);
         }
 
-        default R visit(ParameterAccessNode variableAccess){
-            return visit((VariableAccessNode)variableAccess);
+        default R visit(ParameterAccessNode variableAccess) {
+            return visit((VariableAccessNode) variableAccess);
         }
 
-        default R visit(IntegerLiteralNode literal){
-            return visit((PrimaryExpressionNode)literal);
+        default R visit(IntegerLiteralNode literal) {
+            return visit((PrimaryExpressionNode) literal);
         }
 
-        default R visit(BinaryOperatorNode binaryOperator){
-            return visit((ExpressionNode)binaryOperator);
+        default R visit(TupleLiteralNode literal) {
+            return visit((PrimaryExpressionNode) literal);
         }
 
-        default R visit(UnaryOperatorNode unaryOperator){
-            return visit((ExpressionNode)unaryOperator);
+        default R visit(ArrayLiteralNode literal) {
+            return visit((PrimaryExpressionNode) literal);
         }
 
-        default R visit(PrimaryExpressionNode primaryExpression){
-            return visit((ExpressionNode)primaryExpression);
+        default R visit(BinaryOperatorNode binaryOperator) {
+            return visit((ExpressionNode) binaryOperator);
         }
 
-        default R visit(BracketedAccessOperatorNode bracketedAccess){
+        default R visit(UnaryOperatorNode unaryOperator) {
+            return visit((ExpressionNode) unaryOperator);
+        }
+
+        default R visit(UnpackOperatorNode unpackOperator) {
+            return visit((UnaryOperatorNode) unpackOperator);
+        }
+
+        default R visit(PrimaryExpressionNode primaryExpression) {
+            return visit((ExpressionNode) primaryExpression);
+        }
+
+        default R visit(BracketedAccessOperatorNode bracketedAccess) {
             return visit((BinaryOperatorNode) bracketedAccess);
         }
 
-        default R visit(BitPlaceOperatorNode bitPlacement){
-            return visit((UnaryOperatorNode)bitPlacement);
+        default R visit(BitPlaceOperatorNode bitPlacement) {
+            return visit((UnaryOperatorNode) bitPlacement);
         }
 
         default R visit(MethodInvocationNode methodInvocation){
@@ -940,42 +1007,53 @@ public class Parser implements Serializable {
 
         R visit(ExpressionNode expression, A argument);
 
-        default R visit(PhiNode phi, A argument){
-            return visit((ExpressionNode)phi, argument);
+        default R visit(PhiNode phi, A argument) {
+            return visit((ExpressionNode) phi, argument);
         }
 
 
-        default R visit(VariableAccessNode variableAccess, A argument){
-            return visit((PrimaryExpressionNode)variableAccess, argument);
+        default R visit(VariableAccessNode variableAccess, A argument) {
+            return visit((PrimaryExpressionNode) variableAccess, argument);
         }
 
-        default R visit(ParameterAccessNode variableAccess, A argument){
-            return visit((VariableAccessNode)variableAccess, argument);
+        default R visit(ParameterAccessNode variableAccess, A argument) {
+            return visit((VariableAccessNode) variableAccess, argument);
         }
 
-        default R visit(IntegerLiteralNode literal, A argument){
-            return visit((PrimaryExpressionNode)literal, argument);
+        default R visit(IntegerLiteralNode literal, A argument) {
+            return visit((PrimaryExpressionNode) literal, argument);
         }
 
-        default R visit(BinaryOperatorNode binaryOperator, A argument){
-            return visit((ExpressionNode)binaryOperator, argument);
+        default R visit(TupleLiteralNode literal, A argument) {
+            return visit((PrimaryExpressionNode) literal, argument);
         }
 
-        default R visit(UnaryOperatorNode unaryOperator, A argument){
-            return visit((ExpressionNode)unaryOperator, argument);
+        default R visit(ArrayLiteralNode literal, A argument) {
+            return visit((PrimaryExpressionNode) literal, argument);
         }
 
+        default R visit(BinaryOperatorNode binaryOperator, A argument) {
+            return visit((ExpressionNode) binaryOperator, argument);
+        }
 
-        default R visit(BracketedAccessOperatorNode bracketedAccess, A argument){
+        default R visit(UnaryOperatorNode unaryOperator, A argument) {
+            return visit((ExpressionNode) unaryOperator, argument);
+        }
+
+        default R visit(UnpackOperatorNode unpackOperator, A argument) {
+            return visit((UnaryOperatorNode) unpackOperator, argument);
+        }
+
+        default R visit(BracketedAccessOperatorNode bracketedAccess, A argument) {
             return visit((BinaryOperatorNode) bracketedAccess, argument);
         }
 
-        default R visit(BitPlaceOperatorNode bitPlacement, A argument){
-            return visit((UnaryOperatorNode)bitPlacement, argument);
+        default R visit(BitPlaceOperatorNode bitPlacement, A argument) {
+            return visit((UnaryOperatorNode) bitPlacement, argument);
         }
 
-        default R visit(PrimaryExpressionNode primaryExpression, A argument){
-            return visit((ExpressionNode)primaryExpression, argument);
+        default R visit(PrimaryExpressionNode primaryExpression, A argument) {
+            return visit((ExpressionNode) primaryExpression, argument);
         }
     }
 
@@ -1129,7 +1207,10 @@ public class Parser implements Serializable {
      */
     public static class ProgramNode extends MJNode {
 
+        public final Type INT;
         public final Context context;
+
+        public final Types types;
 
         private final Map<Variable, Object> inputVariables = new IdentityHashMap<>();
         private final Map<Variable, Object> outputVariables = new IdentityHashMap<>();
@@ -1138,12 +1219,18 @@ public class Parser implements Serializable {
         public final BlockNode globalBlock;
 
         public ProgramNode(Context context) {
-            super(new Location(1, 1));
-            this.context = context;
-            globalBlock = new BlockNode(location, new ArrayList<>());
+            this(context, new Types());
         }
 
-        public void addMethod(MethodNode methodNode){
+        public ProgramNode(Context context, Types types) {
+            super(new Location(1, 1));
+            this.context = context;
+            this.types = types;
+            globalBlock = new BlockNode(location, new ArrayList<>());
+            INT = types.INT;
+        }
+
+        public void addMethod(MethodNode methodNode) {
             methods.put(methodNode.name, methodNode);
         }
 
@@ -1257,23 +1344,24 @@ public class Parser implements Serializable {
                 return;
             }
             Location loc = new Location(0, 0);
-            addMethodIfNeeded(new MethodNode(loc, inputName(sec),
+            addMethodIfNeeded(new MethodNode(loc, inputName(sec), types.INT,
                     new ParametersNode(loc, Collections.emptyList()), new BlockNode(loc, Utils.makeArrayList(
-                    new TmpInputVariableDeclarationNode(loc, "tmp",
+                    new TmpInputVariableDeclarationNode(loc, "tmp", types.INT,
                             new IntegerLiteralNode(loc, IntStream.range(0, context.maxBitWidth).mapToObj(i -> bl.create(Lattices.B.U)).collect(Lattices.Value.collector())),
                             sec.toString()),
                     new VariableAssignmentNode(loc, inputName(sec), new BinaryOperatorNode(new VariableAccessNode(loc, inputName(sec)), new VariableAccessNode(loc, "tmp"), APPEND)),
-                    new ReturnStatementNode(loc, Arrays.asList(new VariableAccessNode(loc, "tmp")))
+                    new ReturnStatementNode(loc, new VariableAccessNode(loc, "tmp"))
             )), new GlobalVariablesNode(loc, new HashMap<>())));
             addAppendOnlyVariableDeclarationIfNeeded(inputName(sec), sec);
         }
 
-        private void handlePrint(Sec<?> sec){
-            if (!isMethodUsed(printName(sec))){
+        private void handlePrint(Sec<?> sec) {
+            if (!isMethodUsed(printName(sec))) {
                 return;
             }
             Location loc = new Location(0, 0);
-            addMethodIfNeeded(new MethodNode(loc, printName(sec), new ParametersNode(loc, Collections.singletonList(new ParameterNode(loc, "x"))), new BlockNode(loc, Utils.makeArrayList(
+            addMethodIfNeeded(new MethodNode(loc, printName(sec), types.INT,
+                    new ParametersNode(loc, Collections.singletonList(new ParameterNode(loc, types.INT, "x"))), new BlockNode(loc, Utils.makeArrayList(
                     new VariableAssignmentNode(loc, printName(sec),
                             new BinaryOperatorNode(
                                     new VariableAccessNode(loc, printName(sec)),
@@ -1285,7 +1373,7 @@ public class Parser implements Serializable {
 
         private void addAppendOnlyVariableDeclarationIfNeeded(String name, Sec<?> sec){
             if (!doesVariableExist(name)){
-                globalBlock.statementNodes.add(0, new AppendOnlyVariableDeclarationNode(new Location(0, 0), name, sec.toString()));
+                globalBlock.statementNodes.add(0, new AppendOnlyVariableDeclarationNode(new Location(0, 0), name, types.INT, sec.toString()));
                 context.addAppendOnlyVariable(sec, name);
             }
         }
@@ -1335,15 +1423,17 @@ public class Parser implements Serializable {
      */
     public static class MethodNode extends MJNode {
         public final String name;
+        private Type returnType;
         public final ParametersNode parameters;
         public final BlockNode body;
         public final GlobalVariablesNode globals;
         Map<String, Pair<Variable, Variable>> globalStringDefs = null;
         public Map<Variable, Pair<Variable, Variable>> globalDefs = null;
 
-        public MethodNode(Location location, String name, ParametersNode parameters, BlockNode body, GlobalVariablesNode globals) {
+        public MethodNode(Location location, String name, Type returnType, ParametersNode parameters, BlockNode body, GlobalVariablesNode globals) {
             super(location);
             this.name = name;
+            this.returnType = returnType;
             this.parameters = parameters;
             this.body = body;
             this.globals = globals;
@@ -1351,7 +1441,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return String.format("int %s[[%s]](%s)", name, globals, parameters);
+            return String.format("%s %s[[%s]](%s)", getReturnType(), name, globals, parameters);
         }
 
         @Override
@@ -1361,7 +1451,7 @@ public class Parser implements Serializable {
 
         @Override
         public List<BaseAST> children() {
-            return Utils.makeArrayList(parameters, body);
+            return Utils.makeArrayList(parameters, globals, body);
         }
 
         @Override
@@ -1388,17 +1478,16 @@ public class Parser implements Serializable {
             return !body.statementNodes.isEmpty() && body.getLastStatementOrNull() instanceof ReturnStatementNode && ((ReturnStatementNode) body.getLastStatementOrNull()).hasReturnExpression();
         }
 
-        public int getNumberOfReturnValues() {
-            return hasReturnValue() ? ((ReturnStatementNode) body.getLastStatementOrNull()).expressions.size() : 0;
-        }
-
-        public int getNumberOfParameters() {
-            return parameters.size();
+        /**
+         * empty → var args
+         */
+        public Optional<Integer> getNumberOfParameters() {
+            return Optional.of(parameters.size());
         }
 
         @Override
         public String toPrettyString(String indent, String incr) {
-            return indent + String.format("int %s[[%s]](%s){\n%s\n}\n", name, globals, parameters, body.toPrettyString(indent + incr, incr, false));
+            return indent + String.format("%s %s[[%s]](%s){\n%s\n}\n", getReturnType(), name, globals, parameters, body.toPrettyString(indent + incr, incr, false));
         }
 
         /**
@@ -1413,42 +1502,69 @@ public class Parser implements Serializable {
         /**
          * DefinedVariables[this] \ DefinedVariables[inner]
          */
-        public Set<String> getVariablesDefinedOutside(StatementNode inner){
+        public Set<String> getVariablesDefinedOutside(StatementNode inner) {
             Set<String> set = new HashSet<>(getDefinedVariables());
             set.removeAll(inner.getDefinedVariables());
             return set;
         }
 
-        public boolean isPredefined() { return false; }
+        public boolean isPredefined() {
+            return false;
+        }
+
+        public Type getReturnType() {
+            return returnType;
+        }
+
+        public void setReturnType(Type returnType) {
+            if (this.returnType != null && this.returnType != returnType) {
+                throw new NildumuError(String.format("Return type of method %s cannot have both type %s and %s",
+                        this.name, this.returnType, returnType));
+            }
+            this.returnType = returnType;
+        }
+
+        public int getNumberOfReturnValues() {
+            if (hasReturnValue()) {
+                assert returnType != null;
+                return returnType.getNumberOfBlastedVariables().orElse(0);
+            }
+            return 0;
+        }
     }
 
     public static class PredefinedMethodNode extends MethodNode {
 
-        private final static Map<String, PredefinedMethodNode> predefinedMethods = new HashMap<>();
+        private final static Map<String, Function<ProgramNode, PredefinedMethodNode>> predefinedMethods = new HashMap<>();
+
         static {
             predefinedMethods.put("length",
-                    new PredefinedMethodNode("length", 1, l -> {throw new NildumuError("not supported");}));
+                    program -> new PredefinedMethodNode("length", program.types.INT, -1, l -> {
+                        throw new NildumuError("");
+                    }));
         }
 
-        public static boolean isPredefined(String methodName) { return predefinedMethods.containsKey(methodName); }
+        public static boolean isPredefined(String methodName) {
+            return predefinedMethods.containsKey(methodName);
+        }
 
-        public static PredefinedMethodNode getPredefined(String methodName) {
+        public static PredefinedMethodNode getPredefined(ProgramNode program, String methodName) {
             assert isPredefined(methodName);
-            return predefinedMethods.get(methodName);
+            return predefinedMethods.get(methodName).apply(program);
         }
 
         private final int parameterCount;
         private final Function<List<Value>, Value> function;
 
-        public PredefinedMethodNode(String name, int parameterCount, Function<List<Value>, Value> function) {
-            super(new Location(0, 0), name, null, null, null);
+        public PredefinedMethodNode(String name, Type returnType, int parameterCount, Function<List<Value>, Value> function) {
+            super(new Location(0, 0), name, returnType, null, null, null);
             this.parameterCount = parameterCount;
             this.function = function;
         }
 
         @Override
-        public int getNumberOfParameters() {
-            return parameterCount;
+        public Optional<Integer> getNumberOfParameters() {
+            return parameterCount == -1 ? Optional.empty() : Optional.of(parameterCount);
         }
 
         public Value apply(List<Value> arguments) {
@@ -1460,7 +1576,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return String.format("int %s(%s)", name, parameters);
+            return String.format("%s %s(%s)", getReturnType(), name, parameters);
         }
 
         @Override
@@ -1589,18 +1705,20 @@ public class Parser implements Serializable {
     public static class ParameterNode extends MethodPartNode {
 
         public Variable definition;
+        public final Type type;
         public final String name;
 
 
-        public ParameterNode(Location location, String name) {
+        public ParameterNode(Location location, Type type, String name) {
             super(location);
-            assert !name.isEmpty();
+            assert !name.isEmpty() && Objects.nonNull(type);
+            this.type = type;
             this.name = name;
         }
 
         @Override
         public String toString() {
-            return String.format("int %s", name);
+            return String.format("%s %s", type, name);
         }
 
         @Override
@@ -1830,16 +1948,16 @@ public class Parser implements Serializable {
             List<StatementNode> stmts = new ArrayList<>();
             int i = 0;
             for (; i < statementNodes.size() && statementNodes.get(i) instanceof VariableDeclarationNode && !((VariableDeclarationNode) statementNodes.get(i)).hasInitExpression(); i++) {
-                varDecls.add((VariableDeclarationNode)statementNodes.get(i));
+                varDecls.add((VariableDeclarationNode) statementNodes.get(i));
             }
-            for (; i < statementNodes.size(); i++){
+            for (; i < statementNodes.size(); i++) {
                 stmts.add(statementNodes.get(i));
             }
             return new Pair<>(varDecls, stmts);
         }
 
-        public void prependVariableDeclaration(String variable, boolean hasAppendValue){
-            statementNodes.add(0, new VariableDeclarationNode(location, variable, null, hasAppendValue));
+        public void prependVariableDeclaration(String variable, Type type, boolean hasAppendValue) {
+            statementNodes.add(0, new VariableDeclarationNode(location, variable, type, null, hasAppendValue));
             definedVariables.add(variable);
         }
 
@@ -1848,10 +1966,10 @@ public class Parser implements Serializable {
             definedVariables.addAll(statements.stream().flatMap(s -> s.getDefinedVariables().stream()).collect(Collectors.toSet()));
             lastCondStatement = null;
             for (StatementNode statement : statements) {
-                if (statements instanceof ConditionalStatementNode){
-                    lastCondStatement = (ConditionalStatementNode)statements;
+                if (statements instanceof ConditionalStatementNode) {
+                    lastCondStatement = (ConditionalStatementNode) statements;
                 }
-                if (lastCondStatement != null){
+                if (lastCondStatement != null) {
                     lastCondStatement.setPhisCondInNodes(Collections.singletonList(statement));
                 }
             }
@@ -1876,38 +1994,48 @@ public class Parser implements Serializable {
      */
     public static class VariableDeclarationNode extends VariableAssignmentNode {
 
+        private final Type initialType;
+
         final boolean hasAppendValue;
 
-        public VariableDeclarationNode(Location location, String name, ExpressionNode initExpression, boolean hasAppendValue) {
+        public VariableDeclarationNode(Location location, String name, Type type, ExpressionNode initExpression, boolean hasAppendValue) {
             super(location, name, initExpression);
             this.hasAppendValue = hasAppendValue;
+            this.initialType = type;
         }
 
-        public VariableDeclarationNode(Location location, String name, ExpressionNode initExpression) {
-            this(location, name, initExpression, false);
+        public VariableDeclarationNode(Location location, String name, Type type, ExpressionNode initExpression) {
+            this(location, name, type, initExpression, false);
         }
 
-        public VariableDeclarationNode(Location location, String name) {
-            this(location, name, null);
+        public VariableDeclarationNode(Location location, String name, Type type) {
+            this(location, name, type, null);
         }
 
-        public VariableDeclarationNode(Location location, Variable variable, ExpressionNode initExpression) {
-            this(location, variable.name, initExpression);
+        public VariableDeclarationNode(Location location, Variable variable, Type type, ExpressionNode initExpression) {
+            this(location, variable.name, type, initExpression);
             definition = variable;
         }
 
-        public boolean hasInitExpression(){
+        public boolean hasInitExpression() {
             return expression != null;
         }
 
         @Override
         public String toString() {
-            String intStr = hasAppendValue && !(this instanceof AppendOnlyVariableDeclarationNode) ? "aint" : "int";
-            if (hasInitExpression()){
+            String intStr = hasAppendValue && !(this instanceof AppendOnlyVariableDeclarationNode) ? "aint" : getVarType().toString();
+            if (hasInitExpression()) {
                 return String.format("%s %s = %s;", intStr, variable, expression);
             } else {
                 return String.format("%s %s;", intStr, variable);
             }
+        }
+
+        public Type getVarType() {
+            if (definition != null) {
+                return definition.getType();
+            }
+            return initialType;
         }
 
         @Override
@@ -1962,8 +2090,9 @@ public class Parser implements Serializable {
     public static class OutputVariableDeclarationNode extends VariableDeclarationNode {
         final String secLevel;
 
-        public OutputVariableDeclarationNode(Location location, String name, ExpressionNode initExpression, String secLevel) {
-            super(location, name, initExpression);
+        public OutputVariableDeclarationNode(Location location, String name, Type type, ExpressionNode initExpression, String secLevel) {
+            super(location, name, type, initExpression);
+            assert type == type.getTypes().INT;
             this.secLevel = secLevel;
         }
 
@@ -2002,14 +2131,15 @@ public class Parser implements Serializable {
         final String secLevel;
         final boolean isInput;
 
-        public AppendOnlyVariableDeclarationNode(Location location, String name, String secLevel, boolean isInput) {
-            super(location, name, null, true);
+        public AppendOnlyVariableDeclarationNode(Location location, String name, Type type, String secLevel, boolean isInput) {
+            super(location, name, type, null, true);
+            assert type == type.getTypes().INT;
             this.secLevel = secLevel;
             this.isInput = isInput;
         }
 
-        public AppendOnlyVariableDeclarationNode(Location location, String name, String secLevel) {
-            this(location, name, secLevel, false);
+        public AppendOnlyVariableDeclarationNode(Location location, String name, Type type, String secLevel) {
+            this(location, name, type, secLevel, false);
         }
 
         @Override
@@ -2046,8 +2176,9 @@ public class Parser implements Serializable {
     public static class InputVariableDeclarationNode extends VariableDeclarationNode {
         public final String secLevel;
 
-        public InputVariableDeclarationNode(Location location, String name, IntegerLiteralNode initExpression, String secLevel) {
-            super(location, name, initExpression);
+        public InputVariableDeclarationNode(Location location, String name, Type type, IntegerLiteralNode initExpression, String secLevel) {
+            super(location, name, type, initExpression);
+            assert type == type.getTypes().INT;
             this.secLevel = secLevel;
         }
 
@@ -2080,8 +2211,9 @@ public class Parser implements Serializable {
     public static class TmpInputVariableDeclarationNode extends VariableDeclarationNode {
         public final String secLevel;
 
-        public TmpInputVariableDeclarationNode(Location location, String name, IntegerLiteralNode initExpression, String secLevel) {
-            super(location, name, initExpression);
+        public TmpInputVariableDeclarationNode(Location location, String name, Type type, IntegerLiteralNode initExpression, String secLevel) {
+            super(location, name, type, initExpression);
+            assert type == type.getTypes().INT;
             this.secLevel = secLevel;
         }
 
@@ -2116,7 +2248,7 @@ public class Parser implements Serializable {
      * A variable assignment
      */
     public static class VariableAssignmentNode extends StatementNode {
-        Variable definition;
+        public Variable definition;
         public final String variable;
         public ExpressionNode expression;
 
@@ -2261,18 +2393,20 @@ public class Parser implements Serializable {
      * Assigment that assigns multiple variables (that are already defined) to the value of a return statement
      */
     public static class MultipleVariableAssignmentNode extends StatementNode {
-        List<Variable> definitions;
+        public List<Variable> definitions;
         public final List<String> variables;
-        public MethodInvocationNode expression;
+        public UnpackOperatorNode expression;
 
-        public MultipleVariableAssignmentNode(Location location, String[] variables, MethodInvocationNode expression) {
+        public MultipleVariableAssignmentNode(Location location, String[] variables, UnpackOperatorNode expression) {
             super(location);
+            assert variables.length > 0;
             this.variables = Arrays.asList(variables);
             this.expression = expression;
         }
 
-        public MultipleVariableAssignmentNode(Location location, List<Variable> variables, MethodInvocationNode expression) {
+        public MultipleVariableAssignmentNode(Location location, List<Variable> variables, UnpackOperatorNode expression) {
             super(location);
+            assert variables.size() > 0;
             this.variables = variables.stream().map(v -> v.name).collect(Collectors.toList());
             this.expression = expression;
             this.definitions = variables;
@@ -2751,7 +2885,10 @@ public class Parser implements Serializable {
      */
     public static class ReturnStatementNode extends StatementNode {
 
-        public final List<ExpressionNode> expressions;
+        /**
+         * might be null
+         */
+        public final ExpressionNode expression;
 
         public ReturnStatementNode(Location location) {
             //super(new IntegerLiteralNode(location, ValueLattice.get().bot()));
@@ -2759,14 +2896,18 @@ public class Parser implements Serializable {
         }
 
         public ReturnStatementNode(Location location, List<ExpressionNode> expressions) {
+            this(location, expressions.size() > 0 ? new TupleLiteralNode(location, expressions) : null);
+        }
+
+        public ReturnStatementNode(Location location, ExpressionNode expression) {
             super(location);
-            this.expressions = expressions;
+            this.expression = expression;
         }
 
         @Override
         public String toString() {
             if (hasReturnExpression()) {
-                return String.format("return %s;", expressions.stream().map(Objects::toString).collect(Collectors.joining(", ")));
+                return String.format("return %s;", expression);
             } else {
                 return "return;";
             }
@@ -2775,7 +2916,7 @@ public class Parser implements Serializable {
         @Override
         public String toPrettyString(String indent, String incr) {
             if (hasReturnExpression()) {
-                return String.format("%sreturn %s;", indent, expressions.stream().map(MJNode::toString).collect(Collectors.joining(", ")));
+                return String.format("%sreturn %s;", indent, expression);
             } else {
                 return indent + "return;";
             }
@@ -2787,12 +2928,12 @@ public class Parser implements Serializable {
         }
 
         public boolean hasReturnExpression() {
-            return expressions.size() > 0;
+            return expression != null;
         }
 
         @Override
         public List<BaseAST> children() {
-            return Collections.unmodifiableList(expressions);
+            return hasReturnExpression() ? Collections.singletonList(expression) : Collections.emptyList();
         }
 
         @Override
@@ -2812,7 +2953,7 @@ public class Parser implements Serializable {
 
         @Override
         public BlockPartNode[] getBlockParts() {
-            return expressions.toArray(new BlockPartNode[0]);
+            return hasReturnExpression() ? new BlockPartNode[]{expression} : new BlockPartNode[0];
         }
     }
 
@@ -2820,6 +2961,11 @@ public class Parser implements Serializable {
      * Base node for all expressions
      */
     public static abstract class ExpressionNode extends BlockPartNode {
+
+        /**
+         * type assigned by the name resolution
+         */
+        public Type type;
 
         public ExpressionNode(Location location) {
             super(location);
@@ -2956,10 +3102,13 @@ public class Parser implements Serializable {
             super(expression.location);
             this.expression = expression;
             this.operator = operator;
-            switch (operator){
+            switch (operator) {
                 case INVERT:
                 case TILDE:
                     op = Operator.NOT;
+                    break;
+                case MULTIPLY:
+                    op = Operator.UNPACK;
                     break;
                 default:
                     throw new UnsupportedOperationException(operator.toString());
@@ -2968,7 +3117,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return operator.description + expression;
+            return operator.representation + expression;
         }
 
         @Override
@@ -3009,6 +3158,28 @@ public class Parser implements Serializable {
         @Override
         public String shortType() {
             return operator.representation;
+        }
+    }
+
+    public static class UnpackOperatorNode extends UnaryOperatorNode {
+
+        UnpackOperatorNode(ExpressionNode expression) {
+            super(expression, MULTIPLY);
+        }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R> R accept(ExpressionVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R, A> R accept(ExpressionVisitorWArgs<R, A> visitor, A argument) {
+            return visitor.visit(this, argument);
         }
     }
 
@@ -3212,8 +3383,43 @@ public class Parser implements Serializable {
         }
 
         @Override
-        public <R,A> R accept(ExpressionVisitorWArgs<R, A> visitor, A argument){
+        public <R, A> R accept(ExpressionVisitorWArgs<R, A> visitor, A argument) {
             return visitor.visit(this, argument);
+        }
+    }
+
+    public static class TypeNode extends MJNode {
+
+        public final Type type;
+
+        protected TypeNode(Location location, Type type) {
+            super(location);
+            this.type = type;
+        }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public String toString() {
+            return type.toString();
+        }
+
+        @Override
+        public String toPrettyString(String indent, String incr) {
+            return indent + toString();
+        }
+
+        @Override
+        public String shortType() {
+            return "t";
+        }
+
+        @Override
+        public String type() {
+            return "type";
         }
     }
 
@@ -3268,6 +3474,98 @@ public class Parser implements Serializable {
         @Override
         public String shortType() {
             return "i";
+        }
+    }
+
+    public static class TupleLiteralNode extends PrimaryExpressionNode {
+        public final List<ExpressionNode> elements;
+
+        public TupleLiteralNode(Location location, List<ExpressionNode> elements) {
+            super(location);
+            this.elements = elements;
+        }
+
+        @Override
+        public String toString() {
+            if (elements.size() == 1) {
+                return "(" + elements.get(0) + ",)";
+            }
+            return "(" + elements.stream().map(Object::toString).collect(Collectors.joining(", ")) + ")";
+        }
+
+        @Override
+        public String type() {
+            return "tuple_literal";
+        }
+
+        @Override
+        public List<BaseAST> children() {
+            return new ArrayList<>(elements);
+        }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R> R accept(ExpressionVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R, A> R accept(ExpressionVisitorWArgs<R, A> visitor, A argument) {
+            return visitor.visit(this, argument);
+        }
+
+        @Override
+        public Operator getOperator() {
+            return null;
+        }
+
+        @Override
+        public String shortType() {
+            return "tl";
+        }
+
+        @Override
+        public Operator getOperator(Context c) {
+            return Operator.TUPLE_LITERAL;
+        }
+    }
+
+    public static class ArrayLiteralNode extends TupleLiteralNode {
+
+        public ArrayLiteralNode(Location location, List<ExpressionNode> elements) {
+            super(location, elements);
+        }
+
+        @Override
+        public String toString() {
+            if (elements.size() == 1) {
+                return "{" + elements.get(0) + ",}";
+            }
+            return "{" + elements.stream().map(Object::toString).collect(Collectors.joining(", ")) + "}";
+        }
+
+        @Override
+        public String type() {
+            return "array_literal";
+        }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R> R accept(ExpressionVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public String shortType() {
+            return "al";
         }
     }
 
@@ -3348,7 +3646,7 @@ public class Parser implements Serializable {
      */
     public static class VariableAccessNode extends PrimaryExpressionNode {
         public String ident;
-        Variable definition;
+        public Variable definition;
         ExpressionNode definingExpression;
 
         public VariableAccessNode(Location location, String ident) {
@@ -3360,6 +3658,7 @@ public class Parser implements Serializable {
             super(location);
             this.ident = variable.name;
             this.definition = variable;
+            this.type = definition.type;
         }
 
         @Override

@@ -1597,6 +1597,11 @@ public class Lattices {
             return interval.start;
         }
 
+        public List<Value> split() {
+            assert bits.size() % vl.bitWidth == 0;
+            return split(bits.size() / vl.bitWidth);
+        }
+
         public List<Value> split(int partCount) {
             if (partCount == 0) {
                 return Collections.emptyList();

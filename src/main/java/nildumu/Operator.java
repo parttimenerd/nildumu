@@ -2,12 +2,12 @@ package nildumu;
 
 import nildumu.intervals.Interval;
 import nildumu.mih.MethodInvocationHandler;
+import nildumu.typing.Type;
 import nildumu.util.Util;
 import swp.util.Pair;
 
 import java.util.*;
 import java.util.function.BiPredicate;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -16,7 +16,7 @@ import static nildumu.Context.v;
 import static nildumu.Lattices.*;
 import static nildumu.Lattices.B.*;
 import static nildumu.util.Util.log2;
-import static nildumu.util.Util.p;
+import static nildumu.util.Util.zip;
 
 public interface Operator {
 
@@ -547,6 +547,13 @@ public interface Operator {
         }
     };
 
+    UnaryOperator UNPACK = new UnaryOperator("*") {
+        @Override
+        Value compute(Context c, Value argument) {
+            return argument;
+        }
+    };
+
     BinaryOperator EQUALS = new BinaryOperatorStructured("==") {
         @Override
         public Lattices.B computeBitValue(int i, Value x, Value y) {
@@ -945,6 +952,22 @@ public interface Operator {
         }
     }
 
+    /**
+     * deals with unpacking on one level
+     */
+    static List<Value> unfoldTuple(List<Parser.ExpressionNode> expressions, List<Value> values) {
+        List<Value> ret = new ArrayList<>();
+        assert expressions.size() == values.size();
+        return zip(expressions, values, (e, v) -> {
+            if (e instanceof Parser.UnpackOperatorNode) {
+                List<Value> vals = v.split();
+                assert vals.size() == ((Type.TupleType) e.type).elementTypes.size();
+                return vals;
+            }
+            return Collections.singletonList(v);
+        }).stream().flatMap(List::stream).collect(Collectors.toList());
+    }
+
     class MethodInvocation implements Operator {
 
         final Parser.MethodInvocationNode callSite;
@@ -955,6 +978,7 @@ public interface Operator {
 
         @Override
         public Value compute(Context c, List<Value> arguments) {
+            arguments = Operator.unfoldTuple(callSite.arguments.arguments, arguments);
             if (callSite.definition.isPredefined()){
                 return ((Parser.PredefinedMethodNode)callSite.definition).apply(arguments);
             }
@@ -978,12 +1002,28 @@ public interface Operator {
         }
     }
 
+    Operator TUPLE_LITERAL = new Operator() {
+
+        @Override
+        public Value compute(Context c, List<Value> arguments) {
+            return Value.combine(arguments);
+        }
+
+        @Override
+        public String toString(List<Value> arguments) {
+            if (arguments.size() == 1) {
+                return "(" + arguments.get(0) + ",)";
+            }
+            return "(" + arguments.stream().map(Objects::toString).collect(Collectors.joining(", ")) + ")";
+        }
+    };
+
     BinaryOperator ADD = new BinaryOperator("+") {
         @Override
         Value compute(Context c, Value first, Value second) {
             Set<Bit> argBits = Stream.concat(first.stream(), second.stream()).collect(Collectors.toSet());
             Util.Box<Bit> carry = new Util.Box<>(bl.create(ZERO));
-            return  vl.mapBitsToValue(first, second, (a, b) -> {
+            return vl.mapBitsToValue(first, second, (a, b) -> {
                 Pair<Bit, Bit> add = fullAdder(c, a, b, carry.val);
                 carry.val = add.second;
                 if (c.USE_REDUCED_ADD_OPERATOR){
@@ -1078,16 +1118,16 @@ public interface Operator {
         return IntStream.range(0, size).mapToObj(i -> bl.create(U, depBits)).collect(Value.collector());
     }
 
-    BinaryOperator MULTIPLY = new BinaryOperator("+") {
+    BinaryOperator MULTIPLY = new BinaryOperator("*") {
         @Override
         Value compute(Context c, Value first, Value second) {
-            if (second.isPowerOfTwo()){
+            if (second.isPowerOfTwo()) {
                 return setMultSign(first, second, LEFT_SHIFT.compute(c, first, vl.parse(Math.abs((int) log2(second.asInt())))));
             }
-            if (first.isPowerOfTwo()){
+            if (first.isPowerOfTwo()) {
                 return MULTIPLY.compute(c, second, first);
             }
-            if (first.isConstant() && second.isConstant()){
+            if (first.isConstant() && second.isConstant()) {
                 return vl.parse(first.asInt() * second.asInt());
             }
             return createUnknownValue(first, second);

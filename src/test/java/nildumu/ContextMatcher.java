@@ -187,13 +187,13 @@ public class ContextMatcher {
         return leakage(l -> l.leaks(context.sl.bot(), leakage.equals("inf") ? Context.INFTY : Double.parseDouble(leakage)));
     }
 
-    public ContextMatcher benchLeakageComputationAlgorithms(){
+    public ContextMatcher benchLeakageComputationAlgorithms(int executionTimes) {
         for (MinCut.Algo algo : MinCut.Algo.values()) {
             builder.add(() -> {
-                List<Integer> times = IntStream.range(0, 10).mapToObj(i -> {
+                List<Integer> times = IntStream.range(0, executionTimes).mapToObj(i -> {
                     long start = System.currentTimeMillis();
                     MinCut.compute(context, context.sl.bot(), algo);
-                    return (int)(System.currentTimeMillis() - start);
+                    return (int) (System.currentTimeMillis() - start);
                 }).collect(Collectors.toList());
                 double mean = times.stream().mapToInt(i -> i).sum() * 1.0 / times.size();
                 double std = Math.sqrt(1.0 / times.size() * times.stream().mapToInt(i -> i).mapToDouble(i -> (mean - i) * (mean - i)).sum());

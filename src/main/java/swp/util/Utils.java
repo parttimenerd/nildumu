@@ -226,6 +226,42 @@ public class Utils {
 		}
 	}
 
+	/**
+	 * Simple immutable quadruple (tuple with four entries) implementation.
+	 */
+	public static class Quadruple<T, V, W, X> {
+
+		public final T first;
+
+		public final V second;
+
+		public final W third;
+
+		public final X fourth;
+
+		public Quadruple(T first, V second, W third, X fourth) {
+			this.first = first;
+			this.second = second;
+			this.third = third;
+			this.fourth = fourth;
+		}
+
+		@Override
+		public int hashCode() {
+			return first.hashCode() ^ second.hashCode() ^ third.hashCode() ^ fourth.hashCode();
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (!(obj instanceof Quadruple)){
+				return false;
+			}
+			Quadruple quadruple = (Quadruple)obj;
+			return quadruple.first == this.first && quadruple.second == this.second && quadruple.third == this.third
+					&& quadruple.fourth == this.fourth;
+		}
+	}
+
 	public static <T> ArrayList<T> makeArrayList(T... elements){
 		ArrayList<T> ret = new ArrayList<>(elements.length);
 		Collections.addAll(ret, elements);

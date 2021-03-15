@@ -10,7 +10,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.logging.Level;
 
 import static java.time.Duration.ofMillis;
-import static nildumu.Processor.*;
+import static nildumu.Processor.RECORD_ALTERNATIVES;
+import static nildumu.Processor.process;
 import static nildumu.util.Util.iter;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
@@ -44,7 +45,6 @@ public class LoopTests {
                 "\tx = x + 1;\n" +
                 "}\n" +
                 "l output int o = x;";
-        parse(program, true).leaks(1).run();
         parse(program).leaks(1).run();
     }
 
@@ -66,12 +66,7 @@ public class LoopTests {
                 "\tx = x | 0b11;\n" +
                 "}\n" +
                 "l output int o = x;";
-        parse(program, true).bit("o[1]", "u").leaks(1).run();
-        parse(program)
-                //.bit("x3[2]", "u")
-                //.bit("x2[1]", "u")
-                .bit("o[1]", "u")
-                .leaks(1).run();
+        parse(program).bit("o[1]", "u").leaks(1).run();
     }
 
     @Test
@@ -91,7 +86,6 @@ public class LoopTests {
                 "\th = h;\n" +
                 "}\n" +
                 "l output int o = h";
-        parse(program, true).leaks(1).val("o", "0bu").run();
         parse(program).leaks(1).val("o", "0bu").run();
     }
 
@@ -102,7 +96,6 @@ public class LoopTests {
                 "\th = 1;\n" +
                 "}\n" +
                 "l output int o = h";
-        parse(program, true).leaks(1).run();
         parse(program).leaks(1).run();
     }
 
@@ -117,11 +110,11 @@ public class LoopTests {
      */
     @Test
     public void testBasicLoop4(){
-        assertTimeoutPreemptively(ofMillis(1000), () -> {
+        assertTimeoutPreemptively(ofMillis(100000), () -> {
             parse("h input int h = 0b0u;\n" +
-                "while (h == h){\n" +
-                "\th + 1;\n" +
-                "}\n");
+                    "while (h == h){\n" +
+                    "\th + 1;\n" +
+                    "}\n");
         });
     }
 
@@ -140,7 +133,7 @@ public class LoopTests {
             parse("h input int h = 0b0u;\n" +
                     "while (h == h){\n" +
                     "\th = h + 1;\n" +
-                    "}\n l output int o = h", true).leaks(1).run();
+                    "}\n l output int o = h").leaks(1).run();
         });
     }
 
@@ -166,7 +159,6 @@ public class LoopTests {
                     "  h = [2](h[2] | h[1]);\n" +
                     "}\n" +
                     "l output int o = h;";
-            parse(program, true).leaks(1).run();
             parse(program).leaks(1).run();
         });
     }
@@ -193,7 +185,6 @@ public class LoopTests {
                     "  h = [2](h[2] | h[1]);\n" +
                     "}\n" +
                     "l output int o = h;";
-            parse(program, true).leaks(secretSize).run();
             parse(program).leaks(secretSize).run();
         });
     }
@@ -223,7 +214,6 @@ public class LoopTests {
                     "        }\n" +
                     "     }\n" +
                     "     l output int o = h;";
-            parse(program, true).leaks(1).run();
             parse(program).leaks(1).run();
         });
     }
@@ -248,7 +238,6 @@ public class LoopTests {
                 "    z = z + 1;\n" +
                 "}\n" +
                 "l output int o = z;";
-        parse(program, true).leaks(2).run();
         parse(program).leaks(2).run();
     }
 
@@ -262,7 +251,6 @@ public class LoopTests {
                 "    z = h;\n" +
                 "}\n" +
                 "l output int o = z;";
-        parse(program, true).leaks(3).run();
         parse(program).leaks(3).run();
         Context.LOG.setLevel(Level.INFO);
     }
@@ -286,9 +274,9 @@ public class LoopTests {
                 "    i = i + 1;\n" +
                 "}\n" +
                 "l output int o = O;";
-        parse(program, true).leaks(32).run(); // over approximate
-        parse(program, true, 10).leaks(32).run(); // over approximate
-        parse(program, true, 40).leaks(16).run(); // enough unroll
+        parse(program).leaks(32).run(); // over approximate
+        parse(program, 10).leaks(32).run(); // over approximate
+        parse(program, 40).leaks(16).run(); // enough unroll
     }
 
     @Test
@@ -320,7 +308,6 @@ public class LoopTests {
                 "    i = i + 1;\n" +
                 "}\n" +
                 "l output int o = O;";
-        parse(program, true).leaks(2).run();
         parse(program).leaks(2).run();
     }
 
@@ -339,7 +326,6 @@ public class LoopTests {
                 "    }\n" +
                 "    i = i + 1;\n" +
                 "l output int o = O;";
-        parse(program, true).leaks(1).run();
         parse(program).leaks(1).run();
     }
 
@@ -367,7 +353,7 @@ public class LoopTests {
                 "    }\n" +
                 "    i = i + 1;\n" +
                 "}\n" +
-                "l output int o = O;", true, inlining).leaks(unrolls + 1 > inlining ? 32 : unrolls - 1).run();
+                "l output int o = O;", inlining).leaks(unrolls + 1 > inlining ? 32 : unrolls - 1).run();
     }
 
     @Test
@@ -382,28 +368,23 @@ public class LoopTests {
                 "       o = o + m;\n" +
                 "    i = i + 1;\n" +
                 "}\nint x = i;";
-        parse(program, true).val("x", 1).run();
+        parse(program).val("x", 1).run();
         //parse(program).val("x", "0buuu").run();
         Context.LOG.setLevel(Level.INFO);
     }
 
     ContextMatcher parse(String program) {
-        return parse(program, false);
+        return parse(program, "handler=inlining;maxrec=5;bot=summary");
     }
 
-    ContextMatcher parse(String program, boolean transformLoops) {
-        return parse(program, transformLoops, "handler=inlining;maxrec=5;bot=summary");
+    ContextMatcher parse(String program, int inlining) {
+        return parse(program, String.format("handler=inlining;maxrec=%d;bot=summary", inlining));
     }
 
-    ContextMatcher parse(String program, boolean transformLoops, int inlining) {
-        return parse(program, transformLoops, String.format("handler=inlining;maxrec=%d;bot=summary", inlining));
-    }
-
-    ContextMatcher parse(String program, boolean transformLoops, String mih) {
+    ContextMatcher parse(String program, String mih) {
         Context.LOG.setLevel(Level.WARNING);
         //System.out.println(" ##SSA " + Parser.process(program, false, transformLoops).toPrettyString());
-        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih),
-                (transformLoops ? TRANSFORM_LOOPS : 0) | RECORD_ALTERNATIVES));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih), RECORD_ALTERNATIVES));
     }
 
 
@@ -413,7 +394,7 @@ public class LoopTests {
                 "bit_width 4;\n" +
                 "int i = 0;\n" +
                 "while (i != 1){ i = i + 1; }\n" +
-                "int x = i;", true).val("x", "1").run();
+                "int x = i;").val("x", "1").run();
     }
 
     @Test
@@ -422,6 +403,6 @@ public class LoopTests {
                 "bit_width 4;\n" +
                 "int i = 0;\n" +
                 "while (i < 1){ i = i + 1; }\n" +
-                "int x = i;", true).val("x", "1").run();
+                "int x = i;").val("x", "1").run();
     }
 }

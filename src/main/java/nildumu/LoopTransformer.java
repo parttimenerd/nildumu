@@ -1,5 +1,7 @@
 package nildumu;
 
+import nildumu.typing.Type;
+import nildumu.typing.Types;
 import swp.lexer.Location;
 
 import java.util.*;
@@ -20,14 +22,14 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
      * Collect the read and written variables of a node
      */
     private static class VariableAccessVisitor implements NodeVisitor<Object> {
-        private final Set<String> written = new HashSet<>();
-        private final Set<String> accessed = new HashSet<>();
+        private final Set<Variable> written = new HashSet<>();
+        private final Set<Variable> accessed = new HashSet<>();
 
-        public List<String> getWrittenVariables() {
+        public List<Variable> getWrittenVariables() {
             return Collections.unmodifiableList(new ArrayList<>(written));
         }
 
-        public List<String> getAccessedVariables() {
+        public List<Variable> getAccessedVariables() {
             return Collections.unmodifiableList(new ArrayList<>(accessed));
         }
 
@@ -39,25 +41,26 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
 
         @Override
         public Object visit(VariableAssignmentNode assignment) {
-            written.add(assignment.variable);
-            accessed.add(assignment.variable);
+            written.add(assignment.definition);
+            accessed.add(assignment.definition);
             visitChildrenDiscardReturn(assignment);
             return null;
         }
 
         @Override
         public Object visit(MultipleVariableAssignmentNode assignment) {
-            written.addAll(assignment.variables);
+            written.addAll(assignment.definitions);
             visitChildrenDiscardReturn(assignment);
             return null;
         }
 
         @Override
         public Object visit(VariableAccessNode variableAccess) {
-            return accessed.add(variableAccess.ident);
+            return accessed.add(variableAccess.definition);
         }
     }
 
+    private final Types types;
     private final Map<MJNode, SymbolTable.Scope> scopePerNode;
     private final List<MethodNode> newMethods;
 
@@ -66,6 +69,7 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
         nameResolution.resolve();
         scopePerNode = nameResolution.getScopePerNode();
         newMethods = new ArrayList<>();
+        types = programNode.types;
     }
 
     /**
@@ -97,21 +101,21 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
         VariableAccessVisitor visitor = new VariableAccessVisitor();
         visitor.visit(whileNode);
         SymbolTable.Scope scope = scopePerNode.get(whileNode);
-        List<String> accessedVariables = scope.filter(visitor.getAccessedVariables());
-        String[] writtenVariables = scope.filter(visitor.getWrittenVariables()).toArray(new String[0]);
+        List<Variable> accessedVariables = scope.filterVariables(visitor.getAccessedVariables());
+        List<Variable> writtenVariables = scope.filterVariables(visitor.getWrittenVariables());
 
         Location location = whileNode.location;
         String methodName = "loop_method" + location.line + "_" + location.line;
 
         ParametersNode parametersNode = new ParametersNode(location,
-                accessedVariables.stream().map(v -> new ParameterNode(location, v)).collect(Collectors.toList()));
+                accessedVariables.stream().map(v -> new ParameterNode(location, v.type, v.name)).collect(Collectors.toList()));
         List<ExpressionNode> arguments = accessedVariables.stream().map(v -> new VariableAccessNode(location, v)).collect(Collectors.toList());
         ArgumentsNode argNode = new ArgumentsNode(location, arguments);
 
         MethodInvocationNode invocation = new MethodInvocationNode(location, methodName, argNode);
         StatementNode invocationAssignment;
-        if (writtenVariables.length > 0) {
-            invocationAssignment = new MultipleVariableAssignmentNode(location, writtenVariables, invocation);
+        if (writtenVariables.size() > 0) {
+            invocationAssignment = new MultipleVariableAssignmentNode(location, writtenVariables, new UnpackOperatorNode(invocation));
         } else {
             invocationAssignment = new ExpressionStatementNode(invocation);
         }
@@ -121,10 +125,13 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
                 new IfStatementNode(location, whileNode.conditionalExpression, new BlockNode(location, concatAsArrayList(whileNode.body.statementNodes,
                         Collections.singletonList(invocationAssignment))
                 ), new BlockNode(location, Collections.emptyList())),
-                new ReturnStatementNode(location, Arrays.stream(writtenVariables).map(v -> new VariableAccessNode(location, v)).collect(Collectors.toList())))
+                new ReturnStatementNode(location, writtenVariables.stream().map(v -> new VariableAccessNode(location, v)).collect(Collectors.toList())))
         );
-
-        newMethods.add(new Parser.MethodNode(location, methodName, parametersNode, body,
+        Type returnType = types.INT;
+        if (writtenVariables.size() > 0) {
+            returnType = new Type.TupleType(types, writtenVariables.stream().map(Variable::getType).collect(Collectors.toList()));
+        }
+        newMethods.add(new Parser.MethodNode(location, methodName, returnType, parametersNode, body,
                 new Parser.GlobalVariablesNode(location, Collections.emptyMap())));
         visitChildrenDiscardReturn(whileNode);
         return Optional.of(invocationAssignment);

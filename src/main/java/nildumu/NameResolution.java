@@ -1,5 +1,6 @@
 package nildumu;
 
+import nildumu.typing.TypeResolution;
 import swp.util.Pair;
 
 import java.util.*;
@@ -11,8 +12,9 @@ import static nildumu.util.Util.p;
 /**
  * A simple name resolution that sets the {@code definition} variable in {@link VariableAssignmentNode},
  * {@link VariableDeclarationNode}, {@link VariableAccessNode} and {@link ParameterNode}.
- *
- * Also connects the {@link MethodInvocationNode} with the correct {@link MethodNode}.
+ * <p>
+ * Also connects the {@link MethodInvocationNode} with the correct {@link MethodNode} and does the type resolution:
+ * It assigns every expression a type and does the typechecking. It also resolves "var" types to correct types
  */
 public class NameResolution implements Parser.NodeVisitor<Object> {
 
@@ -27,6 +29,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
     private final Set<Variable> appendVariables;
     private final Map<MJNode, SymbolTable.Scope> scopePerNode;
     private final boolean captureScopes;
+    private MethodNode currentMethod;
 
     public NameResolution(ProgramNode program) {
         this(program, false);
@@ -41,10 +44,12 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         this.appendVariables = new HashSet<>();
         this.scopePerNode = new HashMap<>();
         this.captureScopes = captureScopes;
+        this.currentMethod = null;
     }
 
     public void resolve() {
         program.accept(this);
+        new TypeResolution(program, this).resolveAndThrow();
     }
 
     /**
@@ -78,7 +83,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
             @Override
             public Object visit(AppendOnlyVariableDeclarationNode appendDecl) {
-                Variable definition = new Variable(appendDecl.variable, false, false, true, true);
+                Variable definition = new Variable(appendDecl.variable, appendDecl.getVarType(), false, false, true, true);
                 appendDecl.definition = definition;
                 appendVariables.add(definition);
                 appendToVar.put(definition.name, definition);
@@ -126,7 +131,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         if (symbolTable.isDirectlyInCurrentScope(variableDeclaration.variable)){
             throw new MJError(String.format("Variable %s already defined in scope", variableDeclaration.variable));
         }
-        Variable definition = new Variable(variableDeclaration.variable,
+        Variable definition = new Variable(variableDeclaration.variable, variableDeclaration.getVarType(),
                 variableDeclaration instanceof InputVariableDeclarationNode,
                 variableDeclaration instanceof OutputVariableDeclarationNode,
                 variableDeclaration instanceof AppendOnlyVariableDeclarationNode,
@@ -190,6 +195,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
     @Override
     public Object visit(MethodNode method) {
         captureScope(method);
+        currentMethod = method;
         SymbolTable oldSymbolTable = symbolTable;
         symbolTable = new SymbolTable();
         symbolTable.enterScope();
@@ -198,9 +204,9 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
             if (p.first.equals(p.second)){
                 return;
             }
-            Variable pre = new Variable(p.first, false, false, false, true);
+            Variable pre = new Variable(p.first, program.types.INT, false, false, false, true);
             symbolTable.insert(pre.name, pre);
-            Variable post = new Variable(p.second, false, false, false, true);
+            Variable post = new Variable(p.second, program.types.INT, false, false, false, true);
             symbolTable.insert(post.name, post);
             defs.put(v, p(pre, post));
         });
@@ -209,6 +215,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         visitChildrenDiscardReturn(method);
         symbolTable.leaveScope();
         symbolTable = oldSymbolTable;
+        currentMethod = null;
         return null;
     }
 
@@ -230,7 +237,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         MethodNode method;
         if (!program.hasMethod(methodInvocation.method)){
             if (PredefinedMethodNode.isPredefined(methodInvocation.method)){
-                method = PredefinedMethodNode.getPredefined(methodInvocation.method);
+                method = PredefinedMethodNode.getPredefined(program, methodInvocation.method);
             } else {
                 throw new MJError(String.format("%s: No such method %s", methodInvocation, methodInvocation.method));
             }
@@ -240,9 +247,6 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
 
         methodInvocation.definition = method;
         visitChildrenDiscardReturn(methodInvocation);
-        if (methodInvocation.arguments.size() != method.getNumberOfParameters()){
-            throw new WrongNumberOfArgumentsError(methodInvocation, String.format("Expected %d arguments got %d", method.parameters.size(), methodInvocation.arguments.size()));
-        }
         methodInvocation.globalDefs = methodInvocation.globals.globalVarSSAVars.entrySet().stream()
                 .collect(Collectors.toMap(e -> symbolTable.lookup(e.getKey()), e -> p(symbolTable.lookup(e.getValue().first),
                         symbolTable.lookup(e.getValue().second))));
@@ -272,7 +276,15 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         captureScope(phi);
         phi.controlDeps.forEach(e -> e.accept(this));
         phi.joinedVariables.forEach(e -> e.accept(this));
-        visit((ExpressionNode)phi);
+        visit((ExpressionNode) phi);
+        return null;
+    }
+
+    @Override
+    public Object visit(ReturnStatementNode returnStatement) {
+        captureScope(returnStatement);
+        visitChildrenDiscardReturn(returnStatement);
+        returnStatement.parentMethod = currentMethod;
         return null;
     }
 }

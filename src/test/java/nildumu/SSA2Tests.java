@@ -44,7 +44,7 @@ public class SSA2Tests {
     public void basicWhile(){
         String program = "int a = 0; while (a != 0) { a = 1; }";
         toSSA(program);
-        process(program).val("a3", "0").run();
+        process(program).val("a1", "0").run();
     }
 
     @Test
@@ -126,7 +126,7 @@ public class SSA2Tests {
                 "     while (true) {\n" +
                 "        r = 1;\n" +
                 "     }" +
-                "     int a = r").globalBlock.getLastStatementOrNull().toPrettyString());
+                "     int a = r", true, false).globalBlock.getLastStatementOrNull().toPrettyString());
     }
 
     @Test
@@ -194,9 +194,9 @@ public class SSA2Tests {
     }
 
     @Test
-    public void testInputCallsInLoop(){
+    public void testInputCallsInLoopWithoutLoopTransformation() {
         Parser.WhileStatementNode whileStatement =
-                (Parser.WhileStatementNode) toSSA("while (1) { input() }").globalBlock.children().stream()
+                (Parser.WhileStatementNode) toSSA("while (1) { input() }", true, false).globalBlock.children().stream()
                         .filter(a -> a.toPrettyString().startsWith("while")).findAny().get();
         assertEquals(whileStatement.getPreCondVarAss().get(0).definition,
                 ((Parser.MethodInvocationNode) ((Parser.ExpressionStatementNode) ((Parser.BlockNode)
@@ -204,20 +204,41 @@ public class SSA2Tests {
                         .globalDefs.values().iterator().next().first);
     }
 
-    public static Parser.ProgramNode toSSA(String program){
+    public static Parser.ProgramNode toSSA(String program) {
         return toSSA(program, true);
     }
 
-    public static Parser.ProgramNode toSSA(String program, boolean log){
+    public static Parser.ProgramNode toSSA(String program, boolean log) {
+        return toSSA(program, log, true);
+    }
+
+    public static Parser.ProgramNode toSSA(String program, boolean log, boolean useLoopTransformer) {
         Context.LOG.setLevel(Level.FINE);
         Parser.MJNode.resetIdCounter();
         Lattices.Bit.resetNumberOfCreatedBits();
         Parser.ProgramNode programNode = (Parser.ProgramNode) generator.parse(program);
+        if (log) {
+            if (log) {
+                System.out.println(programNode.toPrettyString());
+                System.out.println("---");
+            }
+        }
+        if (useLoopTransformer) {
+            LoopTransformer.process(programNode);
+            program = programNode.toPrettyString();
+            if (log) {
+                System.out.println(program);
+                System.out.println("---");
+            }
+        }
+        Parser.MJNode.resetIdCounter();
+        Lattices.Bit.resetNumberOfCreatedBits();
+        programNode = (Parser.ProgramNode) generator.parse(program);
         SSAResolution2.process(programNode);
         if (log) {
             System.out.println(programNode.toPrettyString());
         }
-        Parser.ProgramNode resolvedProgram = (Parser.ProgramNode)Parser.generator.parse(programNode.toPrettyString());
+        Parser.ProgramNode resolvedProgram = (Parser.ProgramNode) Parser.generator.parse(programNode.toPrettyString());
         new NameResolution(resolvedProgram).resolve();
         //checkAndThrow(resolvedProgram);
         Parser.ProgramNode transformedProgram = new MetaOperatorTransformator(resolvedProgram.context.maxBitWidth, false).process(resolvedProgram);

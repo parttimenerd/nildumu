@@ -209,9 +209,9 @@ public class TestProgram implements Comparable<TestProgram> {
 
             @Override
             public String visit(Parser.ReturnStatementNode returnStatement) {
-                assert returnStatement.expressions.size() == 1;
+                assert returnStatement.hasReturnExpression();
                 return String.format("return (%s)(%s);", integerTypeStr,
-                        formatExpression(returnStatement.expressions.get(0)));
+                        formatExpression(returnStatement.expression));
             }
 
 
