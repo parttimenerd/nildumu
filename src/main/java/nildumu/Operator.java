@@ -961,7 +961,7 @@ public interface Operator {
         return zip(expressions, values, (e, v) -> {
             if (e instanceof Parser.UnpackOperatorNode) {
                 List<Value> vals = v.split();
-                assert vals.size() == ((Type.TupleType) e.type).elementTypes.size();
+                assert vals.size() == ((Type.TupleType) ((Parser.UnpackOperatorNode) e).expression.type).elementTypes.size();
                 return vals;
             }
             return Collections.singletonList(v);
@@ -1015,6 +1015,22 @@ public interface Operator {
                 return "(" + arguments.get(0) + ",)";
             }
             return "(" + arguments.stream().map(Objects::toString).collect(Collectors.joining(", ")) + ")";
+        }
+    };
+
+    Operator ARRAY_LITERAL = new Operator() {
+
+        @Override
+        public Value compute(Context c, List<Value> arguments) {
+            return Value.combine(arguments);
+        }
+
+        @Override
+        public String toString(List<Value> arguments) {
+            if (arguments.size() == 1) {
+                return "{" + arguments.get(0) + ",}";
+            }
+            return "{" + arguments.stream().map(Objects::toString).collect(Collectors.joining(", ")) + "}";
         }
     };
 

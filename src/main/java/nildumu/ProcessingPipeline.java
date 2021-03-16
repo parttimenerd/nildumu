@@ -1,5 +1,7 @@
 package nildumu;
 
+import nildumu.typing.TypeTransformer;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
@@ -43,13 +45,23 @@ public class ProcessingPipeline {
     }
 
     public static ProcessingPipeline create(boolean transformPlus, boolean transformLoops) {
-        return new ProcessingPipeline(wrap(LoopTransformer::process),
+        return new ProcessingPipeline(wrap(LoopTransformer::process), p -> {
+                    new NameResolution(p).resolve();
+                    return TypeTransformer.process(p);
+                },
                 wrap(SSAResolution2::process),
                 program -> new MetaOperatorTransformator(program.context.maxBitWidth, transformPlus).process(program));
     }
 
-    public static ProcessingPipeline createTillBeforeTypeResolution() {
+    public static ProcessingPipeline createTillBeforeTypeTransformation() {
         return new ProcessingPipeline(wrap(LoopTransformer::process));
+    }
+
+    public static ProcessingPipeline createTillBeforeSSAResolution() {
+        return new ProcessingPipeline(wrap(LoopTransformer::process), p -> {
+            new NameResolution(p).resolve();
+            return TypeTransformer.process(p);
+        });
     }
 
     public Parser.ProgramNode process(String program) {

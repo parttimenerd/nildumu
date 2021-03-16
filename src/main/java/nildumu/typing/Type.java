@@ -1,12 +1,12 @@
 package nildumu.typing;
 
-import nildumu.Parser;
-
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public abstract class Type implements Serializable {
 
@@ -38,16 +38,16 @@ public abstract class Type implements Serializable {
 
     /**
      * returns the number of int variables after blasting, e.g. int → 1, int[3] → 3, int[3][3] → 9,
-     * only empty if generic
+     * only -1 if generic
      */
-    public abstract Optional<Integer> getNumberOfBlastedVariables();
+    public abstract int getNumberOfBlastedVariables();
 
     public Type getBracketAccessResult(int i) {
         return this;
     }
 
     public void checkInvariants() {
-        assert isGeneric() == !getNumberOfBlastedVariables().isPresent();
+        //assert isGeneric() == !(getNumberOfBlastedVariables();
     }
 
     @Override
@@ -55,32 +55,85 @@ public abstract class Type implements Serializable {
         return name;
     }
 
-    /**
-     * an array with a predefined length, works only with non generic sub elements
-     */
-    public static class FixedLengthArrayType extends Type {
+    public List<Type> getBlastedTypes() {
+        return Collections.singletonList(this);
+    }
 
-        private final Type elementType;
-        private final int length;
+    public static abstract class TupleLikeType extends Type {
 
-        public FixedLengthArrayType(Types types, Type elementType, int length) {
-            super(types, String.format("%s[%d]", elementType, length), true);
-            this.elementType = elementType;
+        public final int length;
+        protected int blastCache = -1;
+
+        public TupleLikeType(Types types, String name, boolean forPreprocessingOnly, int length) {
+            super(types, name, forPreprocessingOnly);
             this.length = length;
-            assert !elementType.isGeneric();
+        }
+
+        public int getBlastedStartIndex(int index) {
+            return IntStream.range(0, index).map(i -> getBracketAccessResult(i).getNumberOfBlastedVariables()).sum();
+        }
+
+        @Override
+        public int getNumberOfBlastedVariables() {
+            if (blastCache == -1) {
+                blastCache = IntStream.range(0, length).map(t -> getBracketAccessResult(t).getNumberOfBlastedVariables()).sum();
+            }
+            return blastCache;
+        }
+
+        @Override
+        public List<Type> getBlastedTypes() {
+            return IntStream.range(0, length).mapToObj(i -> {
+                Type type = getBracketAccessResult(i);
+                if (type instanceof TupleLikeType) {
+                    return ((TupleLikeType) type).getBlastedTypes();
+                }
+                return Collections.singletonList(type);
+            }).flatMap(List::stream).collect(Collectors.toList());
         }
 
         public int getLength() {
             return length;
         }
 
+        public String getSanitizedName() {
+            return getName().replace(',', '_').replace("(", "__").replace(")", "__").replace("[", "___").replace("]", "___");
+        }
+
+        public List<Integer> getBlastedIndexes(int index) {
+            int start = getBlastedStartIndex(index);
+            return IntStream.range(start, start + getBracketAccessResult(index).getNumberOfBlastedVariables()).mapToObj(i -> i).collect(Collectors.toList());
+        }
+
+        public abstract boolean hasOnlyIntElements();
+    }
+
+    /**
+     * an array with a predefined length, works only with non generic sub elements
+     */
+    public static class FixedLengthArrayType extends TupleLikeType {
+
+        private final Type elementType;
+        public FixedLengthArrayType(Types types, Type elementType, int length) {
+            super(types, String.format("%s[%d]", elementType, length), true, length);
+            this.elementType = elementType;
+            assert !elementType.isGeneric();
+        }
+
         public Type getElementType() {
             return elementType;
         }
 
+        public int getBlastedStartIndex(int index) {
+            return elementType.getNumberOfBlastedVariables() * index;
+        }
+
         @Override
-        public Optional<Integer> getNumberOfBlastedVariables() {
-            return Optional.of(length * elementType.getNumberOfBlastedVariables().get());
+        public int getNumberOfBlastedVariables() {
+            if (blastCache == -1) {
+                blastCache = elementType.getNumberOfBlastedVariables() * length;
+            }
+            return blastCache;
         }
 
         @Override
@@ -101,21 +154,21 @@ public abstract class Type implements Serializable {
         public int hashCode() {
             return Objects.hash(elementType, length);
         }
+
+        @Override
+        public boolean hasOnlyIntElements() {
+            return elementType == getTypes().INT;
+        }
     }
 
-    public static class TupleType extends Type {
+    public static class TupleType extends TupleLikeType {
 
         public final List<Type> elementTypes;
 
         public TupleType(Types types, List<Type> elementTypes) {
-            super(types, String.format("(%s)", elementTypes.stream().map(Type::toString).collect(Collectors.joining(", "))), true);
+            super(types, String.format("(%s)", elementTypes.stream().map(Type::toString).collect(Collectors.joining(", "))), true, elementTypes.size());
             this.elementTypes = elementTypes;
             assert elementTypes.stream().noneMatch(Type::isGeneric);
-        }
-
-        @Override
-        public Optional<Integer> getNumberOfBlastedVariables() {
-            return Optional.of(elementTypes.stream().mapToInt(t -> t.getNumberOfBlastedVariables().get()).sum());
         }
 
         @Override
@@ -134,6 +187,11 @@ public abstract class Type implements Serializable {
         @Override
         public int hashCode() {
             return Objects.hash(elementTypes);
+        }
+
+        @Override
+        public boolean hasOnlyIntElements() {
+            return elementTypes.stream().allMatch(t -> t == getTypes().INT);
         }
     }
 

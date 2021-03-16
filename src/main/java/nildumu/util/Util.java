@@ -123,4 +123,8 @@ public class Util {
         }
         return Collections.unmodifiableList(ret);
     }
+
+    public static <S, R> List<R> enumerate(List<S> a, BiFunction<Integer, S, R> consumer) {
+        return IntStream.range(0, a.size()).mapToObj(i -> consumer.apply(i, a.get(i))).collect(Collectors.toList());
+    }
 }

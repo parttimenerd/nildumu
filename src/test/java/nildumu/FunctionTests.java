@@ -311,7 +311,7 @@ l output int o = fib(h);
     @ParameterizedTest
     @MethodSource("handlers")
     public void testConditionalRecursion(String handler){
-        parse("bit_width 3;\n" +
+        parse("bit_width 5;\n" +
                 "    int f(int x, int y, int z, int w, int v, int l) {\n" +
                 "\t    int r = 0;\n" +
                 "\t    if (l == 0) {\n" +

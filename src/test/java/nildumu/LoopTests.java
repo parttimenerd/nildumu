@@ -152,7 +152,7 @@ public class LoopTests {
     public void testBasicLoop4_condensed() {
         Lattices.Bit.toStringGivesBitNo = true;
         assertTimeoutPreemptively(ofMillis(1000000), () -> {
-            String program = "bit_width 2;\n" +
+            String program = "bit_width 3;\n" +
                     "h input int h = 0b0u;\n" +
                     "l input int l = 0bu;\n" +
                     "while (l){\n" +
@@ -175,7 +175,7 @@ public class LoopTests {
      </code>
      */
     @ParameterizedTest
-    @ValueSource(ints = {1, 2, 10})
+    @ValueSource(ints = {3, 4, 10})
     public void testBasicLoop4_condensed2(int secretSize) {
         assertTimeoutPreemptively(ofMillis(1000000), () -> {
             String program = String.format("bit_width %d;\n", secretSize) +

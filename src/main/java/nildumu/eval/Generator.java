@@ -25,10 +25,6 @@ public class Generator {
         return (IfStatementNode) cur;
     }
 
-    static IntegerLiteralNode literal(int num){
-        return new IntegerLiteralNode(loc(), vl.parse(num));
-    }
-
     static VariableAccessNode access(String variable){
         return new VariableAccessNode(loc(), variable);
     }

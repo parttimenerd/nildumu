@@ -199,8 +199,8 @@ public class SSA2Tests {
                 (Parser.WhileStatementNode) toSSA("while (1) { input() }", true, false).globalBlock.children().stream()
                         .filter(a -> a.toPrettyString().startsWith("while")).findAny().get();
         assertEquals(whileStatement.getPreCondVarAss().get(0).definition,
-                ((Parser.MethodInvocationNode) ((Parser.ExpressionStatementNode) ((Parser.BlockNode)
-                        whileStatement.body.statementNodes.get(0)).statementNodes.get(0)).expression)
+                ((Parser.MethodInvocationNode) ((Parser.ExpressionStatementNode)
+                        whileStatement.body.statementNodes.get(0)).expression)
                         .globalDefs.values().iterator().next().first);
     }
 

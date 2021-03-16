@@ -2,6 +2,8 @@ package swp.lexer;
 
 public class Location {
 
+	public static final Location ZERO = new Location(0, 0);
+
 	public final int line;
 	public final int column;
 

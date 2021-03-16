@@ -34,7 +34,7 @@ public class TypingTests {
             "'(int, int) method() { return (1, 1); } int var_; int var_2; var_, var_2 = *method(); var value = var_', 'int'"
     })
     public void testTypes(String code, String expectedType) {
-        Parser.ProgramNode program = ProcessingPipeline.createTillBeforeTypeResolution().process(code);
+        Parser.ProgramNode program = ProcessingPipeline.createTillBeforeTypeTransformation().process(code);
         NameResolution nameResolution = new NameResolution(program);
         nameResolution.resolve();
         assertEquals(expectedType, ((Parser.VariableDeclarationNode) program.globalBlock.statementNodes.get(program.globalBlock.statementNodes.size() - 1)).getVarType().toString());

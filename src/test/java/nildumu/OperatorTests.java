@@ -14,7 +14,8 @@ public class OperatorTests {
             "1, >>, 2, 0",
             "1,+, 1, 2",
             "2,*,4, 8",
-            "3, %, 2, 1"
+            "3, %, 2, 1",
+            "5, *, 1, 5"
     })
     public void test(String arg1, String op, String arg2, String result){
         parse(String.format("bit_width 10; l input int a = %s; l input int b = %s; int x = a %s b", arg1, arg2, op)).val("x", result).run();

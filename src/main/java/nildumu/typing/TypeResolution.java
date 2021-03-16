@@ -40,10 +40,16 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
     }
 
     private final ProgramNode program;
+    private final Types types;
     private final NameResolution resolution;
 
     public TypeResolution(ProgramNode program, NameResolution resolution) {
+        this(program, program.types, resolution);
+    }
+
+    public TypeResolution(ProgramNode program, Types types, NameResolution resolution) {
         this.program = program;
+        this.types = types;
         this.resolution = resolution;
     }
 
@@ -110,7 +116,7 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
     @Override
     public List<WrongTypeMessage> visit(MultipleVariableAssignmentNode assignment) {
         List<WrongTypeMessage> messages = visitChildrenAndCollect(assignment);
-        Type.TupleType tupleType = (Type.TupleType) assignment.expression.expression.type;
+        Type.TupleLikeType tupleType = (Type.TupleLikeType) assignment.expression.expression.type;
         Type.TupleType expectedType = new Type.TupleType(program.types, assignment.definitions.stream()
                 .map(Variable::getType).collect(Collectors.toList()));
         if (!tupleType.equals(expectedType)) {
@@ -194,7 +200,7 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
 
     @Override
     public List<WrongTypeMessage> visit(ArrayAssignmentNode assignment) {
-        BracketedAccessOperatorNode accessNode = new BracketedAccessOperatorNode(new VariableAccessNode(assignment.location, assignment.variable), assignment.arrayIndex);
+        BracketedAccessOperatorNode accessNode = new BracketedAccessOperatorNode(new VariableAccessNode(assignment.location, assignment.definition), assignment.arrayIndex);
         Pair<List<WrongTypeMessage>, Optional<Type>> tp = checkArrayAccess(accessNode);
         List<WrongTypeMessage> messages = tp.first;
         Optional<Type> elementType = tp.second;
@@ -238,7 +244,7 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
     public List<WrongTypeMessage> visit(TupleLiteralNode primaryExpression) {
         List<WrongTypeMessage> messages = visitChildrenAndCollect(primaryExpression);
         primaryExpression.type =
-                program.types.getOrCreateTupleType(primaryExpression.elements.stream()
+                types.getOrCreateTupleType(primaryExpression.elements.stream()
                         .flatMap(e -> {
                             if (e instanceof UnpackOperatorNode) {
                                 return ((Type.TupleType) ((UnpackOperatorNode) e).expression.type).elementTypes.stream();
@@ -304,8 +310,8 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
         List<Type> argTypes = ((Type.TupleType) tuple.type).elementTypes;
         MethodNode method = methodInvocation.definition;
         method.getNumberOfParameters().ifPresent(n -> {
-            if (methodInvocation.arguments.size() != n) {
-                throw new NameResolution.WrongNumberOfArgumentsError(methodInvocation, String.format("Expected %d arguments got %d", method.parameters.size(), methodInvocation.arguments.size()));
+            if (argTypes.size() != n) {
+                throw new NameResolution.WrongNumberOfArgumentsError(methodInvocation, String.format("Expected %d arguments got %d", method.parameters.size(), argTypes.size()));
             }
             zip(argTypes, methodInvocation.definition.parameters.parameterNodes, (t, p) -> {
                 if (t != p.type) {

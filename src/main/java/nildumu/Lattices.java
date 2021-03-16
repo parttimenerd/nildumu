@@ -1310,7 +1310,7 @@ public class Lattices {
         }
 
         public static Value combine(List<Value> values) {
-            return values.stream().flatMap(v -> v.withBitCount(ValueLattice.get().bitWidth).bits.stream()).collect(Value.collector());
+            return values.stream().flatMap(v -> v.withBitCountMultipleOf(ValueLattice.get().bitWidth).bits.stream()).collect(Value.collector());
         }
 
         /**
@@ -1622,6 +1622,10 @@ public class Lattices {
                 newBits.add(this.signBit().copy());
             }
             return new Value(newBits);
+        }
+
+        public Value withBitCountMultipleOf(int width) {
+            return withBitCount((int) (Math.ceil(bits.size() * 1.0 / width) * width));
         }
 
         public boolean isNotEmpty() {

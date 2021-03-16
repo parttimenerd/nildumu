@@ -34,7 +34,7 @@ public class SymbolTable {
             else return null;
         }
 
-        boolean contains(String name) {
+        public boolean contains(String name) {
             return lookup(name) != null;
         }
 

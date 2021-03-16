@@ -4,6 +4,8 @@ import nildumu.NildumuError;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Set of types
@@ -22,8 +24,8 @@ public class Types extends AbstractMap<String, Type> implements Serializable {
         }
 
         @Override
-        public Optional<Integer> getNumberOfBlastedVariables() {
-            return Optional.of(1);
+        public int getNumberOfBlastedVariables() {
+            return 1;
         }
     };
 
@@ -42,14 +44,14 @@ public class Types extends AbstractMap<String, Type> implements Serializable {
         }
 
         @Override
-        public Optional<Integer> getNumberOfBlastedVariables() {
-            return Optional.of(1);
+        public int getNumberOfBlastedVariables() {
+            return 1;
         }
     };
 
     public Type VAR = new Type(this, "var", false) {
         @Override
-        public Optional<Integer> getNumberOfBlastedVariables() {
+        public int getNumberOfBlastedVariables() {
             throw new NildumuError("not supported for var type");
         }
 
@@ -95,8 +97,12 @@ public class Types extends AbstractMap<String, Type> implements Serializable {
         return getOrCreateFixedArrayType(subType, Collections.singletonList(lengths.get(lengths.size() - 1)));
     }
 
-    public Type getOrCreateTupleType(List<Type> elementTypes) {
+    public Type.TupleType getOrCreateTupleType(List<Type> elementTypes) {
         Type type = new Type.TupleType(this, elementTypes);
-        return types.computeIfAbsent(type.getName(), n -> type);
+        return (Type.TupleType) types.computeIfAbsent(type.getName(), n -> type);
+    }
+
+    public Type getOrCreateTupleType(Type elementType, int size) {
+        return getOrCreateTupleType(IntStream.range(0, size).mapToObj(i -> INT).collect(Collectors.toList()));
     }
 }
