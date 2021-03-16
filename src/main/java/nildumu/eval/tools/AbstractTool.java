@@ -3,20 +3,31 @@ package nildumu.eval.tools;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
+import nildumu.NildumuError;
 import nildumu.eval.*;
+
+import static java.util.function.Function.identity;
 
 /**
  * Abstract class for analysis tools.
  */
 public abstract class AbstractTool implements Comparable<AbstractTool> {
 
+    public static final int DEFAULT_UNWIND = 32;
     public final String name;
-    public final boolean supportsFunctions;
+    public final int unwind;
+    public final String fileEnding;
 
-    protected AbstractTool(String name, boolean supportsFunctions) {
+    protected AbstractTool(String name, int unwind, String fileEnding) {
         this.name = name;
-        this.supportsFunctions = supportsFunctions;
+        this.unwind = unwind;
+        this.fileEnding = fileEnding;
+        check();
     }
 
     /**
@@ -40,35 +51,9 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
         return name;
     }
 
-    public static List<AbstractTool> getDefaultTools(){
-        return Arrays.asList(
-                new NildumuDemoTool(2, 2),
-               // new NildumuDemoTool(5, 5),
-               new Flowcheck(),
-          //      new LeakWatch(),
-                new ApproxFlow(2),
-            //   new ApproxFlow(5),
-               new ApproxFlow(),
-               new Nildumu(2, 2)//,
-               // new NildumuDemoTool(),
-                //new Nildumu()
-              //  new Nildumu(5, 5)//,
-               //new Quail()
-        );
-    }
-
-    public static List<AbstractTool> getDefaultToolsWithoutVariations(){
-        return Arrays.asList(
-                //new NildumuDemoTool(2, 2),
-                //new NildumuDemoTool(5, 5),
-                new Flowcheck(),
-               // new LeakWatch(),
-                new ApproxFlow(),
-                //new NildumuDemoTool()//,
-                new Nildumu()
-                //new Nildumu()//,
-                //new Quail()
-        );
+    public static List<AbstractTool> getDefaultTools(int... unwindLimits){
+        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.of(new Nildumu(unwind), new ApproxFlow(unwind)))
+                .flatMap(identity()).collect(Collectors.toList());
     }
 
     @Override
@@ -76,9 +61,12 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
         return name.compareTo(o.name);
     }
 
-    public boolean isInterprocedural(){
-        return supportsFunctions;
+    public static void checkExistence(Path path) {
+        if (!path.toFile().exists()) {
+            throw new NildumuError(String.format("%s does not exist, with pwd %s", path, System.getProperty("user.dir")));
+        }
     }
 
-    public AbstractTool setUnwindingLimit(int limit){ return this; }
+    /** check that the required files are present */
+    public abstract void check();
 }

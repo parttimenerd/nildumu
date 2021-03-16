@@ -1,0 +1,3 @@
+[submodule "eval-programs/approxflow"]
+	path = eval-programs/approxflow
+	url = git@github.com:parttimenerd/approxflow.git

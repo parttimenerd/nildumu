@@ -86,10 +86,6 @@ public class Evaluation {
                                                      Path baseFolder){
         PacketList packets = new PacketList();
         tools.forEach(t -> {
-            if (program.hasMethods() && !t.isInterprocedural()){
-                packets.add(AnalysisPacket.empty(t, program));
-                return;
-            }
             Path folder = baseFolder.resolve(t.name);
             try {
                 Files.createDirectories(folder);
@@ -122,8 +118,8 @@ public class Evaluation {
     @Parameters(commandDescription="Evaluation tool")
     static class Cmd {
 
-        @Parameter(description="scal or normal or list", required = true)
-        private String mode;
+        @Parameter(description="scal or normal or list")
+        private String mode = "normal";
 
         @Parameter(description="scalability benchmark", names = "--scal")
         private List<String> scalBench = Collections.singletonList(ScalBench.ALL.name().toLowerCase());
@@ -146,14 +142,11 @@ public class Evaluation {
         @Parameter(names="--tools")
         private List<String> tools = Collections.singletonList("all");
 
-        @Parameter(names="--quail")
-        private boolean quail = false;
-
         @Parameter(names="--parallelism", description = "cores to use")
         private int parallelism = 1;
 
-        @Parameter(names="--exclude_tool_variations")
-        private boolean excludeToolVariations = false;
+        @Parameter(names = {"--unwind", "-u"}, description = "unwinds used")
+        private List<Integer> unwinds = new ArrayList<>(AbstractTool.DEFAULT_UNWIND);
 
         @Parameter(names="--runs")
         private int runs = 1;
@@ -166,18 +159,12 @@ public class Evaluation {
         try {
             System.out.println(String.join(" ", args));
             com.parse(args);
-            List<AbstractTool> tools_ = cmd.excludeToolVariations ?
-                    AbstractTool.getDefaultToolsWithoutVariations() :
-                    AbstractTool.getDefaultTools();
+
+            List<AbstractTool> tools_ = AbstractTool.getDefaultTools(cmd.unwinds.isEmpty() ?
+                    new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray());
             if (!cmd.tools.get(0).equals("all")){
                 tools_ = tools_.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
             }
-            tools_ = tools_.stream().filter(t -> {
-                if (t instanceof Quail){
-                    return cmd.quail;
-                }
-                return true;
-            }).collect(Collectors.toList());
             List<AbstractTool> tools = tools_;
             System.out.println(cmd.maxDuration);
             Duration duration = Duration.parse(cmd.maxDuration);
@@ -189,7 +176,13 @@ public class Evaluation {
                     System.out.println(bench.name().toLowerCase());
                 }
             } else if (!cmd.mode.equals("normal")){
-                cmd.scalBench.forEach(s -> ScalBench.valueOf(s.toUpperCase()).benchmark(cmd.minScalAlpha, cmd.maxScalAlpha, duration, cmd.parallelism, cmd.runs, tools));
+                cmd.scalBench.forEach(s -> ScalBench.valueOf(s.toUpperCase()).benchmark(cmd.minScalAlpha, cmd.maxScalAlpha, duration, cmd.parallelism, cmd.runs, unwind -> {
+                    List<AbstractTool> ts = AbstractTool.getDefaultTools(unwind);
+                    if (!cmd.tools.get(0).equals("all")){
+                        ts = ts.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
+                    }
+                    return ts;
+                }));
             } else {
                 List<TestProgram> specimen = new ArrayList<>();
                 cmd.normalBench.forEach(s -> {
@@ -243,10 +236,10 @@ public class Evaluation {
     public enum ScalBench {
         ALL(i -> null){
             @Override
-            void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, List<AbstractTool> tools) {
+            void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, Function<Integer, List<AbstractTool>> toolsForUnwind) {
                 for (ScalBench bench : ScalBench.values()) {
                     if (bench != ALL){
-                        bench.benchmark(start, endIncl, duration, parallelism, runs, tools);
+                        bench.benchmark(start, endIncl, duration, parallelism, runs, toolsForUnwind);
                     }
                 }
             }
@@ -258,9 +251,9 @@ public class Evaluation {
         REPEATED_MANY_FIBONACCIS(Generator::repeatedManyFibonaccis),
         WHILE_UNWINDING(alpha -> (Parser.ProgramNode)Parser.generator.parse(String.format("h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu; int z = 0; while (0 < h && h < %s){z = z + 1; h = h + 1} l output int o = z;", alpha))) {
             @Override
-            void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, List<AbstractTool> tools) {
+            void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, Function<Integer, List<AbstractTool>> toolsForUnwind) {
                 evalPackets(IntStream.rangeClosed(start, endIncl)
-                        .mapToObj(alpha -> getPacketsForToolsOrDie(tools.stream().map(t -> t.setUnwindingLimit(1 << alpha)).collect(Collectors.toList()), new TestProgram("while_unwinding_" + alpha, programGenerator.apply(1 << alpha), IntegerType.INT), Paths.get("bench").resolve("while_unwinding_" + alpha)))
+                        .mapToObj(alpha -> getPacketsForToolsOrDie(toolsForUnwind.apply(1 << alpha), new TestProgram("while_unwinding_" + alpha, programGenerator.apply(1 << alpha), IntegerType.INT), Paths.get("bench").resolve("while_unwinding_" + alpha)))
                         .flatMap(PacketList::stream)
                         .collect(PacketList.collector()),"bench/temci_run.yaml",
                         "bench/results.csv", duration, parallelism, runs);       }
@@ -271,8 +264,8 @@ public class Evaluation {
             this.programGenerator = programGenerator;
         }
 
-        void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, List<AbstractTool> tools){
-            evalBenchmark(this.name().toLowerCase(), start, endIncl, "bench/" + name().toLowerCase(), programGenerator, duration, parallelism, runs, tools);
+        void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, Function<Integer, List<AbstractTool>> toolsForUnwind){
+            evalBenchmark(this.name().toLowerCase(), start, endIncl, "bench/" + name().toLowerCase(), programGenerator, duration, parallelism, runs, toolsForUnwind.apply(AbstractTool.DEFAULT_UNWIND));
         }
     }
 

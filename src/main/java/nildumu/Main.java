@@ -42,7 +42,7 @@ public class Main {
     private MinCut.Algo algo = MinCut.Algo.OPENWBO;
 
     @Parameter(names = {"-tp", "--transformPlus"}, arity = 1)
-    boolean transformPlus = true;
+    boolean transformPlus = false;
 
     @Parameter(names = {"-tl", "--transformLoops"}, arity = 1)
     boolean transformLoops = true;

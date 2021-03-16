@@ -16,17 +16,14 @@ public class ApproxFlow extends AbstractTool {
 
     static final String GLOBAL_FUNCTION = "__global__";
 
-    static final Path approxFlowFolder = Paths.get("../eval-programs/approxflow");
-
-    private int unwindLimit;
+    static final Path approxFlowFolder = Paths.get("eval-programs/approxflow");
 
     ApproxFlow() {
         this(32);
     }
 
     ApproxFlow(int unwindLimit) {
-        super("ApproxFlow" + unwindLimit, true);
-        this.unwindLimit = unwindLimit;
+        super("ApproxFlow" + unwindLimit, unwindLimit, "c");
     }
 
     static String toCCode(TestProgram program){
@@ -68,7 +65,7 @@ public class ApproxFlow extends AbstractTool {
                         formatter.format(approxFlowFolder),
                         sourceFile.toAbsolutePath(),
                         codeFileName,
-                        unwindLimit,
+                        unwind,
                         codeFileName,
                         GLOBAL_FUNCTION);
             }
@@ -81,7 +78,7 @@ public class ApproxFlow extends AbstractTool {
     }
 
     @Override
-    public AbstractTool setUnwindingLimit(int limit) {
-        return new ApproxFlow(limit);
+    public void check() {
+        checkExistence(approxFlowFolder);
     }
 }

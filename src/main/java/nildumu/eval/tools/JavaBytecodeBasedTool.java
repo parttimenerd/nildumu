@@ -8,14 +8,14 @@ import java.util.*;
 import nildumu.eval.*;
 
 /**
- * Tool that analyses Java bytecode and supports methods
+ * Tool that analyses Java bytecode and supports methods, just there for later use
  */
 public abstract class JavaBytecodeBasedTool extends AbstractTool {
 
     final Path javaLibForCompilation;
 
-    protected JavaBytecodeBasedTool(String name, Path javaLibForCompilation) {
-        super(name, true);
+    protected JavaBytecodeBasedTool(String name, Path javaLibForCompilation, int unwind) {
+        super(name, unwind, ".java");
         this.javaLibForCompilation = javaLibForCompilation;
     }
 

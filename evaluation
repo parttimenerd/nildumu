@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-
+set -e
 case "$(uname -s)" in
    Darwin)
      SCRIPT_PATH=$(greadlink -f "$0")
@@ -13,6 +13,5 @@ esac
 PROJECT_DIR=$(dirname "$SCRIPT_PATH")
 
 cd "$PROJECT_DIR"
-#mvn clean
-mvn compile
+./update_eval > /dev/null
 mvn exec:java -Deval -Dexec.args="$*"
