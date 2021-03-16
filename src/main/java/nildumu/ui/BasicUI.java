@@ -355,7 +355,7 @@ public class BasicUI {
 
         boolean shouldAutoRun = getVarContent("lastAutoRun", "true").equals("true");
         autoRunCheckBox.setSelected(shouldAutoRun);
-        transformPlusCheckBox.setSelected(getVarContent("lastTransformPlus", "true").equals("true"));
+        transformPlusCheckBox.setSelected(getVarContent("lastTransformPlus", "false").equals("true"));
         transformPlusCheckBox.addActionListener(e -> {
             processRefreshTimer.request();
             setVarContent("lastTransformPlus", transformPlusCheckBox.isSelected() + "");

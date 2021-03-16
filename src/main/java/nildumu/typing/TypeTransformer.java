@@ -123,7 +123,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
             } else if (v.getType() == types.INT) {
                 return Collections.singletonList(variable);
             } else {
-                return enumerate(variable.getType().getBlastedTypes(), (i, t) -> new Variable("__blasted_" + v.name + "_" + i, t));
+                return enumerate(variable.getType().getBlastedTypes(), (i, t) -> new Variable("__bl_" + v.name + "_" + i, t));
             }
         });
     }
@@ -277,7 +277,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         }
         List<StatementNode> stmts = new ArrayList<>();
         HashSet<String> varNames = new HashSet<>(assignment.variables);
-        String varName = "__blasted_ma_";
+        String varName = "__bl_";
         while (varNames.contains(varName)) {
             varName += "_";
         }

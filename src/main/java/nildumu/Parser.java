@@ -1502,7 +1502,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toPrettyString(String indent, String incr) {
-            return indent + String.format("%s %s[[%s]](%s){\n%s\n}\n", getReturnType(), name, globals, parameters, body.toPrettyString(indent + incr, incr, false));
+            return indent + String.format("%s %s%s(%s){\n%s\n}\n", getReturnType(), name, globals.globalVarSSAVars.size() > 0 ? String.format("[[%s]]", globals) : "", parameters, body.toPrettyString(indent + incr, incr, false));
         }
 
         /**
@@ -3664,7 +3664,7 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return String.format("%s[[%s]](%s)", method, globals, arguments);
+            return String.format("%s%s(%s)", method, globals.globalVarSSAVars.size() > 0 ? String.format("[[%s]]", globals) : "", arguments);
         }
 
         @Override

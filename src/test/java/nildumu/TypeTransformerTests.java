@@ -39,8 +39,8 @@ public class TypeTransformerTests {
     @Test
     public void testArrayDefinition() {
         assertEquals("use_sec basic;\n" +
-                        "bit_width 3;\nint __blasted_a_0; int __blasted_a_1;\n" +
-                        "__blasted_a_0, __blasted_a_1 = *(1, 2);",
+                        "bit_width 3;\nint __bl_a_0; int __bl_a_1;\n" +
+                        "__bl_a_0, __bl_a_1 = *(1, 2);",
                 parseToTransformed("bit_width 3; int[2] a = {1, 2}"));
 
     }
@@ -49,8 +49,8 @@ public class TypeTransformerTests {
     public void testTupleAssignment() {
         assertEquals("use_sec basic;\n" +
                         "bit_width 3;\n" +
-                        "int __blasted_a_0; int __blasted_a_1; int __blasted_a_2;\n" +
-                        "__blasted_a_0, __blasted_a_1, __blasted_a_2 = *(1, 2, 3);",
+                        "int __bl_a_0; int __bl_a_1; int __bl_a_2;\n" +
+                        "__bl_a_0, __bl_a_1, __bl_a_2 = *(1, 2, 3);",
                 parseToTransformed("bit_width 3; var a = (1, (2, 3))"));
     }
 
@@ -58,12 +58,12 @@ public class TypeTransformerTests {
     public void testTupleToTupleAssignment() {
         assertEquals("use_sec basic;\n" +
                         "bit_width 3;\n" +
-                        "int __blasted_a_0; int __blasted_a_1; int __blasted_a_2;\n" +
-                        "__blasted_a_0, __blasted_a_1, __blasted_a_2 = *(1, 2, 3);\n" +
-                        "int __blasted_b_0;\n" +
-                        "int __blasted_b_1;\n" +
-                        "int __blasted_b_2;\n" +
-                        "__blasted_b_0, __blasted_b_1, __blasted_b_2 = *(__blasted_a_0, __blasted_a_1, __blasted_a_2);",
+                        "int __bl_a_0; int __bl_a_1; int __bl_a_2;\n" +
+                        "__bl_a_0, __bl_a_1, __bl_a_2 = *(1, 2, 3);\n" +
+                        "int __bl_b_0;\n" +
+                        "int __bl_b_1;\n" +
+                        "int __bl_b_2;\n" +
+                        "__bl_b_0, __bl_b_1, __bl_b_2 = *(__bl_a_0, __bl_a_1, __bl_a_2);",
                 parseToTransformed("bit_width 3; var a = (1, (2, 3)); var b = a;"));
     }
 
@@ -71,11 +71,11 @@ public class TypeTransformerTests {
     public void testTupleToTupleAssignment2() {
         assertEquals("use_sec basic;\n" +
                         "bit_width 3;\n" +
-                        "int __blasted_a_0; int __blasted_a_1; int __blasted_a_2;\n" +
-                        "__blasted_a_0, __blasted_a_1, __blasted_a_2 = *(1, 2, 3);\n" +
-                        "int __blasted_b_0;\n" +
-                        "int __blasted_b_1;\n" +
-                        "__blasted_b_0, __blasted_b_1 = *(__blasted_a_1, __blasted_a_2);",
+                        "int __bl_a_0; int __bl_a_1; int __bl_a_2;\n" +
+                        "__bl_a_0, __bl_a_1, __bl_a_2 = *(1, 2, 3);\n" +
+                        "int __bl_b_0;\n" +
+                        "int __bl_b_1;\n" +
+                        "__bl_b_0, __bl_b_1 = *(__bl_a_1, __bl_a_2);",
                 parseToTransformed("bit_width 3; var a = (1, (2, 3)); var b = a[1];"));
     }
 
@@ -83,11 +83,11 @@ public class TypeTransformerTests {
     public void testArrayToArrayAssignment2() {
         assertEquals("use_sec basic;\n" +
                         "bit_width 4;\n" +
-                        "int __blasted_a_0; int __blasted_a_1; int __blasted_a_2; int __blasted_a_3;\n" +
-                        "__blasted_a_0, __blasted_a_1, __blasted_a_2, __blasted_a_3 = *(1, 2, 3, 4);\n" +
-                        "int __blasted_b_0;\n" +
-                        "int __blasted_b_1;\n" +
-                        "__blasted_b_0, __blasted_b_1 = *(__blasted_a_2, __blasted_a_3);",
+                        "int __bl_a_0; int __bl_a_1; int __bl_a_2; int __bl_a_3;\n" +
+                        "__bl_a_0, __bl_a_1, __bl_a_2, __bl_a_3 = *(1, 2, 3, 4);\n" +
+                        "int __bl_b_0;\n" +
+                        "int __bl_b_1;\n" +
+                        "__bl_b_0, __bl_b_1 = *(__bl_a_2, __bl_a_3);",
                 parseToTransformed("bit_width 4; var a = {{1,2}, {3, 4}}; var b = a[1];"));
     }
 
