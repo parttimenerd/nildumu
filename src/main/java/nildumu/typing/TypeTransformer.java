@@ -3,6 +3,7 @@ package nildumu.typing;
 import nildumu.NameResolution;
 import nildumu.Parser;
 import nildumu.Variable;
+import swp.lexer.Location;
 import swp.util.Pair;
 
 import java.util.*;
@@ -119,7 +120,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         return blastedVariablesPerVariable.computeIfAbsent(variable, v -> {
             if (number == 0) {
                 return Collections.emptyList();
-            } else if (number == 1) {
+            } else if (v.getType() == types.INT) {
                 return Collections.singletonList(variable);
             } else {
                 return enumerate(variable.getType().getBlastedTypes(), (i, t) -> new Variable("__blasted_" + v.name + "_" + i, t));
@@ -245,14 +246,24 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
 
     @Override
     public VisRet visit(VariableAssignmentNode assignment) {
-        if (assignment.expression.type instanceof Type.TupleLikeType) {
+        if (assignment.expression.type != types.INT) {
             Type.TupleLikeType type = (Type.TupleLikeType) assignment.expression.type;
             List<Variable> blasted = getBlasted(assignment.definition);
             List<ExpressionNode> op = transform(new UnpackOperatorNode(assignment.expression));
-            MultipleVariableAssignmentNode mulAss = new MultipleVariableAssignmentNode(ZERO, blasted, (UnpackOperatorNode) op.get(0));
-            return new VisRet(true, Collections.singletonList(mulAss), Collections.emptyList());
+            StatementNode node;
+            if (op.get(0) instanceof UnpackOperatorNode) {
+                node = new MultipleVariableAssignmentNode(ZERO, blasted, (UnpackOperatorNode) op.get(0));
+            } else {
+                node = new VariableAssignmentNode(ZERO, blasted.get(0), op.get(0));
+            }
+            return new VisRet(true, Collections.singletonList(node), Collections.emptyList());
         }
-        return new VisRet(true, Collections.singletonList(new VariableAssignmentNode(assignment.location, assignment.definition, transform(assignment.expression).get(0))), Collections.emptyList());
+        ExpressionNode expressionNode = transform(assignment.expression).get(0);
+        assert expressionNode instanceof UnpackOperatorNode || expressionNode.type != null;
+        if (expressionNode.type != types.INT){
+            return new VisRet(true, new MultipleVariableAssignmentNode(ZERO, getBlasted(assignment.definition), new UnpackOperatorNode(expressionNode)));
+        }
+        return new VisRet(true, Collections.singletonList(new VariableAssignmentNode(assignment.location, assignment.definition, expressionNode)), Collections.emptyList());
     }
 
     @Override
@@ -289,20 +300,25 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         ExpressionNode retExpr = null;
         if (returnStatement.expression != null) {
             List<ExpressionNode> expressions = transform(returnStatement.expression);
-            if (methodReturnTypes.get(returnStatement.parentMethod.name) == types.INT) {
+            Type expectedReturnType = methodReturnTypes.get(returnStatement.parentMethod.name);
+            if (expectedReturnType == types.INT) {
                 retExpr = expressions.get(0);
                 if (retExpr instanceof TupleLiteralNode) {
                     retExpr = ((TupleLiteralNode)retExpr).elements.get(0);
                 }
             } else {
-                retExpr = new TupleLiteralNode(returnStatement.location, expressions);
-                retExpr.type = types.getOrCreateTupleType(expressions.stream()
-                        .flatMap(e -> {
-                            if (e instanceof UnpackOperatorNode) {
-                                return ((Type.TupleType) ((UnpackOperatorNode) e).expression.type).elementTypes.stream();
-                            }
-                            return Stream.of(e.type);
-                        }).collect(Collectors.toList()));
+                if (expressions.size() == 1 && expressions.get(0).type == expectedReturnType) {
+                    retExpr = expressions.get(0);
+                } else {
+                    retExpr = new TupleLiteralNode(returnStatement.location, expressions);
+                    retExpr.type = types.getOrCreateTupleType(expressions.stream()
+                            .flatMap(e -> {
+                                if (e instanceof UnpackOperatorNode) {
+                                    return ((Type.TupleType) ((UnpackOperatorNode) e).expression.type).elementTypes.stream();
+                                }
+                                return Stream.of(e.type);
+                            }).collect(Collectors.toList()));
+                }
             }
         }
         return new VisRet(true, new ReturnStatementNode(returnStatement.location, retExpr));
@@ -399,6 +415,12 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         return expression.accept(new ExpressionTransformer());
     }
 
+    public IntegerLiteralNode literal(int num) {
+        IntegerLiteralNode node = new IntegerLiteralNode(ZERO, vl.parse(num));
+        node.type = types.INT;
+        return node;
+    }
+
     class ExpressionTransformer implements ExpressionVisitor<List<ExpressionNode>> {
 
         @Override
@@ -455,7 +477,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         @Override
         public List<ExpressionNode> visit(MethodInvocationNode methodInvocation) {
             if (methodInvocation.definition instanceof PredefinedMethodNode && methodInvocation.definition.name.equals("length")) {
-                return Collections.singletonList(new IntegerLiteralNode(ZERO, vl.parse(collect(methodInvocation.arguments.arguments).size())));
+                return Collections.singletonList(literal(collect(methodInvocation.arguments.arguments).size()));
             } else {
                 visitChildrenDiscardReturn(methodInvocation);
                 if (methodInvocation.arguments.size() == 0){

@@ -286,8 +286,8 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
         if (returnStatement.parentMethod.getReturnType().isVar()) {
             returnStatement.parentMethod.setReturnType(type);
         } else if (type != returnStatement.parentMethod.getReturnType()) {
-            messages.add(new WrongTypeMessage(String.format("return type of method %s, %s, conflicts with return statement %s at %s",
-                    returnStatement.parentMethod.name, returnStatement.parentMethod.getReturnType(), returnStatement, returnStatement.location)));
+            messages.add(new WrongTypeMessage(String.format("return type of method %s, %s, conflicts with return statement %s with type %s at %s",
+                    returnStatement.parentMethod.name, returnStatement.parentMethod.getReturnType(), returnStatement, type, returnStatement.location)));
         }
         return messages;
     }

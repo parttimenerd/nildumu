@@ -106,7 +106,7 @@ public class TypeTransformerTests {
         System.out.println(parseToTransformed("bit_width 4; l input int l = 0buuuu; var x = {{1, 2}, {3, 4}}[l]"));
     }
 
-        @Test
+    @Test
     public void testArrayUnknownIndexGet2() {
         System.out.println(parseToTransformed("bit_width 4; l input int l = 0buuuu; var x = {{1, 2}, {3, 4}}[l]"));
         parse("bit_width 5; l input int l = 0buuuu; var x = {{1, 1}, {1, 1}}[l]; var c = x[1];").val("c", 1).run();
@@ -156,6 +156,39 @@ public class TypeTransformerTests {
                 "arr, i = *loop[[]](arr, i);\n" +
                 "int x = arr[1];", handler)
                 .val("x", expectedValue).run();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'handler=inlining;maxrec=1;bot=basic', '0buuu'",
+            "'basic', '0buuu'",
+            "'summary', '0buuu'"
+    })
+    public void simpleLoopReduced2(String handler, String expectedValue) {
+        parse("use_sec basic;\n" +
+                "bit_width 3;\n" +
+                "(int[1], int) loop[[]](int[1] arr, int i){\n" +
+                "  arr, i = *loop[[]](arr, i);\n" +
+                "  return (arr, 0);\n" +
+                "}\n" +
+                "int[1] arr;\n" +
+                "int i = 0;\n" +
+                "int x = loop[[]]({0,}, i)[0][0];\n", handler)
+                .val("x1", expectedValue).run();
+    }
+
+    @Test
+    public void testArrayOfLength1() {
+        parse("use_sec basic;\n" +
+                "bit_width 3;\n" +
+                "int[1] loop(int[1] arr){\n" +
+                "  return loop(arr);\n" +
+                "}\n" +
+                "int[1] arr = {0,};\n" +
+                "int i = 0;\n" +
+                "arr = loop[[]](arr);\n" +
+                "int x = arr[0];")
+                .val("x", "0buuu").run();
     }
 
     @Test

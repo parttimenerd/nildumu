@@ -93,6 +93,10 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         appendValueVariables = new HashSet<>();
         conditionalScopes = new Stack<>();
         conditionalScopes.push(new Scope());
+        scopes.push(new Scope());
+        if (method != null) {
+            scopes.peek().definedVariables.addAll(method.parameters.parameterNodes.stream().map(p -> p.name).collect(Collectors.toList()));
+        }
         this.types = types;
     }
 
@@ -167,6 +171,20 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
                 new MultipleVariableAssignmentNode(assignment.location,
                         assignment.variables.stream().map(this::create).toArray(String[]::new),
                         assignment.expression));
+    }
+
+    @Override
+    public VisRet visit(ReturnStatementNode returnStatement) {
+        if (returnStatement.hasReturnExpression()) {
+            returnStatement.expression.accept(this);
+        }
+        return VisRet.DEFAULT;
+    }
+
+    @Override
+    public VisRet visit(TupleLiteralNode tupleLiteral) {
+        tupleLiteral.elements.forEach(e -> e.accept(this));
+        return VisRet.DEFAULT;
     }
 
     @Override
