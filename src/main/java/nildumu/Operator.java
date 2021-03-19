@@ -782,10 +782,10 @@ public interface Operator {
                         return Mods.empty();
                     }
                     int bitWidth = Math.max(x.size(), y.size());
-                    return assumeOneValue(x.withBitCount(bitWidth), y.withBitCount(bitWidth));
+                    return assumeOneValue(c, x.withBitCount(bitWidth), y.withBitCount(bitWidth));
                 }
 
-                public Mods assumeOneValue(Value x, Value y) {
+                public Mods assumeOneValue(Context c, Value x, Value y) {
                     // we have 9 different cases, depending on the sign bits
                     if (x.isNegative()) {
                         if (y.isNegative()) {
@@ -793,8 +793,8 @@ public interface Operator {
                             // x < y   <=>   -y < -x   <=>   ~y + 1 < ~x + 1
                             // <=>  ~y < ~x  maybe?
                             Mods mods = Mods.empty();
-                            y.highBitIndicesWOSign(ONE, -1).forEach(i -> mods.add(x.get(i), bl.create(ONE))); // -1?
-                            x.highBitIndicesWOSign(ZERO, 0).forEach(i -> mods.add(y.get(i), bl.create(ZERO)));
+                            y.highBitIndicesWOSign(ONE, -1).forEach(i -> mods.add(c.repl(x.get(i), bl.create(ONE)))); // -1?
+                            x.highBitIndicesWOSign(ZERO, 0).forEach(i -> mods.add(c.repl(y.get(i), bl.create(ZERO))));
                             return mods;
                         } else if (y.isPositive()) {
                             return Mods.empty();
@@ -803,7 +803,7 @@ public interface Operator {
                             // if !(x.largest < y.largest(sign=1)) { y.assume(sign=0) }
                             if (!(x.largest() < y.smallest(ONE))) {
                                 Bit ySign = y.signBit();
-                                return assumeOneValue(x, y.assume(ZERO)).add(ySign, bl.create(ZERO));
+                                return assumeOneValue(c, x, y.assume(ZERO)).add(c.repl(ySign, bl.create(ZERO)));
                             }
                             return Mods.empty();
                         }
@@ -812,25 +812,25 @@ public interface Operator {
                             return Mods.empty();
                         } else if (y.isPositive()) {
                             Mods mods = Mods.empty();
-                            y.highBitIndicesWOSign(ZERO, -1).forEach(i -> mods.add(x.get(i), bl.create(ZERO))); // -1?
-                            x.highBitIndicesWOSign(ONE, 0).forEach(i -> mods.add(y.get(i), bl.create(ONE)));
+                            y.highBitIndicesWOSign(ZERO, -1).forEach(i -> mods.add(c.repl(x.get(i), bl.create(ZERO)))); // -1?
+                            x.highBitIndicesWOSign(ONE, 0).forEach(i -> mods.add(c.repl(y.get(i), bl.create(ONE))));
                             return mods;
                         } else {
                             // y.assume(sign=0): x < y
                             Bit ySign = y.signBit();
-                            return assumeOneValue(x, y.assume(ZERO)).add(ySign, bl.create(ZERO));
+                            return assumeOneValue(c, x, y.assume(ZERO)).add(c.repl(ySign, bl.create(ZERO)));
                         }
                     } else {
                         if (y.isNegative()) {
                             // x.assume(sign=1): x < y
                             Bit xSign = x.signBit();
-                            return assumeOneValue(x.assume(ONE), y).add(xSign, bl.create(ONE));
+                            return assumeOneValue(c, x.assume(ONE), y).add(c.repl(xSign, bl.create(ONE)));
                         } else if (y.isPositive()) {
                             // if !(|x| < |y|) { x is negative }
                             // if !(x.smallest(sign=0) < y.largest) { x.assume(sign=1) }
                             if (!(x.smallest(ZERO) < y.largest())) {
                                 Bit xSign = x.signBit();
-                                return assumeOneValue(x.assume(ONE), y).add(xSign, bl.create(ONE));
+                                return assumeOneValue(c, x.assume(ONE), y).add(c.repl(xSign, bl.create(ONE)));
                             }
                             return Mods.empty();
                         } else {
@@ -850,9 +850,9 @@ public interface Operator {
                     if (vl.mapBits(x, y, (a, b) -> a.val() == b.val() || a.isUnknown() || b.isUnknown()).stream().allMatch(Boolean::booleanValue)) {
                         Mods eqMods = Mods.empty();
                         vl.mapBits(x, y, (xi, yi) -> c.repl(c.notChosen(xi, yi), c.choose(xi, yi))).forEach(eqMods::add);
-                        return assumeOneValue(y, x).intersection(eqMods);
+                        return assumeOneValue(c, y, x).intersection(eqMods);
                     }
-                    return assumeOneValue(y, x);
+                    return assumeOneValue(c, y, x);
                 }
             };
         }

@@ -251,6 +251,29 @@ public class ExtendedTests {
                 "int z = Z;").val("z", "0b0{28}u{4}").run();
     }
 
+    @Test
+    public void testIllustrativeExampleConsended() {
+        parse("int O = 0;\n" +
+                "h input int h = 0bu{8};\n" +
+                "int z = h & 0b01111111; int x_ = 0; \n" +
+                "if (z < 64) {\n" +
+                "    O = h;\n" +
+                "}" +
+                "l output int o = O; int x = x_;").val("o", "0bu0uuuuuu").run();
+    }
+
+    @Test
+    public void testIllustrativeExampleConsended2() {
+        parse("int O = 0;\n" +
+                "h input int h = 0bu{8};\n" +
+                "int z = h & 0b01110111; int x_ = 0; \n" +
+                "if (z < 64) {\n" +
+                "    O = h;\n" +
+                "x_ = z;" +
+                "}" +
+                "l output int o = O; int x = x_;").val("o", "0bu0uuuuuu").val("x", "0b00uu0uuu").run();
+    }
+
     public ContextMatcher parse(String program){
         return new ContextMatcher(process(program, Context.Mode.EXTENDED, MethodInvocationHandler.createDefault(), RECORD_ALTERNATIVES));
     }
