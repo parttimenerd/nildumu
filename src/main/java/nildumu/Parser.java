@@ -493,7 +493,7 @@ public class Parser implements Serializable {
                                     .unaryLayerLeft(INVERT, MINUS, TILDE)
                                     .custom("LBRACKET INTEGER_LITERAL RBRACKET expression", asts -> {
                                         return new BitPlaceOperatorNode((ExpressionNode) asts.get(3),
-                                                vl.parse(asts.get(1).getMatchedString()).asInt());
+                                                vl.parse(asts.get(1).getMatchedString()).asLong());
                                     });
                         })
                         .addRule("postfix_expression", "primary_expression")
@@ -606,7 +606,7 @@ public class Parser implements Serializable {
                         })
                         .addRule("array_type", "type LBRACKET INTEGER_LITERAL RBRACKET", asts -> {
                             Type subType = asts.get(0).<TypeNode>as().type;
-                            int length = vl.parse(asts.get(2).getMatchedString()).asInt();
+                            int length = (int)vl.parse(asts.get(2).getMatchedString()).asLong();
                             return new TypeNode(asts.get(0).<MJNode>as().location,
                                     types.getOrCreateFixedArrayType(subType, Collections.singletonList(length)));
                         })
@@ -3242,9 +3242,9 @@ public class Parser implements Serializable {
      */
     public static class BitPlaceOperatorNode extends UnaryOperatorNode {
 
-        public final int index;
+        public final long index;
 
-        public BitPlaceOperatorNode(ExpressionNode expression, int index) {
+        public BitPlaceOperatorNode(ExpressionNode expression, long index) {
             super(expression, BIT_PLACE_OP, new Operator.PlaceBit(index));
             assert index > 0;
             this.index = index;

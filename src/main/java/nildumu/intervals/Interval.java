@@ -13,12 +13,12 @@ public class Interval {
 
     private static long counter = 0;
     public final long id;
-    public int start;
-    public int end;
+    public long start;
+    public long end;
 
     public final Set<Lattices.Bit> bits;
 
-    public Interval(int start, int end) {
+    public Interval(long start, long end) {
         this.id = counter++;
         this.start = start;
         this.end = end;
@@ -34,7 +34,7 @@ public class Interval {
         return String.format("[%d, %d]", start, end);
     }
 
-    public int size(){
+    public long size(){
         return end - start + 1;
     }
 

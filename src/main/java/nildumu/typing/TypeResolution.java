@@ -182,7 +182,7 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
         } else if (array.type instanceof Type.TupleType) {
             Type.TupleType type = (Type.TupleType) array.type;
             if (arrayIndex instanceof IntegerLiteralNode) {
-                int index = ((IntegerLiteralNode) arrayIndex).value.asInt();
+                int index = (int)((IntegerLiteralNode) arrayIndex).value.asLong();
                 if (index < 0 || index >= type.elementTypes.size()) {
                     messages.add(new WrongTypeMessage(String.format("Index %s is not out of bounds in tuple access %s at %s", arrayIndex, access, access.location)));
                 } else {
@@ -213,7 +213,7 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
         } else if (assignment.definition.getType() instanceof Type.TupleType) {
             Type.TupleType type = (Type.TupleType) assignment.definition.getType();
             if (assignment.arrayIndex instanceof IntegerLiteralNode) {
-                int index = ((IntegerLiteralNode) assignment.arrayIndex).value.asInt();
+                int index = (int)((IntegerLiteralNode) assignment.arrayIndex).value.asLong();
                 if (index < 0 || index >= type.elementTypes.size()) {
                     messages.add(new WrongTypeMessage(String.format("Index %s is not out of bounds in tuple assignment %s at %s", assignment.arrayIndex, assignment, assignment.location)));
                 }

@@ -120,7 +120,7 @@ public class SizeTest {
     }
 
     void assertIntervalSize(Intervals.ConstrainedInterval interval){
-        int expected = interval.size();
+        long expected = interval.size();
         System.out.println(interval);
         assertEquals(String.format("Count elements in %s", interval), expected,
                 Intervals.countPattern(interval.start, interval.end,

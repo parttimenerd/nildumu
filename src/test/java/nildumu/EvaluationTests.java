@@ -32,8 +32,8 @@ public class EvaluationTests {
                 "\n" +
                 "int i = 0;\n" +
                 "\n" +
-                "while (i < BITS){\n" +
-                "    int m = 1<<(30-i);\n" +
+                "while (i < 16){\n" +
+                "    int m = 1<<(31-i);\n" +
                 "    if (z + m <= I) {\n" +
                 "        z = z + m;\n" +
                 "    }\n" +

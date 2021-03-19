@@ -10,6 +10,7 @@ import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import static nildumu.Context.v;
@@ -1051,16 +1052,16 @@ public interface Operator {
 
     class PlaceBit extends UnaryOperator {
 
-        final int index;
+        final long index;
 
-        public PlaceBit(int index) {
+        public PlaceBit(long index) {
             super(String.format("[%d]·", index));
             this.index = index;
         }
 
         @Override
         Value compute(Context c, Value argument) {
-            return IntStream.range(1, index + 2).mapToObj(i -> i == index ? argument.get(1) : bl.create(ZERO)).collect(Value.collector());
+            return LongStream.range(1, index + 2).mapToObj(i -> i == index ? argument.get(1) : bl.create(ZERO)).collect(Value.collector());
         }
     }
 
@@ -1075,7 +1076,7 @@ public interface Operator {
             if (!second.isConstant()) {
                 throw new NildumuError("Only constant indices supported for bit select operators");
             }
-            return new Value(first.get(second.asInt()));
+            return new Value(first.get((int)second.asLong()));
         }
     }
 
@@ -1202,19 +1203,23 @@ public interface Operator {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isConstant()){
-                int shift = second.asInt();
+                int shift = (int)second.asLong();
                 if (shift >= c.maxBitWidth){
                     return vl.parse(0);
                 }
                 if (shift < 0){
                     return RIGHT_SHIFT.compute(c, first, vl.parse(-shift));
                 }
-                return IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
-                    if (i - shift < 1){
+                if (!first.isPositive()) {
+                    return createUnknownValue(first, second);
+                }
+                Value ret = Stream.concat(IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
+                    if (i - shift < 1) {
                         return bl.create(ZERO);
                     }
                     return first.get(i - shift);
-                }).collect(Value.collector());
+                }), Stream.of(bl.create(ZERO))).collect(Value.collector());
+                return ret;
             }
             return createUnknownValue(first, second);
         }
@@ -1222,20 +1227,22 @@ public interface Operator {
 
     BinaryOperator RIGHT_SHIFT = new BinaryOperator(">>") {
 
-
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isConstant()){
-                int shift = second.asInt();
+                int shift = (int)second.asLong();
                 if (shift < 0){
                     return LEFT_SHIFT.compute(c, first, vl.parse(-shift));
                 }
-                return IntStream.range(1, c.maxBitWidth + 1).mapToObj(i -> {
+                if (!first.isPositive()) {
+                    return createUnknownValue(first, second);
+                }
+                return Stream.concat(IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
                     if (i + shift > c.maxBitWidth){
                         return bl.create(ZERO);
                     }
                     return first.get(i + shift);
-                }).collect(Value.collector());
+                }), Stream.of(bl.create(ZERO))).collect(Value.collector());
             }
             return createUnknownValue(first, second);
         }
@@ -1265,13 +1272,13 @@ public interface Operator {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isPowerOfTwo()) {
-                return setMultSign(first, second, LEFT_SHIFT.compute(c, first, vl.parse(Math.abs((int) log2(second.asInt())))));
+                return setMultSign(first, second, LEFT_SHIFT.compute(c, first, vl.parse(Math.abs((int) log2(second.asLong())))));
             }
             if (first.isPowerOfTwo()) {
                 return MULTIPLY.compute(c, second, first);
             }
             if (first.isConstant() && second.isConstant()) {
-                return vl.parse(first.asInt() * second.asInt());
+                return vl.parse(first.asLong() * second.asLong());
             }
             return createUnknownValue(first, second);
         }
@@ -1291,13 +1298,13 @@ public interface Operator {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isPowerOfTwo()){
-                return setMultSign(first, second, RIGHT_SHIFT.compute(c, first, vl.parse((int)log2(second.asInt()))));
+                return setMultSign(first, second, RIGHT_SHIFT.compute(c, first, vl.parse((int)log2(second.asLong()))));
             }
             if (first.isPowerOfTwo()){
                 return DIVIDE.compute(c, second, first);
             }
             if (first.isConstant() && second.isConstant()){
-                return vl.parse(first.asInt() * second.asInt());
+                return vl.parse(first.asLong() * second.asLong());
             }
             return createUnknownValue(first, second);
         }
@@ -1308,14 +1315,14 @@ public interface Operator {
         Value compute(Context c, Value first, Value second) {
             if (second.isPowerOfTwo() && !second.isNegative()) {
                 return IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
-                    if (i > log2(second.asInt())) {
+                    if (i > log2(second.asLong())) {
                         return bl.create(ZERO);
                     }
                     return first.get(i);
                 }).collect(Value.collector());
             }
             if (first.isConstant() && second.isConstant()) {
-                return vl.parse(first.asInt() % second.asInt());
+                return vl.parse(first.asLong() % second.asLong());
             }
             return createUnknownValue(first, second);
         }

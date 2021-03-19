@@ -52,7 +52,7 @@ public class ExtendedTests {
                 "int x = h * 2;\n" +
                 "if (h == x){\n" +
                 "    x = h;\n" +
-                "} else {x = 0; } l output int o = x").leaks(4).run();
+                "} else {x = 0; } l output int o = x").leaks(5).run();
     }
 
     /**

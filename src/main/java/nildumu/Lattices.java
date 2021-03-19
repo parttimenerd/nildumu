@@ -1212,7 +1212,7 @@ public class Lattices {
                     }
                     Value val = new Value(bits);
                     if (val.isConstant()) {
-                        val.setInterval(new Interval(val.asInt(), val.asInt()));
+                        val.setInterval(new Interval(val.asLong(), val.asLong()));
                     }
                     return new Pair<>(val, i);
                 }
@@ -1229,8 +1229,8 @@ public class Lattices {
             return new Pair<>(parse("0b" + toBinaryString(Integer.parseInt(str.substring(start, end)))), end);
         }
 
-        public Value parse(int val){
-            return parse(Integer.toString(val));
+        public Value parse(long val){
+            return parse(Long.toString(val));
         }
 
         public static ValueLattice get() {
@@ -1398,26 +1398,26 @@ public class Lattices {
             return (bits.stream().allMatch(Bit::isConstant) && bits.size() > 0);
         }
 
-        public int asInt(){
+        public long asLong(){
             assert isConstant();
-            int result = 0;
+            long result = 0;
             boolean neg = signBit().val == ONE;
             int signBitVal = signBit().val.value.get();
             for (int i = bits.size() - 1; i >= 0; i--){
-                result = result * 2;
+                result = result * 2l;
                 int bitVal = bits.get(i).val.value.get();
                 if (signBitVal != bitVal){
-                    result += 1;
+                    result += 1l;
                 }
             }
             if (neg){
-                return -result - 1;
+                return -result - 1l;
             }
             return result;
         }
 
-        public int asInt(B sign, B assumedUnknown){
-            int result = 0;
+        public long asLong(B sign, B assumedUnknown){
+            long result = 0;
             boolean neg = sign == ONE;
             int signBitVal = sign.value.get();
             for (int i = bits.size() - 1; i >= 0; i--){
@@ -1479,7 +1479,7 @@ public class Lattices {
 
         public String toLiteralString(){
             if (isConstant() && bits.size() <= vl.bitWidth){
-                return Integer.toString(asInt());
+                return Long.toString(asLong());
             }
             List<Bit> reversedBits = new ArrayList<>(bits);
             Collections.reverse(reversedBits);
@@ -1506,7 +1506,7 @@ public class Lattices {
             if (!isConstant()){
                 return false;
             }
-            double twoLog = log2(asInt());
+            double twoLog = log2(asLong());
             return ((int)twoLog) == twoLog;
         }
 
@@ -1616,10 +1616,10 @@ public class Lattices {
             return hasInterval() && interval.start == interval.end; // TODO
         }
 
-        public int singleValue() {
+        public long singleValue() {
             assert singleValued();
             if (isConstant()) {
-                return asInt();
+                return asLong();
             }
             return interval.start;
         }
@@ -1689,16 +1689,16 @@ public class Lattices {
             return new Value(newBits);
         }
 
-        public int largest() {
+        public long largest() {
             return largest(signBit().val);
         }
 
-        public int largest(B sign) {
+        public long largest(B sign) {
             assert sign.isConstant();
             if (sign == ZERO) {
-                return asInt(sign, ONE);
+                return asLong(sign, ONE);
             }
-            return asInt(sign, ZERO);
+            return asLong(sign, ZERO);
         }
 
         public long smallest() {
@@ -1708,9 +1708,9 @@ public class Lattices {
         public long smallest(B sign) {
             assert sign.isConstant();
             if (sign == ZERO) {
-                return asInt(sign, ZERO);
+                return asLong(sign, ZERO);
             }
-            return asInt(sign, ONE);
+            return asLong(sign, ONE);
         }
 
         /**

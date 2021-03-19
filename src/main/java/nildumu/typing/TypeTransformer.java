@@ -3,7 +3,6 @@ package nildumu.typing;
 import nildumu.NameResolution;
 import nildumu.Parser;
 import nildumu.Variable;
-import swp.lexer.Location;
 import swp.util.Pair;
 
 import java.util.*;
@@ -398,7 +397,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         ExpressionNode indexExpression = arrayAssignment.arrayIndex;
         List<Variable> blasted = getBlasted(arrayAssignment.definition);
         if (indexExpression instanceof IntegerLiteralNode && ((IntegerLiteralNode) indexExpression).value.isConstant()) {
-            int index = ((IntegerLiteralNode) indexExpression).value.asInt();
+            int index = (int)((IntegerLiteralNode) indexExpression).value.asLong();
             if (!(arrayAssignment.expression instanceof MethodInvocationNode)) {
                 List<ExpressionNode> ret = transform(arrayAssignment.expression);
                 //return new VisRet(true, type.getBlastedIndexes(index).stream().map(i -> blasted.get(i)).collect(Collectors.toList()), Collections.emptyList());
@@ -494,7 +493,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
             }
             Type.TupleLikeType type = (Type.TupleLikeType) bracketedAccess.left.type;
             if (bracketedAccess.right instanceof IntegerLiteralNode && ((IntegerLiteralNode) bracketedAccess.right).value.isConstant()) {
-                int index = ((IntegerLiteralNode) bracketedAccess.right).value.asInt();
+                int index = (int)((IntegerLiteralNode) bracketedAccess.right).value.asLong();
                 if (!(bracketedAccess.left instanceof MethodInvocationNode)) {
                     List<ExpressionNode> ret = bracketedAccess.left.accept(this);
                     return type.getBlastedIndexes(index).stream().map(ret::get).collect(Collectors.toList());
@@ -513,7 +512,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         int packets;
         ExpressionNode transformedIndexExpr;
         if (type instanceof Type.TupleType) {
-            int index = ((IntegerLiteralNode) indexExpression).value.asInt();
+            int index = (int)((IntegerLiteralNode) indexExpression).value.asLong();
             elemLength = type.getBracketAccessResult(index).getNumberOfBlastedVariables();
             packets = 1;
             transformedIndexExpr = literal(type.getBlastedStartIndex(index));

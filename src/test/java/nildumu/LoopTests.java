@@ -314,19 +314,26 @@ public class LoopTests {
     @Test
     @Timeout(3)
     public void testBinarySearch_condensedWithoutLoop() {
-        String program = "h input int I = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;\n" +
+        String program = "h input int I = 0b0u{32};\n" +
                 "int O = 0;\n" +
                 "\n" +
                 "int m = 0;\n" +
                 "int i = 0;\n" +
                 "\n" +
-                "    m = 1<<(30-i);\n" +
+                "    m = 1<<(31-i);\n" +
                 "    if (O + m <= I) {\n" +
                 "        O = O + m;\n" +
                 "    }\n" +
                 "    i = i + 1;\n" +
-                "l output int o = O;";
+                "l output int o = O; int m_ = m;";
         parse(program).leaks(1).run();
+    }
+
+    @Test
+    public void testBinarySearch_condensedWithoutLoop2() {
+        String program = "h input int I = 0b0u{32};\n" +
+                "int m_ = 1 << 31;";
+        parse(program).val("m_", 2147483648l).run();
     }
 
     /**

@@ -10,18 +10,18 @@ import static nildumu.Lattices.*;
 
 public class Intervals {
 
-  static int bitVal(int val, int index) {
+  static long bitVal(long val, int index) {
     if (index == vl.bitWidth - 1) {
       return val >= 0 ? 0 : 1;
     }
     return (val & (1 << index)) >> index;
   }
 
-  public static int countPattern(Interval interval, Constraints constraints) {
+  public static long countPattern(Interval interval, Constraints constraints) {
     return countPattern(interval.start, interval.end, constraints);
   }
 
-  public static int countPattern(int a, int b, Constraints constraints) {
+  public static long countPattern(long a, long b, Constraints constraints) {
     return new PatternCounterM().countPattern(a, b, constraints);
   }
 
@@ -31,7 +31,7 @@ public class Intervals {
       return IntStream.range(0, size()).mapToObj(i -> get(size() - i - 1).toString()).collect(Collectors.joining());
     }
 
-    default boolean match(int val) {
+    default boolean match(long val) {
       for (int i = 0; i < size(); i++) {
         Lattices.B b = get(i);
         if (b != U && bitVal(val, i) != b.value.get()) {
@@ -41,7 +41,7 @@ public class Intervals {
       return true;
     }
 
-    default int highestBitThatDoesNotMatch(int val) {
+    default long highestBitThatDoesNotMatch(long val) {
       for (int i = size(); i >= 0; i--) {
         Lattices.B b = get(i);
         if (b != U && bitVal(val, i) != b.value.get()) {
@@ -118,9 +118,9 @@ public class Intervals {
       return constrain(vl.bitWidth - 1);
     }
 
-    public int size() {
+    public long size() {
       Constraints constraints = new ListConstraints(this.constraints);
-      return (int) IntStream.range(start, end + 1).filter(constraints::match).count();
+      return (int) LongStream.range(start, end + 1).filter(constraints::match).count();
     }
   }
 
@@ -164,14 +164,14 @@ public class Intervals {
 
   public static abstract class PatternCounter {
 
-    public abstract int countPattern(int a, int b, Constraints constraints);
+    public abstract long countPattern(long a, long b, Constraints constraints);
 
   }
 
   public static class PatternCounterM extends PatternCounter {
 
     @Override
-    public int countPattern(int a, int b, Constraints constraints) {
+    public long countPattern(long a, long b, Constraints constraints) {
       if (a == 0) {
         if (b >= 0) {
           return countPatternZeroIncl(b, constraints);
@@ -189,16 +189,16 @@ public class Intervals {
       }
     }
 
-    public int countPatternZeroIncl(int b, Constraints constraints) {
+    public long countPatternZeroIncl(long b, Constraints constraints) {
       return countPatternZero(b, constraints) + (constraints.match(b) ? 1 : 0);
     }
 
-    public int countPatternZero(int b, Constraints constraints) {
+    public long countPatternZero(long b, Constraints constraints) {
       int solution = 0;
-      int highestUnequalIndex = constraints.highestBitThatDoesNotMatch(b);
+      long highestUnequalIndex = constraints.highestBitThatDoesNotMatch(b);
       for (int i = vl.bitWidth - 1; i >= 0; i--) {
         Lattices.B m = constraints.get(i);
-        int a = bitVal(b, i);
+        long a = bitVal(b, i);
         if (a == 1 && m == ZERO) {
           if (i + 1 > highestUnequalIndex) {
             solution += 1;

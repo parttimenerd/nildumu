@@ -1,6 +1,5 @@
 package nildumu;
 
-import com.kitfox.svg.A;
 import org.junit.jupiter.api.function.Executable;
 
 import java.util.ArrayList;
@@ -46,12 +45,12 @@ public class ContextMatcher {
         return use(MinCut.usedAlgo);
     }
 
-    public ContextMatcher val(String variable, int value){
+    public ContextMatcher val(String variable, long value){
         Lattices.Value actual = getValue(variable);
         builder.add(() -> assertTrue(actual.isConstant(),
                 String.format("Variable %s should have an integer val, has %s: %s vs %s",
                 variable, actual.toLiteralString(), value, actual.repr())));
-        builder.add(() -> assertEquals(value, actual.asInt(),
+        builder.add(() -> assertEquals(value, actual.asLong(),
                 String.format("Variable %s should have integer val %d", variable, value)));
         return this;
     }
