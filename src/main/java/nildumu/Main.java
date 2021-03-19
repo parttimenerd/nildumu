@@ -39,7 +39,7 @@ public class Main {
     private String programPath;
 
     @Parameter(names = "--algo", description = "Used leakage computation algorithm", converter = AlgoConverter.class)
-    private MinCut.Algo algo = MinCut.Algo.OPENWBO;
+    private MinCut.Algo algo = MinCut.usedAlgo;
 
     @Parameter(names = {"-tp", "--transformPlus"}, arity = 1)
     boolean transformPlus = false;

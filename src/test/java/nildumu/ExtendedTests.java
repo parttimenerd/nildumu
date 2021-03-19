@@ -170,6 +170,16 @@ public class ExtendedTests {
                 "l output int o = 0;").leaks(0).run();
     }
 
+    @Test
+    public void testLowerPowerOfTwo() {
+        parse("h input int h = 0buuuu; int x = 0; if (2 < h) { x = h; } int y = x").val("y", "0b00uu").run();
+    }
+
+    @Test
+    public void testLower() {
+        parse("h input int h = 0buuuuu; int x = 0; if (3 < h) { x = h; } int y = x").val("y", "0b00uu").run();
+    }
+
     public ContextMatcher parse(String program){
         return new ContextMatcher(process(program, Context.Mode.EXTENDED, MethodInvocationHandler.createDefault(), RECORD_ALTERNATIVES));
     }

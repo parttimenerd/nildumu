@@ -15,7 +15,7 @@ public class EvaluationTests {
                 "    H = H - 5;\n" +
                 "    O = O + 1;\n" +
                 "}\n" +
-                "l output int o = O;", 10).leaks(32).run();
+                "l output int o = O;", 32).useSingleMCAlgo().leaks(32).run();
     }
 
     @Test
@@ -26,6 +26,10 @@ public class EvaluationTests {
                 "    H = H - 4;\n" +
                 "    O = O + 1;\n" +
                 "}\n" +
-                "l output int o = O;", 10).leaks(32).run();
+                "l output int o = O;", 32).useSingleMCAlgo().leaks(32).run();
+    }
+
+    public static void main(String[] args) {
+        new EvaluationTests().testElectronicPurseBinary();
     }
 }

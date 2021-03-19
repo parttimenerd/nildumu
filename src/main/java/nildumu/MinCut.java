@@ -10,6 +10,7 @@ import swp.util.Pair;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static nildumu.Context.INFTY;
@@ -23,7 +24,7 @@ import static nildumu.Lattices.*;
  */
 public class MinCut {
 
-    public static Algo usedAlgo = Algo.OPENWBO;
+    public static Algo usedAlgo = Algo.GRAPHT_PP;
 
     public enum Algo {
         GRAPHT_PP("JGraphT Preflow-Push", false, false),
@@ -47,6 +48,25 @@ public class MinCut {
 
         public boolean supportsIntervals() {
             return supportsIntervals;
+        }
+
+        public <T> T use(Supplier<T> func) {
+            Algo prev = usedAlgo;
+            usedAlgo = this;
+            T t;
+            try {
+                t = func.get();
+            } finally {
+                usedAlgo = prev;
+            }
+            return t;
+        }
+
+        public void use(Runnable func) {
+            use(() -> {
+                func.run();
+                return null;
+            });
         }
     }
 

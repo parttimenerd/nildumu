@@ -144,11 +144,11 @@ public class BitGraph {
     }
 
     public Set<Lattices.Bit> minCutBits(Set<Lattices.Bit> outputBits, Set<Lattices.Bit> inputBits) {
-        return MinCut.compute(new SourcesAndSinks(INFTY, outputBits, INFTY, inputBits, context), context::weight, MinCut.Algo.OPENWBO).minCut;
+        return MinCut.compute(new SourcesAndSinks(INFTY, outputBits, INFTY, inputBits, context), context::weight, MinCut.usedAlgo).minCut;
     }
 
     public Set<Lattices.Bit> minCutBits(Set<Lattices.Bit> outputBits, Set<Lattices.Bit> inputBits, double outputWeight) {
-        return MinCut.compute(new SourcesAndSinks(INFTY, outputBits, INFTY, inputBits, context), b -> outputBits.contains(b) ? outputWeight : context.weight(b), MinCut.Algo.OPENWBO).minCut;
+        return MinCut.compute(new SourcesAndSinks(INFTY, outputBits, INFTY, inputBits, context), b -> outputBits.contains(b) ? outputWeight : context.weight(b), MinCut.usedAlgo).minCut;
     }
 
     public Graph createDotGraph(String name, boolean withMinCut) {

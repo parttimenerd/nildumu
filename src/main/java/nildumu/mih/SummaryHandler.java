@@ -186,6 +186,7 @@ public class SummaryHandler extends MethodInvocationHandler {
     }
 
     BitGraph methodIteration(Context c, Parser.MethodInvocationNode callSite, MethodInvocationHandler handler, List<Lattices.Value> parameters) {
+        System.out.println("iterate " + callSite.method);
         c.resetFrames();
         c.pushNewFrame(callSite, parameters.stream().flatMap(Lattices.Value::stream).collect(Collectors.toSet()));
         for (int i = 0; i < parameters.size(); i++) {

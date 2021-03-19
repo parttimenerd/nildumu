@@ -1,5 +1,6 @@
 package nildumu;
 
+import com.kitfox.svg.A;
 import org.junit.jupiter.api.function.Executable;
 
 import java.util.ArrayList;
@@ -30,9 +31,19 @@ public class ContextMatcher {
 
     private final Context context;
     private final TestBuilder builder = new TestBuilder();
+    private MinCut.Algo[] algos = MinCut.Algo.values();
 
     public ContextMatcher(Context context) {
         this.context = context;
+    }
+
+    public ContextMatcher use(MinCut.Algo algo) {
+        algos = new MinCut.Algo[]{algo};
+        return this;
+    }
+
+    public ContextMatcher useSingleMCAlgo() {
+        return use(MinCut.usedAlgo);
     }
 
     public ContextMatcher val(String variable, int value){
@@ -91,8 +102,18 @@ public class ContextMatcher {
 
     public class LeakageMatcher {
 
+        private final MinCut.Algo[] algos;
+
+        public LeakageMatcher() {
+            this(ContextMatcher.this.algos);
+        }
+
+        public LeakageMatcher(MinCut.Algo[] algos) {
+            this.algos = algos;
+        }
+
         public LeakageMatcher leaks(Lattices.Sec<?> attackerSec, double leakage){
-            for (MinCut.Algo algo : MinCut.Algo.values()) {
+            for (MinCut.Algo algo : algos) {
                 Executable inner = () -> {
                     MinCut.ComputationResult comp = MinCut.compute(context, attackerSec, algo);
                     assertEquals(leakage, comp.maxFlow, () -> {
@@ -122,7 +143,7 @@ public class ContextMatcher {
          * Only uses leakage computation algorithms that support intervals.
          */
         public LeakageMatcher numberOfOutputs(Lattices.Sec<?> attackerSec, int outputs){
-            for (MinCut.Algo algo : MinCut.Algo.values()) {
+            for (MinCut.Algo algo : algos) {
                 if (!algo.supportsIntervals()){
                     continue;
                 }
@@ -143,7 +164,7 @@ public class ContextMatcher {
         }
 
         public LeakageMatcher leaksAtLeast(Lattices.Sec sec, double leakage) {
-            for (MinCut.Algo algo : MinCut.Algo.values()) {
+            for (MinCut.Algo algo : algos) {
                 builder.add(() -> {
                     MinCut.ComputationResult comp = MinCut.compute(context, sec, algo);
                     assertTrue(comp.maxFlow >= leakage,
