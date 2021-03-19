@@ -206,20 +206,8 @@ public class Processor {
                 }
                 Value cond = context.nodeValue(whileStatement.conditionalExpression);
                 Bit condBit = cond.get(1);
-                Lattices.B condVal = condBit.val();
-                if (condVal.isAtLeastUnknown() && cond.singleValued()){
-                    int val = cond.singleValue();
-                    switch (val){
-                        case 0:
-                            condVal = ZERO;
-                            break;
-                        case 1:
-                            condVal = ONE;
-                            break;
-                    }
-                }
                 weightCondBit(condBit);
-                if (condVal == ONE || condVal == U) {
+                if (cond.mightBe(true)) {
                     conditionalBits.put(whileStatement.body, new Pair<>(condBit, bl.create(ONE)));
                     branchOfBlock.put(whileStatement.body,
                             new Context.Branch(whileStatement.conditionalExpression, true));
@@ -343,7 +331,15 @@ public class Processor {
                 }
                 bit.deps().forEach(this::weightCondBit);
             }
-        }, context::evaluate, node, statementNodesToOmitOneTime);
+        }, context::evaluate, node, statementNodesToOmitOneTime, b -> {
+            if (b.operator == LexerTerminal.AND) {
+                return context.nodeValue(b.left).is(true);
+            }
+            if (b.operator == LexerTerminal.OR) {
+                return context.nodeValue(b.left).is(false);
+            }
+            return true;
+        });
         return context;
     }
 }

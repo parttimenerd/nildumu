@@ -198,6 +198,17 @@ public class BasicTests {
         Parser.generator.parse(program);
     }
 
+    @Test
+    public void testAnd() {
+        parse("int x = 0 && 1").val("x", 0).run();
+        parse("int x = 1 && 1").val("x", 1).run();
+    }
+
+    @Test
+    public void testOr() {
+        parse("int x = 1 || 2").val("x", 1).run();
+    }
+
     public ContextMatcher parse(String program){
         return new ContextMatcher(process(program));
     }

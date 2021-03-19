@@ -129,6 +129,12 @@ public class Context {
         public Operator defaultValue(Map<MJNode, Operator> map, MJNode key) {
             Operator op = key.getOperator(Context.this);
             if (op == null){
+                if (key instanceof BinaryOperatorNode) {
+                    throw new NildumuError(String.format("No operator for binary operator %s implemented", ((BinaryOperatorNode) key).operator));
+                }
+                if (key instanceof UnaryOperatorNode) {
+                    throw new NildumuError(String.format("No operator for unary operator %s implemented", ((UnaryOperatorNode) key).operator));
+                }
                 throw new NildumuError(String.format("No operator for %s implemented", key));
             }
             return op;

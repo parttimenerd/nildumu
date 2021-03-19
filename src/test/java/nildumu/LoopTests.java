@@ -373,15 +373,15 @@ public class LoopTests {
         Context.LOG.setLevel(Level.INFO);
     }
 
-    ContextMatcher parse(String program) {
+    static ContextMatcher parse(String program) {
         return parse(program, "handler=inlining;maxrec=5;bot=summary");
     }
 
-    ContextMatcher parse(String program, int inlining) {
+    static ContextMatcher parse(String program, int inlining) {
         return parse(program, String.format("handler=inlining;maxrec=%d;bot=summary", inlining));
     }
 
-    ContextMatcher parse(String program, String mih) {
+    static ContextMatcher parse(String program, String mih) {
         Context.LOG.setLevel(Level.WARNING);
         //System.out.println(" ##SSA " + Parser.process(program, false, transformLoops).toPrettyString());
         return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih), RECORD_ALTERNATIVES));

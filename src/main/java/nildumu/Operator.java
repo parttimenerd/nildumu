@@ -469,6 +469,36 @@ public interface Operator {
         }
     };
 
+    class ShortCircuitOperator implements Operator {
+
+        private final Parser.LexerTerminal op;
+        private final BinaryOperator operator;
+
+        public ShortCircuitOperator(Parser.LexerTerminal op, BinaryOperator operator) {
+            this.op = op;
+            this.operator = operator;
+        }
+
+        @Override
+        public String toString(List<Value> arguments) {
+            return arguments.stream().map(Value::toString).collect(Collectors.joining());
+        }
+
+        @Override
+        public Value compute(Context c, List<Value> arguments) {
+            return arguments.size() == 1 || arguments.get(1).isBot() ? arguments.get(0) : operator.compute(c, arguments.get(0), arguments.get(1));
+        }
+
+        @Override
+        public boolean allowsUnevaluatedArguments() {
+            return true;
+        }
+    }
+
+    Operator LOGICAL_AND = new ShortCircuitOperator(Parser.LexerTerminal.AND, AND);
+
+    Operator LOGICAL_OR = new ShortCircuitOperator(Parser.LexerTerminal.OR, OR);
+
     BitWiseBinaryOperator XOR = new BitWiseBinaryOperatorStructured("^") {
 
         @Override

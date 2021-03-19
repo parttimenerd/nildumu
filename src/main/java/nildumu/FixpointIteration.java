@@ -2,9 +2,13 @@ package nildumu;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import swp.parser.lr.BaseAST;
+import swp.util.Pair;
 
 /**
  * Does a fix point iteration over nodes
@@ -18,7 +22,8 @@ public class FixpointIteration {
      *  @param nodeVisitor returns true if something changed
      * @param node node to start iterating on
      */
-    public static void worklist(Parser.NodeVisitor<Boolean> nodeVisitor, Parser.MJNode node, HashSet<Parser.StatementNode> statementNodesToOmitOneTime){
+    public static void worklist(Parser.NodeVisitor<Boolean> nodeVisitor, Parser.MJNode node,
+                                HashSet<Parser.StatementNode> statementNodesToOmitOneTime){
         assert !(node instanceof Parser.ExpressionNode);
         HashSet<Parser.MJNode> visitedBefore = new HashSet<>();
         Stack<Parser.MJNode> nodesToVisit = new Stack<>();
@@ -49,7 +54,8 @@ public class FixpointIteration {
      * @param node node to start iterating on
      */
     public static void worklist2(Parser.NodeVisitor<Boolean> nodeVisitor, Consumer<Parser.ExpressionNode> expressionConsumer,
-                                 Parser.MJNode node, Set<Parser.StatementNode> statementNodesToOmitOneTime){
+                                 Parser.MJNode node, Set<Parser.StatementNode> statementNodesToOmitOneTime,
+                                 Predicate<Parser.BinaryOperatorNode> evalSecondArgument){
         assert !(node instanceof Parser.ExpressionNode);
         Set<Parser.MJNode> visitedBefore = new HashSet<>();
         Stack<Parser.MJNode> nodesToVisit = new Stack<>();
@@ -67,7 +73,7 @@ public class FixpointIteration {
                             if (childNode instanceof Parser.VariableAccessNode){
                                 childNode = ((Parser.VariableAccessNode) childNode).definingExpression;
                             }
-                            walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode);
+                            walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode, evalSecondArgument);
                         }
                     }
                     preCondVarAss.accept(nodeVisitor);
@@ -82,7 +88,7 @@ public class FixpointIteration {
                             childNode = defExpr;
                         }
                     }
-                    walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode);
+                    walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode, evalSecondArgument);
                 }
             }
             boolean somethingChanged = curNode.accept(nodeVisitor);
@@ -129,17 +135,25 @@ public class FixpointIteration {
      * <p/>
      * Assumes expression trees.
      */
-    public static void walkExpression(Consumer<Parser.ExpressionNode> visitor, Parser.ExpressionNode expression){
+    public static void walkExpression(Consumer<Parser.ExpressionNode> visitor, Parser.ExpressionNode expression,
+                                      Predicate<Parser.BinaryOperatorNode> visitSecondArgument){
         if (Thread.interrupted()) {
             Thread.currentThread().interrupt();
             return;
         }
-        //if (!(expression instanceof Parser.PhiNode)) {
-            expression.children().stream().filter(c -> c instanceof Parser.ExpressionNode &&
-                    !((c instanceof Parser.VariableAccessNode && ((Parser.VariableAccessNode) c).definingExpression != null) &&
-                            !(c instanceof Parser.ParameterAccessNode)) && !(c instanceof Parser.PhiNode))
-                    .forEach(c -> walkExpression(visitor, (Parser.ExpressionNode) c));
-    //}
+        List<Parser.ExpressionNode> children = expression.children().stream().filter(c -> c instanceof Parser.ExpressionNode &&
+                !((c instanceof Parser.VariableAccessNode && ((Parser.VariableAccessNode) c).definingExpression != null) &&
+                        !(c instanceof Parser.ParameterAccessNode)) && !(c instanceof Parser.PhiNode))
+                .map(e -> (Parser.ExpressionNode)e).collect(Collectors.toList());
+        if (expression instanceof Parser.BinaryOperatorNode && children.size() == 2) {
+            walkExpression(visitor, children.get(0), visitSecondArgument);
+            if (visitSecondArgument.test((Parser.BinaryOperatorNode) expression)){
+                walkExpression(visitor, children.get(1), visitSecondArgument);
+            }
+        } else {
+            children.forEach(c -> walkExpression(visitor, c, visitSecondArgument));
+        }
+
 
         visitor.accept(expression);
     }
@@ -162,6 +176,6 @@ public class FixpointIteration {
                 }, expression);
                 return false;
             }
-        }, e -> System.out.println("    → " + e.toString() + " " + e.shortType()), node, new HashSet<>());
+        }, e -> System.out.println("    → " + e.toString() + " " + e.shortType()), node, new HashSet<>(), b -> true);
     }
 }

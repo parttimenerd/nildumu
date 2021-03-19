@@ -3039,6 +3039,9 @@ public class Parser implements Serializable {
 
         public BinaryOperatorNode(ExpressionNode left, ExpressionNode right, LexerTerminal operator) {
             super(left.location);
+            Objects.requireNonNull(left);
+            Objects.requireNonNull(right);
+            Objects.requireNonNull(operator);
             this.left = left;
             this.right = right;
             this.operator = operator;
@@ -3071,6 +3074,10 @@ public class Parser implements Serializable {
                     return Operator.MODULO;
                 case APPEND:
                     return Operator.APPEND;
+                case AND:
+                    return Operator.LOGICAL_AND;
+                case OR:
+                    return Operator.LOGICAL_OR;
                 default:
                     return null;
             }

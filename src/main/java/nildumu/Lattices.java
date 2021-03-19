@@ -1639,6 +1639,18 @@ public class Lattices {
             bits.forEach(b -> b.addDependencies(deps));
             return this;
         }
+
+        public boolean mightBe(boolean b) {
+            /*if (singleValued()) {
+                return (asInt() != 0) == b;
+            }
+            return b || bits.stream().allMatch(bit -> bit.val != ONE);*/
+            return get(1).val == U || is(b);
+        }
+
+        public boolean is(boolean b) {
+            return b ? (get(1).val == ONE) : (get(1).val == ZERO);
+        }
     }
 
     /**
