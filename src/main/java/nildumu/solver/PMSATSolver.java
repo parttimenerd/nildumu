@@ -8,6 +8,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.*;
 
+import static nildumu.util.Util.enumerate;
+
 /**
  * Allows to create partial max sat formulas and solve them, creates output in the WDIMACS format
  */
@@ -206,15 +208,21 @@ public abstract class PMSATSolver<V> extends Solver<V> {
                 if (line.startsWith("s UNKNOWN")){
                     return Optional.empty();
                 }
-                if (line.startsWith("v")){
+                if (line.startsWith("v ")){
                     for (String str : line.substring(2).split(" ")){
                         if (str.isEmpty()){
                             continue;
                         }
                         int val = Integer.parseInt(str);
                         if (val > 0 && !maximize){
+                            if (val >= variables.varToVal.size()){
+                                continue;
+                            }
                             trueVariables.add(variables.var(Math.abs(val)));
                         } else {
+                            if (-val >= variables.varToVal.size()){
+                                continue;
+                            }
                             falseVariables.add(variables.var(Math.abs(val)));
                         }
                     }
@@ -223,6 +231,11 @@ public abstract class PMSATSolver<V> extends Solver<V> {
             }
         } catch (IOException ex){
             return Optional.empty();
+        }
+        try {
+            reader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
         double multiplier = roundUp ? calculateWeightMultiplier() : 1;
         double weight = trueVariables.stream().mapToDouble(variables::weight).map(i -> i / multiplier).sum();

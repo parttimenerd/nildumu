@@ -213,6 +213,9 @@ public class ContextMatcher {
 
     public ContextMatcher benchLeakageComputationAlgorithms(int executionTimes) {
         for (MinCut.Algo algo : MinCut.Algo.values()) {
+            if (!algo.supportsAlternatives) {
+                continue;
+            }
             builder.add(() -> {
                 List<Integer> times = IntStream.range(0, executionTimes).mapToObj(i -> {
                     long start = System.currentTimeMillis();

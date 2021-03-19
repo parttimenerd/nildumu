@@ -43,8 +43,8 @@ public class EvaluationTests {
     }
 
     public void check(String program, int shouldLeakAt32, int shouldLeakAt5) {
-        parse(program, 32).use(MinCut.Algo.OPENWBO).leaks(shouldLeakAt32).run();
-        //parse(program, 5).leaks(shouldLeakAt5).run();
+        parse(program, 32).useSingleMCAlgo().leaks(shouldLeakAt32).run();
+        parse(program, 5).useSingleMCAlgo().leaks(shouldLeakAt5).run();
     }
 
 

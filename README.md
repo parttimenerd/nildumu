@@ -18,6 +18,14 @@ Run a basic UI via the `gui` script in the main directory. This allows
 to run the analysis and see the computed leakage and the bit dependency
 graph.
 
+Setup
+-----
+```shell script
+./download_solvers   # download MaxSAT solvers from the MaxSAT Evaluation webpage
+./gui                # build and run the gui
+./evaluate           # build and run the evaluation
+```
+
 Language
 --------
 - the language has a C like syntax

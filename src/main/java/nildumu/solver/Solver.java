@@ -39,10 +39,6 @@ public abstract class Solver<V> {
 
     public abstract Optional<Result<V>> solve();
 
-    public static <V> Solver<V> getDefaultSolver(boolean maximize){
-        return new RC2Solver<>(maximize);
-    }
-
     public abstract void writeInHumanReadableFormat(OutputStreamWriter writer) throws IOException;
 
     public void printInHumanReadableFormat(){

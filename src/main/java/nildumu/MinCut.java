@@ -1,7 +1,7 @@
 package nildumu;
 
 import nildumu.solver.LeakageAlgorithm;
-import nildumu.solver.OpenWBOSolver;
+import nildumu.solver.PMSATSolverImpl;
 import nildumu.util.DefaultMap;
 import org.jgrapht.alg.flow.PushRelabelMFImpl;
 import org.jgrapht.graph.DefaultWeightedEdge;
@@ -27,18 +27,27 @@ public class MinCut {
     public static Algo usedAlgo = Algo.GRAPHT_PP;
 
     public enum Algo {
-        GRAPHT_PP("JGraphT Preflow-Push", false, false),
-        //RC2("RC2 PMSAT solver", true, false),
-        OPENWBO("Open-WBO PMSAT", true, true);
+        GRAPHT_PP("JGraphT Preflow-Push", false, false, null, ""),
+        OPENWBO_GLUCOSE("Open-WBO GL PMSAT", "Open-WBO/bin/open-wbo-g", ""),
+        OPENWBO_MERGESAT("Open-WBO MS PMSAT", "Open-WBO/bin/open-wbo-ms", ""),
+        UWRMAXSAT("UWrMaxSat PMSAT", "UWrMaxSat-1.1w/bin/uwrmaxsat", "-m");
 
         public final String description;
         public final boolean supportsIntervals;
         public final boolean supportsAlternatives;
+        public final String binaryPath;
+        public final String options;
 
-        Algo(String description, boolean supportsIntervals, boolean supportsAlternatives) {
+        Algo(String description, boolean supportsIntervals, boolean supportsAlternatives, String binaryPath, String options) {
             this.description = description;
             this.supportsIntervals = supportsIntervals;
             this.supportsAlternatives = supportsAlternatives;
+            this.binaryPath = binaryPath;
+            this.options = options;
+        }
+
+        Algo(String description, String binaryPath, String options) {
+            this(description, true, true, binaryPath, options);
         }
 
         @Override
@@ -214,12 +223,8 @@ public class MinCut {
                     throw new NildumuError(String.format("Algo %s cannot be used when recording alternatives", algo));
                 }
                 return new GraphTPP(sourcesAndSinks, weights).compute();
-            /*case RC2:
-                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new RC2Solver<>(false)).compute();*/
-            case OPENWBO:
-                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new OpenWBOSolver<>(false), sourcesAndSinks.context.inIntervalMode()).compute();
             default:
-                throw new NildumuError("Unknown algo");
+                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new PMSATSolverImpl<>(algo.binaryPath, algo.options, false), sourcesAndSinks.context.inIntervalMode()).compute();
         }
     }
 
