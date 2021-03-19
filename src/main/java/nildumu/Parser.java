@@ -350,6 +350,7 @@ public class Parser implements Serializable {
                         .addRule("block_statement_w_semi", "input_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "tmp_input_decl_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "array_assignment_statement SEMICOLON", asts -> asts.get(0))
+                        //.addRule("block_statement_w_semi", "assert_statement SEMICOLON", asts -> asts.get(0))
                         .addRule("block_statement_w_semi", "block")
                         .addRule("block_statement", "statement", asts -> asts.get(0))
                         .addRule("block_statement", "var_decl", asts -> asts.get(0))
@@ -361,6 +362,7 @@ public class Parser implements Serializable {
                         .addRule("block_statement", "input_statement")
                         .addRule("block_statement", "tmp_input_decl_statement")
                         .addRule("block_statement", "array_assignment_statement")
+                        //.addRule("block_statement", "assert_statement")
                         .addRule("block_statement", "block")
                         .addRule("var_decl", "type ident", asts -> {
                             Type type = ((TypeNode) asts.get(0)).type;
@@ -450,6 +452,9 @@ public class Parser implements Serializable {
                         .addRule("return_statement", "RETURN expression", asts -> {
                             return new ReturnStatementNode(asts.getStartLocation(), (ExpressionNode) asts.get(1));
                         })
+                        /*.addRule("assert_statement", "ASSERT expression", asts -> {
+                            return new Assert
+                        })*/
                         .addOperators("expression", "postfix_expression", operators -> {
                             operators.defaultBinaryAction((asts, op) -> {
                                 return new BinaryOperatorNode((ExpressionNode) asts.get(0), (ExpressionNode) asts.get(2), valueOf(op));

@@ -30,6 +30,9 @@ public class Mods {
     }
 
     public Mods add(Bit orig, Bit repl){
+        if (orig.isConstant()) {
+            return this;
+        }
         this.replacements.put(orig, repl);
         return this;
     }
@@ -102,16 +105,30 @@ public class Mods {
         });
     }
 
-    public Mods merge(Mods other) {
+    public Mods copy() {
+        return new Mods(new HashMap<>(replacements), new HashMap<>(intervalReplacements));
+    }
+
+    /** union */
+    public Mods union(Mods other) {
+        other.replacements.forEach(this::add);
+        other.intervalReplacements.forEach(this::add);
+        return this;
+    }
+
+    public Mods intersection(Mods other) {
         for (Map.Entry<Bit, Bit> entry : other.replacements.entrySet()) {
-            if (!replacements.containsKey(entry.getKey())){
-                replacements.put(entry.getKey(), entry.getValue());
+            if (replacements.containsKey(entry.getKey())){
+                add(entry.getKey(), entry.getValue());
+            } else {
+                replacements.remove(entry.getKey());
             }
         }
-
         for (Map.Entry<Interval, Interval> entry : other.intervalReplacements.entrySet()) {
-            if (!intervalReplacements.containsKey(entry.getKey())) {
-                intervalReplacements.put(entry.getKey(), entry.getValue());
+            if (intervalReplacements.containsKey(entry.getKey())) {
+                add(entry.getKey(), entry.getValue());
+            } else {
+                intervalReplacements.remove(entry.getKey());
             }
         }
         return this;

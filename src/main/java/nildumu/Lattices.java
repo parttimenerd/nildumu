@@ -1305,6 +1305,12 @@ public class Lattices {
             assert !ENABLE_MISC_CHECKS || !hasDuplicateBits();
         }
 
+        private Value(Vector<Bit> bits) {
+            //assert bits.size() > 1;
+            this.bits = bits;
+            assert !ENABLE_MISC_CHECKS || !hasDuplicateBits();
+        }
+
         public Value(Bit... bits) {
             this(Arrays.asList(bits));
         }
@@ -1410,6 +1416,23 @@ public class Lattices {
             return result;
         }
 
+        public int asInt(B sign, B assumedUnknown){
+            int result = 0;
+            boolean neg = sign == ONE;
+            int signBitVal = sign.value.get();
+            for (int i = bits.size() - 1; i >= 0; i--){
+                result = result * 2;
+                B val = bits.get(i).val;
+                int bitVal = (val == U ? assumedUnknown : val).value.get();
+                if (signBitVal != bitVal){
+                    result += 1;
+                }
+            }
+            if (neg){
+                return -result - 1;
+            }
+            return result;
+        }
 
         @Override
         public Iterator<Bit> iterator() {
@@ -1465,6 +1488,10 @@ public class Lattices {
 
         public boolean isNegative(){
             return signBit().val == ONE;
+        }
+
+        public boolean isPositive(){
+            return signBit().val == ZERO;
         }
 
         public Value map(Function<Bit, Bit> mapper){
@@ -1650,6 +1677,52 @@ public class Lattices {
 
         public boolean is(boolean b) {
             return b ? (get(1).val == ONE) : (get(1).val == ZERO);
+        }
+
+        public Value assume(B sign) {
+            assert sign.isConstant();
+            if (sign == signBit().val) {
+                return this;
+            }
+            Vector<Bit> newBits = new Vector<>(bits);
+            newBits.set(bits.size() - 1, bl.create(sign));
+            return new Value(newBits);
+        }
+
+        public int largest() {
+            return largest(signBit().val);
+        }
+
+        public int largest(B sign) {
+            assert sign.isConstant();
+            if (sign == ZERO) {
+                return asInt(sign, ONE);
+            }
+            return asInt(sign, ZERO);
+        }
+
+        public long smallest() {
+            return smallest(signBit().val);
+        }
+
+        public long smallest(B sign) {
+            assert sign.isConstant();
+            if (sign == ZERO) {
+                return asInt(sign, ZERO);
+            }
+            return asInt(sign, ONE);
+        }
+
+        /**
+         * Returns the bit indices (without the sign indices),
+         * indices = highest non sign bit indices, …, last consecutive val bit indices + app
+         */
+        public IntStream highBitIndicesWOSign(B val, int app) {
+            int smallest = bits.size();
+            for (int i = bits.size() - 1; i >= 1 && get(i).val == val; i--) {
+                smallest = i;
+            }
+            return IntStream.range(Math.max(1, smallest + app), bits.size());
         }
     }
 

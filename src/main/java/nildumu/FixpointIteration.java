@@ -2,13 +2,10 @@ package nildumu;
 
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import swp.parser.lr.BaseAST;
-import swp.util.Pair;
 
 /**
  * Does a fix point iteration over nodes
@@ -55,7 +52,8 @@ public class FixpointIteration {
      */
     public static void worklist2(Parser.NodeVisitor<Boolean> nodeVisitor, Consumer<Parser.ExpressionNode> expressionConsumer,
                                  Parser.MJNode node, Set<Parser.StatementNode> statementNodesToOmitOneTime,
-                                 Predicate<Parser.BinaryOperatorNode> evalSecondArgument){
+                                 Predicate<Parser.BinaryOperatorNode> evalSecondArgument,
+                                 Consumer<Parser.BinaryOperatorNode> runAfterEvalSecondArgument){
         assert !(node instanceof Parser.ExpressionNode);
         Set<Parser.MJNode> visitedBefore = new HashSet<>();
         Stack<Parser.MJNode> nodesToVisit = new Stack<>();
@@ -73,7 +71,7 @@ public class FixpointIteration {
                             if (childNode instanceof Parser.VariableAccessNode){
                                 childNode = ((Parser.VariableAccessNode) childNode).definingExpression;
                             }
-                            walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode, evalSecondArgument);
+                            walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode, evalSecondArgument, runAfterEvalSecondArgument);
                         }
                     }
                     preCondVarAss.accept(nodeVisitor);
@@ -88,7 +86,7 @@ public class FixpointIteration {
                             childNode = defExpr;
                         }
                     }
-                    walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode, evalSecondArgument);
+                    walkExpression(expressionConsumer, (Parser.ExpressionNode)childNode, evalSecondArgument, runAfterEvalSecondArgument);
                 }
             }
             boolean somethingChanged = curNode.accept(nodeVisitor);
@@ -136,7 +134,8 @@ public class FixpointIteration {
      * Assumes expression trees.
      */
     public static void walkExpression(Consumer<Parser.ExpressionNode> visitor, Parser.ExpressionNode expression,
-                                      Predicate<Parser.BinaryOperatorNode> visitSecondArgument){
+                                      Predicate<Parser.BinaryOperatorNode> visitSecondArgument,
+                                      Consumer<Parser.BinaryOperatorNode> runAfterEvalSecondArgument){
         if (Thread.interrupted()) {
             Thread.currentThread().interrupt();
             return;
@@ -146,12 +145,13 @@ public class FixpointIteration {
                         !(c instanceof Parser.ParameterAccessNode)) && !(c instanceof Parser.PhiNode))
                 .map(e -> (Parser.ExpressionNode)e).collect(Collectors.toList());
         if (expression instanceof Parser.BinaryOperatorNode && children.size() == 2) {
-            walkExpression(visitor, children.get(0), visitSecondArgument);
+            walkExpression(visitor, children.get(0), visitSecondArgument, runAfterEvalSecondArgument);
             if (visitSecondArgument.test((Parser.BinaryOperatorNode) expression)){
-                walkExpression(visitor, children.get(1), visitSecondArgument);
+                walkExpression(visitor, children.get(1), visitSecondArgument, runAfterEvalSecondArgument);
+                runAfterEvalSecondArgument.accept((Parser.BinaryOperatorNode) expression);
             }
         } else {
-            children.forEach(c -> walkExpression(visitor, c, visitSecondArgument));
+            children.forEach(c -> walkExpression(visitor, c, visitSecondArgument, runAfterEvalSecondArgument));
         }
 
 
@@ -176,6 +176,6 @@ public class FixpointIteration {
                 }, expression);
                 return false;
             }
-        }, e -> System.out.println("    → " + e.toString() + " " + e.shortType()), node, new HashSet<>(), b -> true);
+        }, e -> System.out.println("    → " + e.toString() + " " + e.shortType()), node, new HashSet<>(), b -> true, b -> {});
     }
 }

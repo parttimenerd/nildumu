@@ -48,7 +48,9 @@ public class ContextMatcher {
 
     public ContextMatcher val(String variable, int value){
         Lattices.Value actual = getValue(variable);
-        builder.add(() -> assertTrue(actual.isConstant(), String.format("Variable %s should have an integer val, has %s", variable, actual.repr())));
+        builder.add(() -> assertTrue(actual.isConstant(),
+                String.format("Variable %s should have an integer val, has %s: %s vs %s",
+                variable, actual.toLiteralString(), value, actual.repr())));
         builder.add(() -> assertEquals(value, actual.asInt(),
                 String.format("Variable %s should have integer val %d", variable, value)));
         return this;
@@ -58,7 +60,8 @@ public class ContextMatcher {
         Lattices.Value expected = vl.parse(value);
         Lattices.Value actual = getValue(variable);
         builder.add(() -> assertEquals(expected.toLiteralString(), actual.toLiteralString(),
-                String.format("Variable %s should have val %s, has val %s", variable, expected.repr(), actual.repr())));
+                String.format("Variable %s should have val %s, has val %s: %s vs %s", variable,
+                        expected.toLiteralString(), actual.toLiteralString(), expected.repr(), actual.repr())));
         return this;
     }
 

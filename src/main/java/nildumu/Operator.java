@@ -416,7 +416,7 @@ public interface Operator {
                     if (v(x) == ZERO){
                         return c.repl(y, a);
                     }
-                    return Mods.empty();
+                    return c.repl(x, a).intersection(c.repl(y, a));
                 }
 
                 @Override
@@ -458,7 +458,7 @@ public interface Operator {
                     if (v(x) == ONE){
                         return c.repl(y, a);
                     }
-                    return Mods.empty();
+                    return c.repl(x, a).union(c.repl(y, a));
                 }
 
                 @Override
@@ -469,14 +469,12 @@ public interface Operator {
         }
     };
 
-    class ShortCircuitOperator implements Operator {
+    abstract class ShortCircuitOperator implements Operator {
 
         private final Parser.LexerTerminal op;
-        private final BinaryOperator operator;
 
-        public ShortCircuitOperator(Parser.LexerTerminal op, BinaryOperator operator) {
+        public ShortCircuitOperator(Parser.LexerTerminal op) {
             this.op = op;
-            this.operator = operator;
         }
 
         @Override
@@ -486,8 +484,13 @@ public interface Operator {
 
         @Override
         public Value compute(Context c, List<Value> arguments) {
-            return arguments.size() == 1 || arguments.get(1).isBot() ? arguments.get(0) : operator.compute(c, arguments.get(0), arguments.get(1));
+            if (arguments.size() == 1 || arguments.get(1).isBot()) {
+                return arguments.get(0);
+            }
+            return compute(c, arguments.get(0), arguments.get(1));
         }
+
+        public abstract Value compute(Context c, Value x, Value y);
 
         @Override
         public boolean allowsUnevaluatedArguments() {
@@ -495,9 +498,21 @@ public interface Operator {
         }
     }
 
-    Operator LOGICAL_AND = new ShortCircuitOperator(Parser.LexerTerminal.AND, AND);
+    Operator LOGICAL_AND = new ShortCircuitOperator(Parser.LexerTerminal.AND) {
 
-    Operator LOGICAL_OR = new ShortCircuitOperator(Parser.LexerTerminal.OR, OR);
+        @Override
+        public Value compute(Context c, Value x, Value y) {
+            return AND.compute(c, x, y);
+        }
+    };
+
+    Operator LOGICAL_OR = new ShortCircuitOperator(Parser.LexerTerminal.OR) {
+        @Override
+        public Value compute(Context c, Value x, Value y) {
+            // assumes that x is either unknown or false
+            return OR.compute(c, x, y);
+        }
+    };
 
     BitWiseBinaryOperator XOR = new BitWiseBinaryOperatorStructured("^") {
 
@@ -756,7 +771,89 @@ public interface Operator {
 
         @Override
         Context.ModsCreator computeModsCreator(int i, Bit r, Value x, Value y, List<B> bitValues, DependencySet dataDeps) {
-            return (c, b, a) -> Mods.empty();
+            if (i > 1){
+                return (c, b, a) -> Mods.empty();
+            }
+            return new StructuredModsCreator() {
+                @Override
+                public Mods assumeOne(Context c, Bit r, Bit a) {
+                    if (i != 1){
+                        return Mods.empty();
+                    }
+                    int bitWidth = Math.max(x.size(), y.size());
+                    return assumeOneValue(x.withBitCount(bitWidth), y.withBitCount(bitWidth));
+                }
+
+                public Mods assumeOneValue(Value x, Value y) {
+                    // we have 9 different cases, depending on the sign bits
+                    if (x.isNegative()) {
+                        if (y.isNegative()) {
+                            // do something
+                            // x < y   <=>   -y < -x   <=>   ~y + 1 < ~x + 1
+                            // <=>  ~y < ~x  maybe?
+                            Mods mods = Mods.empty();
+                            y.highBitIndicesWOSign(ONE, -1).forEach(i -> mods.add(x.get(i), bl.create(ONE))); // -1?
+                            x.highBitIndicesWOSign(ZERO, 0).forEach(i -> mods.add(y.get(i), bl.create(ZERO)));
+                            return mods;
+                        } else if (y.isPositive()) {
+                            return Mods.empty();
+                        } else {
+                            // if !(x < -|y|) { y is positive }
+                            // if !(x.largest < y.largest(sign=1)) { y.assume(sign=0) }
+                            if (!(x.largest() < y.smallest(ONE))) {
+                                Bit ySign = y.signBit();
+                                return assumeOneValue(x, y.assume(ZERO)).add(ySign, bl.create(ZERO));
+                            }
+                            return Mods.empty();
+                        }
+                    } else if (x.isPositive()) {
+                        if (y.isNegative()) {
+                            return Mods.empty();
+                        } else if (y.isPositive()) {
+                            Mods mods = Mods.empty();
+                            y.highBitIndicesWOSign(ZERO, -1).forEach(i -> mods.add(x.get(i), bl.create(ZERO))); // -1?
+                            x.highBitIndicesWOSign(ONE, 0).forEach(i -> mods.add(y.get(i), bl.create(ONE)));
+                            return mods;
+                        } else {
+                            // y.assume(sign=0): x < y
+                            Bit ySign = y.signBit();
+                            return assumeOneValue(x, y.assume(ZERO)).add(ySign, bl.create(ZERO));
+                        }
+                    } else {
+                        if (y.isNegative()) {
+                            // x.assume(sign=1): x < y
+                            Bit xSign = x.signBit();
+                            return assumeOneValue(x.assume(ONE), y).add(xSign, bl.create(ONE));
+                        } else if (y.isPositive()) {
+                            // if !(|x| < |y|) { x is negative }
+                            // if !(x.smallest(sign=0) < y.largest) { x.assume(sign=1) }
+                            if (!(x.smallest(ZERO) < y.largest())) {
+                                Bit xSign = x.signBit();
+                                return assumeOneValue(x.assume(ONE), y).add(xSign, bl.create(ONE));
+                            }
+                            return Mods.empty();
+                        } else {
+                            return Mods.empty();
+                        }
+                    }
+                }
+
+                @Override
+                public Mods assumeZero(Context c, Bit r, Bit _a) {
+                    // we can assume that a is zero and r is unkndown and therefore ignore it
+                    if (i != 1){
+                        return Mods.empty();
+                    }
+                    // x == y or x > y
+                    // check if x can be y:
+                    if (vl.mapBits(x, y, (a, b) -> a.val() == b.val() || a.isUnknown() || b.isUnknown()).stream().allMatch(Boolean::booleanValue)) {
+                        Mods eqMods = Mods.empty();
+                        vl.mapBits(x, y, (xi, yi) -> c.repl(c.notChosen(xi, yi), c.choose(xi, yi))).forEach(eqMods::add);
+                        return assumeOneValue(y, x).intersection(eqMods);
+                    }
+                    return assumeOneValue(y, x);
+                }
+            };
         }
 
         @Override

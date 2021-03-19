@@ -3,6 +3,7 @@ package nildumu;
 import nildumu.mih.MethodInvocationHandler;
 import org.junit.jupiter.api.Test;
 
+import static nildumu.LoopTests.parse;
 import static nildumu.Processor.RECORD_ALTERNATIVES;
 import static nildumu.Processor.process;
 
@@ -172,12 +173,82 @@ public class ExtendedTests {
 
     @Test
     public void testLowerPowerOfTwo() {
-        parse("h input int h = 0buuuu; int x = 0; if (2 < h) { x = h; } int y = x").val("y", "0b00uu").run();
+        parse("h input int h = 0buuuuu; int x = 0; if (2 < h) { x = h; } int y = x").val("y", "0b0uuuu").run();
+    }
+
+    @Test
+    public void testLowerOnes() {
+        parse("h input int h = 0buuuuu; int x = 0; if (3 < h) { x = h; } int y = x").val("y", "0b0uuuu").run();
     }
 
     @Test
     public void testLower() {
-        parse("h input int h = 0buuuuu; int x = 0; if (3 < h) { x = h; } int y = x").val("y", "0b00uu").run();
+        parse("h input int h = 0buuuuu; int x = 0; if (h > 0) { x = h; } int y = x").val("y", "0b0uuuu").run();
+    }
+
+    @Test
+    public void testLowerCombination() {
+        parse("h input int h = 0buuuuuuu; int x = 0; if ((((4 < h) || (4 == h)) && (h < 16))) { x = h; } int y = x").val("y", "0b000uuuu").run();
+    }
+
+    @Test
+    public void testLowerCombination2() {
+        parse("h input int h = 0buuuuuuu; int x = 0; if (h < 16) { x = h; } int y = x").val("y", "0buuuuuuu").run();
+    }
+
+    @Test
+    public void testLowerCombination3() {
+        parse("h input int h = 0buuuuuuu; int x = 0; if ((4 < h) || (4 == h)) { x = h; } int y = x").val("y", "0b0uuuuuu").run();
+    }
+
+    @Test
+    public void testLowerCombination4() {
+        parse("h input int h = 0buuuu; int x = 0; if ((0 < h) && (h < 4)) { x = h; } int y = x").val("y", "0b00uu").run();
+    }
+
+    @Test
+    public void testLowerCombination5() {
+        parse("h input int h = 0buuuu; int x = 0; if ((0 < h || h == 0) && (h < 4)) { x = h; } int y = x").val("y", "0b00uu").run();
+    }
+
+    @Test
+    public void testLowerCombination6() {
+        parse("h input int h = 0buuuuuuu; int x = 0; if ((2 < h) || (2 == h)) { x = h; } int y = x").val("y", "0b0uuuuuu").run();
+    }
+
+    @Test
+    public void testLowerCombination7() {
+        parse("h input int h = 0bu{8}; int x = 0; if (4 < h && h < 16) { x = h; } int y = x").val("y", "0b0000uuuu").run();
+    }
+
+    @Test
+    public void testLowerCombination8() {
+        parse("h input int h = 0bu{6}; int x = 0; if (0 < h && h < 2) { x = h; } int y = x").val("y", "0b00000u").run();
+    }
+
+    @Test
+    public void testShortCircuitPropagation() {
+        parse("h input int x = 0buu; h input int y = 0buu; int z = 0; if (x == 0 && y == x) { z = y; } int a = z").val("a", "0b00").run();
+    }
+
+    @Test
+    public void testShortCircuitPropagation2() {
+        parse("h input int x = 0buu; h input int y = 0buu; int z = 0; if ((x != 0) && (x != 0 || y == x)) { z = y; } int a = z").val("a", "0buu").run();
+    }
+
+    @Test
+    public void testShortCircuitPropagation3() {
+        parse("h input int x = 0buu; h input int y = 0b0u; int z = 0; if ((x > 0) || (x == 0 || y == x)) { z = y; } int a = z").val("a", "0b0u").run();
+    }
+
+    @Test
+    public void testElectronicPurseBinary(){
+        parse("h input int H = 0bu{32};\n" +
+                "int Z = 0;\n" +
+                "if (4 < H && H < 16){\n" +
+                "    Z = H; "+
+                "}\n" +
+                "int z = Z;").val("z", "0b0{28}u{4}").run();
     }
 
     public ContextMatcher parse(String program){

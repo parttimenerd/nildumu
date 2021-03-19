@@ -151,6 +151,7 @@ public class Processor {
             @Override
             public Boolean visit(IfStatementNode ifStatement) {
                 Value cond = context.nodeValue(ifStatement.conditionalExpression);
+                context.assertAdditionalModsEmpty();
                 Bit condBit = cond.get(1);
                 Lattices.B condVal = condBit.val();
                 if (condVal.isAtLeastUnknown() && cond.singleValued()){
@@ -205,6 +206,7 @@ public class Processor {
                     throw new NildumuError("while-statements are only supported in modes starting at loop mode");
                 }
                 Value cond = context.nodeValue(whileStatement.conditionalExpression);
+                context.assertAdditionalModsEmpty();
                 Bit condBit = cond.get(1);
                 weightCondBit(condBit);
                 if (cond.mightBe(true)) {
@@ -333,12 +335,25 @@ public class Processor {
             }
         }, context::evaluate, node, statementNodesToOmitOneTime, b -> {
             if (b.operator == LexerTerminal.AND) {
-                return context.nodeValue(b.left).is(true);
+                if (context.nodeValue(b.left).mightBe(true)) {
+                    context.pushMiscMods(context.repl(context.nodeValue(b.left).get(1), bl.create(ONE)));
+                    return true;
+                }
+                return false;
             }
             if (b.operator == LexerTerminal.OR) {
-                return context.nodeValue(b.left).is(false);
+                if (context.nodeValue(b.left).mightBe(false)) {
+                    context.pushMiscMods(context.repl(context.nodeValue(b.left).get(1), bl.create(ZERO)));
+                    return true;
+                }
+                return false;
             }
             return true;
+        }, b -> {
+            if ((b.operator == LexerTerminal.AND && context.nodeValue(b.left).mightBe(true)) ||
+                    (b.operator == LexerTerminal.OR && context.nodeValue(b.left).mightBe(false))) {
+                context.popMiscMods();
+            }
         });
         return context;
     }

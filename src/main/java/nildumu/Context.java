@@ -6,6 +6,7 @@ import nildumu.util.DefaultMap;
 import nildumu.util.Util;
 import swp.util.Pair;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -312,6 +313,10 @@ public class Context {
 
     private boolean recordAlternatives;
 
+    /** additional mods that come from short circuiting, e.g. in  (x && y) the mods from x == true are added
+     * to the mods for evaluating y */
+    private Stack<Mods> additionalMods = new Stack<>();
+
     /*-------------------------- loop mode specific -------------------------------*/
 
     private final HashMap<Bit, Double> weightMap = new HashMap<>();
@@ -464,13 +469,13 @@ public class Context {
                 if (((VariableAccessNode) node).definition.hasAppendValue){
                     return val.asAppendOnly();
                 }
-                return val;
+                return replace(val);
             }
             //return getVariableValue(((VariableAccessNode) node).definition);
         } else if (node instanceof WrapperNode){
             return ((WrapperNode<Value>) node).wrapped;
         }
-        return frame.nodeValueState.nodeValueMap.get(node);
+        return replace(frame.nodeValueState.nodeValueMap.get(node));
     }
 
     public Value nodeValue(MJNode node, Value value){
@@ -548,7 +553,6 @@ public class Context {
             nodeValue(node, newVal);
             return somethingChanged;
         }
-
         boolean paramsChanged = compareAndStoreParamVersion(node);
         if (!paramsChanged){
             return false;
@@ -737,7 +741,7 @@ public class Context {
             ModsCreator modsCreator = repl(condBit);
             Mods newMods = modsCreator.apply(this, condBit, bl.create(branch.val ? B.ONE : B.ZERO));
             if (frame.nodeValueState.modsMap.containsKey(branch)) {
-                frame.nodeValueState.modsMap.put(branch, Mods.empty().add(frame.nodeValueState.modsMap.get(branch)).merge(newMods));
+                frame.nodeValueState.modsMap.put(branch, Mods.empty().add(frame.nodeValueState.modsMap.get(branch)).union(newMods));
             } else {
                 frame.nodeValueState.modsMap.put(branch, newMods);
             }
@@ -753,6 +757,18 @@ public class Context {
 
     public void popBranch(){
         frame.nodeValueState.branchStack.pop();
+    }
+
+    public void pushMiscMods(Mods mods) {
+        additionalMods.push(mods);
+    }
+
+    public void popMiscMods() {
+        additionalMods.pop();
+    }
+
+    public void assertAdditionalModsEmpty() {
+        assert additionalMods.empty();
     }
 
     /**
@@ -778,9 +794,18 @@ public class Context {
 
     /* -------------------------- extended mode specific -------------------------------*/
 
-    public Bit replace(Bit bit, Branch branch){
+    public Bit replace(Bit bit, @Nullable Branch branch){
         if (inExtendedMode()) {
-            Optional<Branch> optCur = Optional.of(branch);
+            Bit ret = null;
+            for (Mods additionalMod : additionalMods) {
+                if (additionalMod.definedFor(bit)) {
+                    ret = additionalMod.replace(bit);
+                }
+            }
+            if (ret != null) {
+                return ret;
+            }
+            Optional<Branch> optCur = Optional.ofNullable(branch);
             while (optCur.isPresent()){
                 Mods curMods = frame.nodeValueState.modsMap.get(optCur.get());
                 if (curMods.definedFor(bit)){
@@ -792,9 +817,18 @@ public class Context {
         return bit;
     }
 
-    public Interval replace(Interval inter, Branch branch){
+    public Interval replace(Interval inter, @Nullable Branch branch){
         if (inExtendedMode()) {
-            Optional<Branch> optCur = Optional.of(branch);
+            Interval ret = null;
+            for (Mods additionalMod : additionalMods) {
+                if (additionalMod.definedFor(inter)) {
+                    ret = additionalMod.replace(inter);
+                }
+            }
+            if (ret != null) {
+                return ret;
+            }
+            Optional<Branch> optCur = Optional.ofNullable(branch);
             while (optCur.isPresent()){
                 Mods curMods = frame.nodeValueState.modsMap.get(optCur.get());
                 if (curMods.definedFor(inter)){
@@ -808,12 +842,15 @@ public class Context {
 
     public Value replace(Value value) {
         if (frame.nodeValueState.branchStack.isEmpty()){
+            if (!additionalMods.empty()) {
+                return replace(value, null);
+            }
             return value;
         }
         return replace(value, frame.nodeValueState.branchStack.peek());
     }
 
-    public Value replace(Value value, Branch branch) {
+    public Value replace(Value value, @Nullable Branch branch) {
         Util.Box<Boolean> replacedABit = new Util.Box<>(false);
         Value newValue = value.stream().map(b -> {
             Bit r = replace(b, branch);
@@ -961,7 +998,7 @@ public class Context {
         repl(o, (c, b, a) -> {
             Mods oMods = oModsCreator.apply(c, b, a);
             Mods nMods = nModsCreator.apply(c, b, a);
-            return Mods.empty().add(oMods).merge(nMods);
+            return Mods.empty().add(oMods).union(nMods);
         });
         replMap.remove(n);
         return true;

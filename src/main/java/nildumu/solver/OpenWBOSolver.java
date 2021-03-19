@@ -38,7 +38,6 @@ public class OpenWBOSolver<V> extends PMSATSolver<V> {
                 "https://maxsat-evaluations.github.io/2018/mse18-solver-src/complete/Open-WBO.zip into the " +
                 "dist folder and to run this tool in the main project directory";
         try {
-            System.err.println("Running solver with formula" + file.getAbsolutePath());
             ProcessBuilder builder = new ProcessBuilder();
             Process proc = new ProcessBuilder().command("dist/Open-WBO/bin/open-wbo-gluc", file.getAbsolutePath()).start();
             proc.waitFor();
