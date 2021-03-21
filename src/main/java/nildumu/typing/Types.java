@@ -27,6 +27,11 @@ public class Types extends AbstractMap<String, Type> implements Serializable {
         public int getNumberOfBlastedVariables() {
             return 1;
         }
+
+        @Override
+        public boolean isInt() {
+            return true;
+        }
     };
 
     /**

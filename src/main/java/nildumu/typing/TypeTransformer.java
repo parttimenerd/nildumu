@@ -74,13 +74,15 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         }
     }
 
+    private final ProgramNode programNode;
     private final Types types;
     private final Map<Variable, List<Variable>> blastedVariablesPerVariable;
     private final Map<Triple<Integer, Integer, Integer>, MethodNode> setters;
     private final Map<Triple<Integer, Integer, Integer>, MethodNode> getters;
     private final Map<String, Type> methodReturnTypes;
 
-    public TypeTransformer(Types types, MethodNode method, Map<Triple<Integer, Integer, Integer>, MethodNode> setters, Map<Triple<Integer, Integer, Integer>, MethodNode> getters, Map<String, Type> methodReturnTypes) {
+    public TypeTransformer(ProgramNode programNode, Types types, MethodNode method, Map<Triple<Integer, Integer, Integer>, MethodNode> setters, Map<Triple<Integer, Integer, Integer>, MethodNode> getters, Map<String, Type> methodReturnTypes) {
+        this.programNode = programNode;
         this.types = types;
         this.methodReturnTypes = methodReturnTypes;
         this.blastedVariablesPerVariable = new HashMap<>();
@@ -100,6 +102,15 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
     public List<MethodNode> resolveGlobalBlock(Parser.BlockNode node) {
         visit(node);
         return getCreatedMethods();
+    }
+
+    private Type getMethodReturnType(String name, MethodNode method) {
+        return methodReturnTypes.computeIfAbsent(name, m -> {
+            if (method != null) {
+                return method.getReturnType();
+            }
+            return PredefinedMethodNode.getPredefined(programNode, name).getReturnType();
+        });
     }
 
     @Override
@@ -144,7 +155,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
             Variable returnVariable = new Variable("__br", returnType);
             List<StatementNode> body = new ArrayList<>();
             body.add(new VariableDeclarationNode(ZERO, returnVariable, null));
-            for (int i = 0; i < size; i += elemSize) {
+            for (int i = 0; i + elemSize - 1 < size; i += packets) {
                 body.add(new IfStatementNode(ZERO, new BinaryOperatorNode(indexAccess, literal(i), LexerTerminal.EQUALS),
                         new BlockNode(ZERO, Collections.singletonList(new VariableAssignmentNode(ZERO, returnVariable, new TupleLiteralNode(ZERO, IntStream.range(i, i + elemSize).mapToObj(j -> new VariableAccessNode(ZERO, blastedVars.get(j))).collect(Collectors.toList())))))));
             }
@@ -287,6 +298,9 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
             }
             return new VisRet(true, new VariableAssignmentNode(assignment.location, assignment.definitions.get(0), expr));
         }
+        if (assignment.definitions.stream().allMatch(v -> v.getType().isInt())) {
+            return new VisRet(false);
+        }
         List<StatementNode> stmts = new ArrayList<>();
         HashSet<String> varNames = new HashSet<>(assignment.variables);
         String varName = "__bl_";
@@ -352,6 +366,11 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
     }
 
     @Override
+    public VisRet visit(ExpressionStatementNode expressionStatement) {
+        return new VisRet(true, new ExpressionStatementNode(transform(expressionStatement.expression).get(0)));
+    }
+
+    @Override
     public VisRet visit(IfStatementNode ifStatement) {
         visit(ifStatement.ifBlock);
         visit(ifStatement.elseBlock);
@@ -365,7 +384,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
     }
 
     public static MethodNode process(TypeTransformer parent, MethodNode method) {
-        TypeTransformer resolution = new TypeTransformer(parent.types, method, parent.setters, parent.getters, parent.methodReturnTypes);
+        TypeTransformer resolution = new TypeTransformer(parent.programNode, parent.types, method, parent.setters, parent.getters, parent.methodReturnTypes);
         resolution.resolve(method.parameters);
         resolution.resolve(method.body);
         MethodNode methodNode = new MethodNode(method.location, method.name, null, new ParametersNode(method.parameters.parameterNodes.stream().flatMap(p -> resolution.getBlasted(p.definition).stream()).collect(Collectors.toList())), method.body, method.globals);
@@ -384,7 +403,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
     }
 
     public static ProgramNode process(Parser.ProgramNode program) {
-        TypeTransformer resolution = new TypeTransformer(program.types, null, new HashMap<>(), new HashMap<>(), new HashMap<>());
+        TypeTransformer resolution = new TypeTransformer(program, program.types, null, new HashMap<>(), new HashMap<>(), new HashMap<>());
         resolution.fillMethodReturnTypes(program.methods());
         resolution.resolveGlobalBlock(program.globalBlock);
         List<MethodNode> newMethods = program.methods().stream().map(m -> TypeTransformer.process(resolution, m)).collect(Collectors.toList());
@@ -420,7 +439,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         return new VisRet(true, new MultipleVariableAssignmentNode(arrayAssignment.location,
                 blasted, new UnpackOperatorNode(new MethodInvocationNode(arrayAssignment.location,
                 getSetter(accessorIdAndIndexExpr.first), accessorIdAndIndexExpr.second,
-                Stream.concat(blasted.stream().map(v -> (ExpressionNode) new VariableAccessNode(arrayAssignment.location, v)), transform(arrayAssignment.expression).stream()).collect(Collectors.toList())))));
+                Stream.concat(blasted.stream().map(v -> (ExpressionNode) new VariableAccessNode(arrayAssignment.location, v)), transform(arrayAssignment.expression).stream()).map(this::castToInt).collect(Collectors.toList())))));
     }
 
     List<ExpressionNode> transform(ExpressionNode expression) {
@@ -433,6 +452,14 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         return node;
     }
 
+    private ExpressionNode castToInt(ExpressionNode expression) {
+        if (expression.type != types.INT) {
+            return new MethodInvocationNode(expression.location, PredefinedMethodNode.getPredefined(programNode, "toInt"),
+                    new ArgumentsNode(expression.location, Collections.singletonList(expression)));
+        }
+        return expression;
+    }
+
     class ExpressionTransformer implements ExpressionVisitor<List<ExpressionNode>> {
 
         @Override
@@ -443,8 +470,8 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
 
         @Override
         public List<ExpressionNode> visit(BinaryOperatorNode binaryOperator) {
-            return Collections.singletonList(new BinaryOperatorNode(binaryOperator.left.accept(this).get(0),
-                    binaryOperator.right.accept(this).get(0), binaryOperator.operator).setExpressionType(binaryOperator.type));
+            return Collections.singletonList(new BinaryOperatorNode(castToInt(binaryOperator.left.accept(this).get(0)),
+                    castToInt(binaryOperator.right.accept(this).get(0)), binaryOperator.operator).setExpressionType(binaryOperator.type));
         }
 
         @Override
@@ -454,7 +481,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
 
         @Override
         public List<ExpressionNode> visit(UnaryOperatorNode unaryOperator) {
-            return Collections.singletonList(new UnaryOperatorNode(visit(unaryOperator.expression).get(0), unaryOperator.operator).setExpressionType(unaryOperator.type));
+            return Collections.singletonList(new UnaryOperatorNode(castToInt(visit(unaryOperator.expression).get(0)), unaryOperator.operator).setExpressionType(unaryOperator.type));
         }
 
         @Override
@@ -491,11 +518,17 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
             if (methodInvocation.definition instanceof PredefinedMethodNode && methodInvocation.definition.name.equals("length")) {
                 return Collections.singletonList(literal(collect(methodInvocation.arguments.arguments).size()));
             } else {
+                methodInvocation.arguments.arguments = methodInvocation.arguments.arguments.stream().flatMap(v -> v.accept(this).stream()).collect(Collectors.toList());
                 visitChildrenDiscardReturn(methodInvocation);
                 if (methodInvocation.arguments.size() == 0){
-                    return Collections.singletonList(methodInvocation);
+                    return Collections.singletonList(methodInvocation); // return type
                 }
-                return Collections.singletonList(new MethodInvocationNode(methodInvocation.location, methodInvocation.method, new ArgumentsNode(ZERO, transform(new UnpackOperatorNode(new TupleLiteralNode(ZERO, methodInvocation.arguments.arguments.stream().flatMap(a -> a.accept(this).stream()).collect(Collectors.toList())))))).setExpressionType(methodReturnTypes.get(methodInvocation.method)));
+                if (methodInvocation.definition instanceof PredefinedMethodNode
+                        && methodInvocation.definition.name.equals("toInt")
+                        && methodInvocation.arguments.get(0).type.isInt()) {
+                    return Collections.singletonList(methodInvocation.arguments.get(0));
+                }
+                return Collections.singletonList(new MethodInvocationNode(methodInvocation.location, methodInvocation.method, new ArgumentsNode(ZERO, transform(new UnpackOperatorNode(new TupleLiteralNode(ZERO, methodInvocation.arguments.arguments.stream().flatMap(a -> a.accept(this).stream()).collect(Collectors.toList())))))).setExpressionType(getMethodReturnType(methodInvocation.method, methodInvocation.definition)));
             }
         }
 
@@ -507,7 +540,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
             Type.TupleLikeType type = (Type.TupleLikeType) bracketedAccess.left.type;
             if (bracketedAccess.right instanceof IntegerLiteralNode && ((IntegerLiteralNode) bracketedAccess.right).value.isConstant()) {
                 int index = (int)((IntegerLiteralNode) bracketedAccess.right).value.asLong();
-                if (!(bracketedAccess.left instanceof MethodInvocationNode)) {
+                if (bracketedAccess.left instanceof VariableAccessNode) {
                     List<ExpressionNode> ret = bracketedAccess.left.accept(this);
                     return type.getBlastedIndexes(index).stream().map(ret::get).collect(Collectors.toList());
                 }

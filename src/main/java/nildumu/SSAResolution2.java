@@ -86,7 +86,76 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     private final Types types;
 
-    public SSAResolution2(Types types, MethodNode method) {
+    private final VariableSet collectedVariableNames;
+
+    private static class VariableSet extends AbstractSet<String> {
+
+        private final Set<String> variables;
+
+        private VariableSet(Set<String> variables) {
+            this.variables = variables;
+        }
+
+        @Override
+        public Iterator<String> iterator() {
+            return variables.iterator();
+        }
+
+        @Override
+        public int size() {
+            return variables.size();
+        }
+
+        @Override
+        public boolean contains(Object o) {
+            return variables.contains(o);
+        }
+
+        /** Create a version of the variable name that is not yet present in this set and add it */
+        public String create(String variable) {
+            while (variables.contains(variable)) {
+                variable = variable + "_" + System.nanoTime() % 10000;
+            }
+            variables.add(variable);
+            return variable;
+        }
+    }
+
+    public static class VariableDefinitionVisitor implements NodeVisitor<Object> {
+        final Set<String> variables = new HashSet<>();
+
+        @Override
+        public Object visit(MJNode node) {
+            visitChildrenDiscardReturn(node);
+            return null;
+        }
+
+        @Override
+        public Object visit(VariableDeclarationNode assignment) {
+            variables.add(assignment.variable);
+            return null;
+        }
+
+        @Override
+        public Object visit(StatementNode statementNode) {
+            return null;
+        }
+
+        @Override
+        public Object visit(BlockNode block) {
+            visitChildrenDiscardReturn(block);
+            return null;
+        }
+
+        public static VariableSet process(MJNode node) {
+            VariableDefinitionVisitor visitor = new VariableDefinitionVisitor();
+            node.accept(visitor);
+            return new VariableSet(visitor.variables);
+        }
+    }
+
+    public SSAResolution2(Types types, MethodNode method, VariableSet collectedVariableNames) {
+        this.collectedVariableNames = collectedVariableNames;
         reverseMapping = new HashMap<>();
         versionCount = new HashMap<>();
         scopes = new Stack<>();
@@ -312,7 +381,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     public static void process(SSAResolution2 parent, MethodNode method) {
-        SSAResolution2 resolution = new SSAResolution2(parent.types, method);
+        SSAResolution2 resolution = new SSAResolution2(parent.types, method, VariableDefinitionVisitor.process(method));
         resolution.pushNewVariablesScope();
         Map<String, String> pre = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, v -> {
             resolution.appendValueVariables.add(v);
@@ -328,7 +397,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     public static void process(ProgramNode program){
-        SSAResolution2 resolution = new SSAResolution2(program.types, null);
+        SSAResolution2 resolution = new SSAResolution2(program.types, null, VariableDefinitionVisitor.process(program.globalBlock));
         resolution.pushNewVariablesScope();
         resolution.resolveGlobalBlock(program.globalBlock)
                 .forEach(v -> program.globalBlock.prependVariableDeclaration(v, program.types.INT, resolution.appendValueVariables.contains(v)));
@@ -421,7 +490,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
             scopes.peek().newVariablesLocated.put(origin, origin);
             return variable;
         }
-        String newVariable = origin + (numberOfVersions(origin) + 1);
+        String newVariable = this.collectedVariableNames.create(origin + (numberOfVersions(origin) + 1));
         String pred = resolveLocated(variable);
         versionCount.put(origin, numberOfVersions(origin) + 1);
         reverseMapping.put(newVariable, origin);

@@ -133,7 +133,7 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
         Type.TupleType expectedType = new Type.TupleType(program.types, assignment.definitions.stream()
                 .map(Variable::getType).collect(Collectors.toList()));
         if (!tupleType.equals(expectedType)) {
-            messages.add(new WrongTypeMessage(String.format("Exppected expression of type %s in %s at %s, got expression of type %s",
+            messages.add(new WrongTypeMessage(String.format("Expected expression of type %s in %s at %s, got expression of type %s",
                     expectedType, assignment, assignment.location, tupleType)));
         }
         return messages;
@@ -322,18 +322,20 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
         List<WrongTypeMessage> messages = visit(tuple);
         List<Type> argTypes = ((Type.TupleType) tuple.type).elementTypes;
         MethodNode method = methodInvocation.definition;
-        method.getNumberOfParameters().ifPresent(n -> {
-            if (argTypes.size() != n) {
-                throw new NameResolution.WrongNumberOfArgumentsError(methodInvocation, String.format("Expected %d arguments got %d", method.parameters.size(), argTypes.size()));
-            }
-            zip(argTypes, methodInvocation.definition.parameters.parameterNodes, (t, p) -> {
-                if (t != p.type) {
-                    return new WrongTypeMessage(String.format("Argument for parameter %s of method %s should have type %s, got type %s at %s",
-                            p.name, method.name, p.type, t, methodInvocation.location));
+        if (!(method instanceof PredefinedMethodNode && method.name.equals("toInt"))) {
+            method.getNumberOfParameters().ifPresent(n -> {
+                if (argTypes.size() != n) {
+                    throw new NameResolution.WrongNumberOfArgumentsError(methodInvocation, String.format("Expected %d arguments got %d", method.parameters.size(), argTypes.size()));
                 }
-                return null;
-            }).stream().filter(Objects::nonNull).forEach(messages::add);
-        });
+                zip(argTypes, methodInvocation.definition.parameters.parameterNodes, (t, p) -> {
+                    if (t != p.type) {
+                        return new WrongTypeMessage(String.format("Argument for parameter %s of method %s should have type %s, got type %s at %s",
+                                p.name, method.name, p.type, t, methodInvocation.location));
+                    }
+                    return null;
+                }).stream().filter(Objects::nonNull).forEach(messages::add);
+            });
+        }
         methodInvocation.type = method.getReturnType();
         return messages;
     }

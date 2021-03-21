@@ -2,6 +2,7 @@ package nildumu;
 
 import nildumu.mih.MethodInvocationHandler;
 import nildumu.typing.TypeTransformer;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -239,5 +240,87 @@ public class TypeTransformerTests {
     @Test
     public void testArrayInput2() {
         parse("h input int[2] arr = 0bu1u; int o = arr[1]").val("o", "0bu1u").run();
+    }
+
+    @Test
+    @Disabled
+    public void testMid() {
+        parse("int mid((int, int) pos) { return (pos[0] + pos[1]) / 2}").run();
+    }
+
+    @Test
+    public void testMid2() {
+        parse("int mid((int, int) pos) { return ((pos[0]) + (pos[1])) / 2}");
+    }
+
+    @Test
+    public void testPassArrayAsArgument() {
+        parse("int[2] arr; int sum(int[2] arr) { return arr[0]; }");
+    }
+
+    @Test
+    public void testArray() {
+        parse("int[1] berths; while (0 < length(berths)) {}");
+    }
+
+    @Test
+    public void testArray2() {
+        parse("int[3] berths;\n" +
+                "while (length(berths)) {\n" +
+                "\tberths[0] = 0;\n" +
+                "}");
+    }
+
+    @Test
+    public void testArray3() {
+        parse("(int,int)[1] berths;\n" +
+                "int i = 0;\n" +
+                "while (i < length(berths)) {\n" +
+                "\tberths[i] = (0, 0);\n" +
+                "}");
+    }
+
+    @Test
+    public void testArray4() {
+        parse("int is_solution((int,int)[1] berths) {\n" +
+                "\tint sum = 0;\n" +
+                "\tint i = 0;\n" +
+                "\twhile (i < 2) {\n" +
+                "\t\tsum = berths[i][0];\n" +
+                "\t}\n" +
+                "}");
+    }
+
+    @Test
+    public void testUseArrayElementAsInt() {
+        parse("int[2][1] berths;0 + ((berths[0])[0]);");
+    }
+
+    @Test
+    public void testArray5() {
+        parse("int[2][2] berths;\n" +
+                "int i = 0;\n" +
+                "while (i < length(berths)) {\n" +
+                "\tberths[i] = {0, 0};\n" +
+                "\ti = i + 1; \n" +
+                "}\n" +
+                "\n" +
+                "int is_solution(int[2][2] berths, int N) {\n" +
+                "\treturn 0;\n" +
+                "}\n" +
+                "\n" +
+                "\n" +
+                "int break = 0;\n" +
+                "while (!break) {\n" +
+                "\tint i = 0;\n" +
+                "\tberths[i] = {0, 1};\n" +
+                "\t\n" +
+                "\tif (is_solution(berths, 1)) {\n" +
+                "\t\tbreak = 1;\n" +
+                "\t}\n" +
+                "\ti = i + 1;\n" +
+                "}\n" +
+                "\n" +
+                "l output int[2][2] b = berths;");
     }
 }

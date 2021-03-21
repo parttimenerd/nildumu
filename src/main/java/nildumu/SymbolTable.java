@@ -85,7 +85,7 @@ public class SymbolTable {
 
     void throwIfNotInCurrentScope(String name) {
         if (lookup(name) == null) {
-            throw new Parser.MJError(String.format("Variable %s isn't defined in the current or parent scopes", name));
+            throw new NildumuError(String.format("Variable %s isn't defined in the current or parent scopes", name));
         }
     }
 

@@ -313,16 +313,17 @@ public class Processor {
             }
 
             private void weightCondBit(Bit bit){
-                if (bit.isAtLeastUnknown()){
-                    context.weight(bit, Context.INFTY);
-                }
-                if (bit.value() != null && bit.value().node() != null){
-                    MJNode node = bit.value().node();
-                    if (node.getOperator() == EQUALS || node.getOperator() == UNEQUALS || node.getOperator() == LESS){
-                        return;
+                bl.walkBits(bit, b -> {
+                    if (bit.isAtLeastUnknown()){
+                        context.weight(bit, Context.INFTY);
                     }
-                }
-                bit.deps().forEach(this::weightCondBit);
+                    if (bit.value() != null && bit.value().node() != null){
+                        MJNode node = bit.value().node();
+                        if (node.getOperator() == EQUALS || node.getOperator() == UNEQUALS || node.getOperator() == LESS){
+                            return;
+                        }
+                    }
+                }, b -> false);
             }
         }, context::evaluate, node, statementNodesToOmitOneTime, b -> {
             if (b.operator == LexerTerminal.AND) {

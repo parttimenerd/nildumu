@@ -23,6 +23,7 @@ import java.util.stream.Stream;
 
 import static nildumu.Lattices.*;
 import static nildumu.Parser.LexerTerminal.*;
+import static nildumu.util.Util.enumerate;
 import static nildumu.util.Util.p;
 
 /**
@@ -140,7 +141,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static final Generator generator = Generator.getCachedIfPossible("stuff/ihrtsd34sd5fhgojjsddfgsdfewiosdd", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static final Generator generator = Generator.getCachedIfPossible("./parser/1", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
                 Types types = new Types();
@@ -1559,8 +1560,18 @@ public class Parser implements Serializable {
 
         static {
             predefinedMethods.put("length",
-                    program -> new PredefinedMethodNode("length", program.types.INT, -1, l -> {
+                    program -> new PredefinedMethodNode("length", program.types.INT, -1, null, l -> {
                         throw new NildumuError("");
+                    }));
+            predefinedMethods.put("abs",
+                    program -> new PredefinedMethodNode("abs", program.types.INT, 1, Collections.singletonList(program.types.INT), l -> {
+                        assert l.size() == 1;
+                        return l.get(0).assume(B.ZERO);
+                    }));
+            predefinedMethods.put("toInt",
+                    program -> new PredefinedMethodNode("toInt", program.types.INT, 1,
+                            Collections.singletonList(program.types.getOrCreateTupleType(Collections.singletonList(program.INT))), l -> {
+                        return l.get(0);
                     }));
         }
 
@@ -1576,8 +1587,10 @@ public class Parser implements Serializable {
         private final int parameterCount;
         private final Function<List<Value>, Value> function;
 
-        public PredefinedMethodNode(String name, Type returnType, int parameterCount, Function<List<Value>, Value> function) {
-            super(new Location(0, 0), name, returnType, null, null, null);
+        public PredefinedMethodNode(String name, Type returnType, int parameterCount, List<Type> paramTypes, Function<List<Value>, Value> function) {
+            super(Location.ZERO, name, returnType, parameterCount != -1 ?
+                    new ParametersNode(Location.ZERO, enumerate(paramTypes, (i, t) -> new ParameterNode(Location.ZERO, t, "p" + i))) : null,
+                    null, new GlobalVariablesNode(Location.ZERO, new HashMap<>()));
             this.parameterCount = parameterCount;
             this.function = function;
         }
@@ -3069,6 +3082,8 @@ public class Parser implements Serializable {
                     return Operator.ADD;
                 case MULTIPLY:
                     return Operator.MULTIPLY;
+                case DIVIDE:
+                    return Operator.DIVIDE;
                 case LEFT_SHIFT:
                     return Operator.LEFT_SHIFT;
                 case RIGHT_SHIFT:
@@ -3287,12 +3302,12 @@ public class Parser implements Serializable {
 
         @Override
         public String toString() {
-            return String.format("%s[%s]", left, right);
+            return String.format("(%s[%s])", left, right);
         }
 
         @Override
         public String toPrettyString(String indent, String incr) {
-            return indent + String.format("%s[%s]", left.toPrettyString(), right.toPrettyString());
+            return indent + String.format("(%s[%s])", left.toPrettyString(), right.toPrettyString());
         }
 
         @Override
@@ -3325,7 +3340,7 @@ public class Parser implements Serializable {
      * Arguments for a method call
      */
     public static class ArgumentsNode extends BlockPartNode {
-        public final List<ExpressionNode> arguments;
+        public List<ExpressionNode> arguments;
 
         public ArgumentsNode(Location location, List<ExpressionNode> arguments) {
             super(location);
@@ -3670,6 +3685,10 @@ public class Parser implements Serializable {
 
         public MethodInvocationNode(Location location, MethodNode method, ExpressionNode arg, List<ExpressionNode> args) {
             this(location, method, new ArgumentsNode(location, Stream.concat(Stream.of(arg), args.stream()).collect(Collectors.toList())));
+        }
+
+        public MethodInvocationNode(Location location, MethodNode method, ExpressionNode arg) {
+            this(location, method, new ArgumentsNode(location, Collections.singletonList(arg)));
         }
 
         @Override

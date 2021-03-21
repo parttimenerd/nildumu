@@ -74,7 +74,14 @@ public class ProcessingPipeline {
                 Parser.MJNode.resetIdCounter();
                 Lattices.Bit.resetNumberOfCreatedBits();
             }
-            program = stage.process(program);
+            try {
+                program = stage.process(program);
+            } catch (NildumuError err) {
+                System.err.println("---- prior to state ---");
+                System.err.println(program);
+                System.err.println("----");
+                throw new NildumuError(err);
+            }
         }
         Parser.ProgramNode programNode = (Parser.ProgramNode) Parser.generator.parse(program);
         new NameResolution(programNode).resolve();

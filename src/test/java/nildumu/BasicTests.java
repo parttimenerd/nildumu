@@ -209,8 +209,12 @@ public class BasicTests {
         parse("int x = 1 || 2").val("x", 1).run();
     }
 
+    @Test
+    public void testDivide() {
+        parse("h input int c = 0bu{10}; int x = c / 2;").val("x", "0bu{10}").run();
+    }
+
     public ContextMatcher parse(String program){
         return new ContextMatcher(process(program));
     }
-
 }

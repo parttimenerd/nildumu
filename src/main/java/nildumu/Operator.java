@@ -1294,7 +1294,7 @@ public interface Operator {
         }
     };
 
-    BinaryOperator DIVIDE = new BinaryOperator("+") {
+    BinaryOperator DIVIDE = new BinaryOperator("/") {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isPowerOfTwo()){

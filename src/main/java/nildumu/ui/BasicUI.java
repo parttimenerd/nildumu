@@ -178,7 +178,7 @@ public class BasicUI {
         transformLoopsCheckBox.setToolTipText("transform loops into recursion, increases precision");
         panel7.add(transformLoopsCheckBox, new GridConstraints(0, 2, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         recordAlternativesCheckBox = new JCheckBox();
-        recordAlternativesCheckBox.setEnabled(false);
+        recordAlternativesCheckBox.setEnabled(true);
         recordAlternativesCheckBox.setText("rec alt");
         recordAlternativesCheckBox.setToolTipText("record alternatives, only works with PMSAT based min-cut computation");
         panel7.add(recordAlternativesCheckBox, new GridConstraints(0, 3, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
@@ -488,6 +488,7 @@ public class BasicUI {
         fontSizeMultiplierComboBox.addActionListener(l -> {
             changeFontSize(Float.parseFloat(fontSizeMultiplierComboBox.getSelectedItem().toString().replace("%", "")) / 100);
         });
+        storeButton.addActionListener(l -> store(storeSelectComboBox.getSelectedItem().toString()));
     }
 
     public void processAndUpdate(String program) {

@@ -129,7 +129,7 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
     public Object visit(VariableDeclarationNode variableDeclaration) {
         captureScope(variableDeclaration);
         if (symbolTable.isDirectlyInCurrentScope(variableDeclaration.variable)){
-            throw new MJError(String.format("Variable %s already defined in scope", variableDeclaration.variable));
+            throw new NildumuError(String.format("Variable %s already defined in scope", variableDeclaration.variable));
         }
         Variable definition = new Variable(variableDeclaration.variable, variableDeclaration.getVarType(),
                 variableDeclaration instanceof InputVariableDeclarationNode,
@@ -212,7 +212,12 @@ public class NameResolution implements Parser.NodeVisitor<Object> {
         });
         method.globalStringDefs = defs;
         appendVariables.forEach(v -> symbolTable.insert(v.name, v));
-        visitChildrenDiscardReturn(method);
+        try {
+            visitChildrenDiscardReturn(method);
+        } catch (NildumuError err) {
+            System.err.println(method.toPrettyString());
+            throw new NildumuError(err);
+        }
         symbolTable.leaveScope();
         symbolTable = oldSymbolTable;
         currentMethod = null;

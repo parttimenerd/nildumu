@@ -1633,6 +1633,9 @@ public class Lattices {
             if (partCount == 0) {
                 return Collections.emptyList();
             }
+            if (isBot()) {
+                return IntStream.range(0, partCount).mapToObj(i -> vl.bot()).collect(Collectors.toList());
+            }
             assert bits.size() % partCount == 0;
             int partSize = bits.size() / partCount;
             return IntStream.range(0, partCount)

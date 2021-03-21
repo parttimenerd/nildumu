@@ -141,6 +141,9 @@ public class Generator {
 	}
 
 	private static Pair<File, File> getFilePair(String id) {
+		if (id.startsWith("./")) {
+			return new Pair<>(new File(id + "lexer.ser"), new File(id + "parser.ser"));
+		}
 		String prefix = Config.getTmpDir() + "/" + id + "_";
 		return new Pair<>(new File(prefix + "lexer.ser"), new File(prefix + "parser.ser"));
 	}

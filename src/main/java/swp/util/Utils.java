@@ -222,7 +222,7 @@ public class Utils {
 				return false;
 			}
 			Triple triple = (Triple)obj;
-			return triple.first == this.first && triple.second == this.second && triple.third == this.third;
+			return triple.first.equals(this.first) && triple.second.equals(this.second) && triple.third.equals(this.third);
 		}
 	}
 

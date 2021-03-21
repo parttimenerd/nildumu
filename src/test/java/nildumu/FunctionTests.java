@@ -1,10 +1,7 @@
 package nildumu;
 
 import nildumu.mih.MethodInvocationHandler;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.RepeatedTest;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -420,6 +417,19 @@ l output int o = fib(h);
         //JungPanel.show(c2.getJungGraphForVisu(c1.sl.bot()));
         new ContextMatcher(c1).leaks(1).run();
         //new ContextMatcher(c2).leaks(1).run();
+    }
+
+    @Test
+    public void testAbs() {
+        parse("int i = abs(-1)").val("i", 1).run();
+    }
+
+    @Test
+    @Disabled
+    public void testShippingGlobalNotFound() {
+        parse("int i = 0;\n" +
+                "int is_solution() { return i;\n" +
+                "}").run();
     }
 
     static ContextMatcher parse(String program){

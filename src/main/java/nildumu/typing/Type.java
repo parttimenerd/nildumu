@@ -59,6 +59,10 @@ public abstract class Type implements Serializable {
         return Collections.singletonList(this);
     }
 
+    public boolean isInt() {
+        return false;
+    }
+
     public static abstract class TupleLikeType extends Type {
 
         public final int length;
