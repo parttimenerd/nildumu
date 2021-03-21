@@ -36,6 +36,11 @@ public class LoopTransformerTests {
         transform("int i = 10; while (i > 10) { }", true, true);
     }
 
+    @Test
+    public void testNestedLoops() {
+        assertEquals(2, transform("int i = 0; while (i < 10) { int j = i; while (j > 0) { j = j - 1; } i = i + 1 }", true, true).getMethodNames().size());
+    }
+
     public static Parser.ProgramNode transform(String program, boolean log, boolean ssa) {
         Context.LOG.setLevel(Level.FINE);
         Parser.MJNode.resetIdCounter();

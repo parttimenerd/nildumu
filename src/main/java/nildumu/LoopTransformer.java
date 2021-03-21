@@ -98,6 +98,7 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
 
     @Override
     public Optional<StatementNode> visit(WhileStatementNode whileNode) {
+        visit(whileNode.body);
         VariableAccessVisitor visitor = new VariableAccessVisitor();
         visitor.visit(whileNode);
         SymbolTable.Scope scope = scopePerNode.get(whileNode);
@@ -105,7 +106,7 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
         List<Variable> writtenVariables = scope.filterVariables(visitor.getWrittenVariables());
 
         Location location = whileNode.location;
-        String methodName = "loop_method" + location.line + "_" + location.line;
+        String methodName = "loop_method" + location.line + "_" + location.column;
 
         ParametersNode parametersNode = new ParametersNode(location,
                 accessedVariables.stream().map(v -> new ParameterNode(location, v.type, v.name)).collect(Collectors.toList()));

@@ -204,18 +204,16 @@ public class LoopTests {
      */
     @Test
     public void testBasicLoopNested() {
-        assertTimeoutPreemptively(ofMillis(1000000), () -> {
-            String program = "     bit_width 2;\n" +
-                    "     h input int h = 0b0u;\n" +
-                    "     l input int l = 0bu;\n" +
-                    "     while (l){\n" +
-                    "        while (l){\n" +
-                    "            h = [2](h[2] | h[1]);\n" +
-                    "        }\n" +
-                    "     }\n" +
-                    "     l output int o = h;";
-            parse(program).leaks(1).run();
-        });
+        String program = "     bit_width 4;\n" +
+                "     h input int h = 0b0u;\n" +
+                "     l input int l = 0bu;\n" +
+                "     while (l){\n" +
+                "        while (l){\n" +
+                "            h = [2](h[2] | h[1]);\n" +
+                "        }\n" +
+                "     }\n" +
+                "     l output int o = h;";
+        parse(program).leaks(1).run();
     }
 
     /*@Test
