@@ -140,7 +140,7 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static final Generator generator = Generator.getCachedIfPossible("stuff/ihrtsd345fgsddfgsdfewiosdd", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static final Generator generator = Generator.getCachedIfPossible("stuff/ihrtsd34sd5fhgojjsddfgsdfewiosdd", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
                 Types types = new Types();
@@ -239,19 +239,19 @@ public class Parser implements Serializable {
                         .addRule("line", "output_decl_statement")
                         .addRule("line", "input_decl_statement")
                         .addRule("line", "append_decl_statement")
-                        .addRule("output_decl_statement", "IDENT OUTPUT INT IDENT EQUAL_SIGN expression", asts -> {
+                        .addRule("output_decl_statement", "IDENT OUTPUT type IDENT (EQUAL_SIGN expression)?", asts -> {
                             return new OutputVariableDeclarationNode(
                                     asts.get(0).getMatchedTokens().get(0).location,
                                     asts.get(3).getMatchedString(),
-                                    types.INT,
-                                    (ExpressionNode) asts.get(5),
+                                    ((TypeNode) asts.get(2)).type,
+                                    (ExpressionNode)((ListAST) asts.get(4)).getAll(ExpressionNode.class).stream().findAny().orElse(null),
                                     asts.get(0).getMatchedString());
                         })
-                        .addRule("input_decl_statement", "IDENT INPUT INT IDENT EQUAL_SIGN input_literal", asts -> {
+                        .addRule("input_decl_statement", "IDENT INPUT type IDENT EQUAL_SIGN input_literal", asts -> {
                             return new InputVariableDeclarationNode(
                                     asts.getStartLocation(),
                                     asts.get(3).getMatchedString(),
-                                    types.INT,
+                                    ((TypeNode) asts.get(2)).type,
                                     (IntegerLiteralNode) asts.get(5),
                                     asts.get(0).getMatchedString());
                         })
@@ -2132,7 +2132,6 @@ public class Parser implements Serializable {
 
         public OutputVariableDeclarationNode(Location location, String name, Type type, ExpressionNode initExpression, String secLevel) {
             super(location, name, type, initExpression);
-            assert type == type.getTypes().INT;
             this.secLevel = secLevel;
         }
 
@@ -2218,7 +2217,6 @@ public class Parser implements Serializable {
 
         public InputVariableDeclarationNode(Location location, String name, Type type, IntegerLiteralNode initExpression, String secLevel) {
             super(location, name, type, initExpression);
-            assert type == type.getTypes().INT;
             this.secLevel = secLevel;
         }
 

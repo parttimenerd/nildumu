@@ -12,6 +12,7 @@ import static nildumu.Lattices.*;
 import static nildumu.Lattices.B.*;
 import static nildumu.Operator.*;
 import static nildumu.Parser.*;
+import static nildumu.util.Util.p;
 
 public class Processor {
 
@@ -57,6 +58,7 @@ public class Processor {
     public static Context process(Context context, MJNode node) {
 
         final Set<StatementNode> statementNodesToOmitOneTime = new HashSet<>();
+        final Set<Pair<Sec<?>, Variable>> outputVariables = new HashSet<>();
 
         FixpointIteration.worklist2(new NodeVisitor<Boolean>() {
 
@@ -137,7 +139,7 @@ public class Processor {
             @Override
             public Boolean visit(OutputVariableDeclarationNode outputDecl) {
                 visit((VariableAssignmentNode) outputDecl);
-                context.addOutputValue(context.sl.parse(outputDecl.secLevel), context.getVariableValue(outputDecl.definition));
+                outputVariables.add(p(context.sl.parse(outputDecl.secLevel), outputDecl.definition));
                 return false;
             }
 
@@ -344,6 +346,9 @@ public class Processor {
                 context.popMiscMods();
             }
         });
+        for (Pair<Sec<?>, Variable> pair : outputVariables) {
+            context.addOutputValue(pair.first, context.getVariableValue(pair.second));
+        }
         return context;
     }
 }

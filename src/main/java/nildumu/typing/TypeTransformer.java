@@ -218,11 +218,24 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
 
     @Override
     public VisRet visit(InputVariableDeclarationNode decl) {
-        return visit(decl, (v, e) -> {
+        BiFunction<Variable, ExpressionNode, VariableDeclarationNode> constructor = (v, e) -> {
             InputVariableDeclarationNode node = new InputVariableDeclarationNode(ZERO, v.name, v.getType(), (IntegerLiteralNode) e, decl.secLevel);
             node.definition = v;
             return node;
-        });
+        };
+        List<Variable> blasted = getBlasted(decl.definition);
+        StatementNode assignment = decl.expression != null ? visit((VariableAssignmentNode) decl).statementsToAdd.get(0) : null;
+        List<StatementNode> decls;
+        if (assignment instanceof VariableAssignmentNode) {
+            VariableAssignmentNode ass = (VariableAssignmentNode) assignment;
+            decls = blasted.stream().map(v -> constructor.apply(v, ass.expression)).collect(Collectors.toList());
+        } else {
+            decls = new ArrayList<>(enumerate(blasted, (i, v) -> constructor.apply(v, null)));
+            if (assignment != null) {
+                decls.add(assignment);
+            }
+        }
+        return new VisRet(true, decls, Collections.emptyList());
     }
 
     @Override

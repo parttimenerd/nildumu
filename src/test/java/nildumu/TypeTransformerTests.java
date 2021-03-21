@@ -174,7 +174,7 @@ public class TypeTransformerTests {
                 "int[1] arr;\n" +
                 "int i = 0;\n" +
                 "int x = loop[[]]({0,}, i)[0][0];\n", handler)
-                .val("x1", expectedValue).run();
+                .val("x", expectedValue).run();
     }
 
     @Test
@@ -229,5 +229,15 @@ public class TypeTransformerTests {
                 "arr, i = *loop[[]](arr, i);\n" +
                 "int x = arr[1];", "handler=basic")
                 .val("x", "0buuu").run();
+    }
+
+    @Test
+    public void testArrayInput() {
+        parse("h input int[2] arr = 0buu; l output int[2] o = arr").leaks(4).run();
+    }
+
+    @Test
+    public void testArrayInput2() {
+        parse("h input int[2] arr = 0bu1u; int o = arr[1]").val("o", "0bu1u").run();
     }
 }

@@ -1,5 +1,6 @@
 package nildumu;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -26,6 +27,7 @@ public class TypingTests {
 
     @ParameterizedTest
     @CsvSource({
+            "'h input int[2] value = 0b0uu', 'int[2]'",
             "'var value = 1', 'int'",
             "'var value = (1, 1)', '(int, int)'",
             "'var value = (1, (1, 1))', '(int, (int, int))'",

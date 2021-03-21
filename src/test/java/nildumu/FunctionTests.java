@@ -53,7 +53,7 @@ public class FunctionTests {
     })
     public void testBasicFunctionCallWithMultipleReturns(String program, String valX, String valY) {
         Context.LOG.setLevel(Level.FINE);
-        parse(program, "inlining", 20).val("x1", valX).val("y1", valY).run();
+        parse(program, "inlining", 20).val("x", valX).val("y", valY).run();
     }
 
     @ParameterizedTest

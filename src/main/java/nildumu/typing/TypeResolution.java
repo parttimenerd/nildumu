@@ -107,6 +107,19 @@ public class TypeResolution implements Parser.NodeVisitor<List<TypeResolution.Wr
     }
 
     @Override
+    public List<WrongTypeMessage> visit(InputVariableDeclarationNode inputDeclaration) {
+        List<WrongTypeMessage> messages = visitChildrenAndCollect(inputDeclaration);
+        if (inputDeclaration.getVarType().isVar()) {
+             inputDeclaration.definition.setType(inputDeclaration.expression.type);
+        } else {
+            if (inputDeclaration.expression.type != types.INT) {
+                assertType(messages, inputDeclaration.expression, inputDeclaration.definition.getType());
+            }
+        }
+        return messages;
+    }
+
+    @Override
     public List<WrongTypeMessage> visit(VariableAssignmentNode assignment) {
         List<WrongTypeMessage> messages = visitChildrenAndCollect(assignment);
         assertType(messages, assignment.expression, assignment.definition.getType());

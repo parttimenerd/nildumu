@@ -53,6 +53,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
          * Defined variables
          */
         final Set<String> definedVariables = new HashSet<>();
+        /** contains variables from the defined variables field, that are defined without a value */
+        final Set<String> definedVariablesWOAssigment = new HashSet<>();
         final Map<String, String> newVariablesLocated = new HashMap<>();
 
         Map<String, String> getNewWithoutDefined(){
@@ -133,8 +135,16 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     private void defineVariable(String variable){
+        defineVariable(variable, true);
+    }
+
+    private void defineVariable(String variable, boolean hasAssignment) {
         scopes.peek().definedVariables.add(variable);
         conditionalScopes.peek().definedVariables.add(variable);
+        if (!hasAssignment) {
+            scopes.peek().definedVariablesWOAssigment.add(variable);
+            conditionalScopes.peek().definedVariablesWOAssigment.add(variable);
+        }
     }
 
     @Override
@@ -147,7 +157,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     @Override
     public VisRet visit(VariableDeclarationNode declaration) {
-        defineVariable(declaration.variable);
+        defineVariable(declaration.variable, declaration.hasInitExpression());
         return visit((MJNode)declaration);
     }
 
@@ -406,6 +416,11 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
      */
     private String create(String variable, boolean hasAppendValue){
         String origin = resolveOrigin(variable);
+        if (scopes.peek().definedVariablesWOAssigment.contains(origin)) {
+            scopes.peek().definedVariablesWOAssigment.remove(origin);
+            scopes.peek().newVariablesLocated.put(origin, origin);
+            return variable;
+        }
         String newVariable = origin + (numberOfVersions(origin) + 1);
         String pred = resolveLocated(variable);
         versionCount.put(origin, numberOfVersions(origin) + 1);
