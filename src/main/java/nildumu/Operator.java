@@ -16,8 +16,7 @@ import java.util.stream.Stream;
 import static nildumu.Context.v;
 import static nildumu.Lattices.*;
 import static nildumu.Lattices.B.*;
-import static nildumu.util.Util.log2;
-import static nildumu.util.Util.zip;
+import static nildumu.util.Util.*;
 
 public interface Operator {
 
@@ -642,6 +641,18 @@ public interface Operator {
 
                 @Override
                 public Mods assumeZero(Context c, Bit r, Bit a) {
+                    List<Pair<Bit, Bit>> pairs = zip(x.bits, y.bits, (f, g) -> {
+                        if (f.isUnknown() && g.isConstant()) {
+                            return p(f, g);
+                        }
+                        if (g.isUnknown() && f.isConstant()) {
+                            return p(g, f);
+                        }
+                        return null;
+                    }).stream().filter(Objects::nonNull).collect(Collectors.toList());
+                    if (pairs.size() == 1) {
+                        return c.repl(pairs.get(0).first, bl.create(pairs.get(0).second.val().neg()));
+                    }
                     return Mods.empty();
                 }
             };

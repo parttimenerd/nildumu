@@ -72,6 +72,24 @@ public class EvaluationTests {
     }
 
     @Test
+    public void testIllustrativeExample2() {
+        check("/* Z. Meng and G. Smith, Calculating Bounds on Information Leakage Using Two-bit Patterns, in Proceedings of the ACM SIGPLAN 6th Workshop on Programming Languages and Analysis for Security, 2011, p. 1:1--1:12. */\n" +
+                "/* Should leak log 17 = 4.087 bits */\n" +
+                "int O;\n" +
+                "h input int h = 0b0u{32};\n" +
+                "int z = h & 0b001110111011101110111011101110111; /* 0x77777777 */\n" +
+                "if (z <= 64) {\n" +
+                "    O = h;\n" +
+                "} else {\n" +
+                "    O = 0;\n" +
+                "}\n" +
+                "if (O % 2 == 0) {\n" +
+                "    O = O + 1;\n" +
+                "}\n" +
+                "l output int o = O;", 9, 9);
+    }
+
+    @Test
     public void testImplicitFlow() {
         check("/* Toy program from paper of Meng et. al: \"Calculating bounds on information leakage using two-bit patterns\" */\n" +
                 "/* https://github.com/qif/jpf-qif/blob/master/src/examples/plas/ImplicitFlow.java */\n" +

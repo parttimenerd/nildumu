@@ -274,6 +274,15 @@ public class ExtendedTests {
                 "l output int o = O; int x = x_;").val("o", "0bu0uuuuuu").val("x", "0b00uu0uuu").run();
     }
 
+    @Test
+    public void testModulo() {
+        parse("h input int O = 0b0u{2};\n int z = 3;" +
+                "if (O % 2 == 0) {\n" +
+                "    O = O + 1; z = O;\n" +
+                "}\n" +
+                "l output int o = O; int z_ = z;").val("z_", "0b0u1").val("o", "0b0u1").run();
+    }
+
     public ContextMatcher parse(String program){
         return new ContextMatcher(process(program, Context.Mode.EXTENDED, MethodInvocationHandler.createDefault(), RECORD_ALTERNATIVES));
     }

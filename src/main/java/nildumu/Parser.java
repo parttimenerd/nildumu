@@ -2755,10 +2755,7 @@ public class Parser implements Serializable {
 
         @Override
         public List<BaseAST> children() {
-            if (hasElseBlock()) {
-                return Utils.makeArrayList(conditionalExpression, ifBlock, elseBlock);
-            }
-            return Utils.makeArrayList(conditionalExpression, ifBlock);
+            return Utils.makeArrayList(conditionalExpression, ifBlock, elseBlock);
         }
 
         @Override
