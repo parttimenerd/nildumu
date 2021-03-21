@@ -244,11 +244,371 @@ public class EvaluationTests {
                 "l output int o = z;", -1, 32);
     }
 
+    @Test
+    public void testGuessPresenceAll() {
+        check("/* N is the total number of houses */\n" +
+                "int N;\n" +
+                "\n" +
+                "/* We consider different sizes of houses. S, M and L indicate the number of houses of each size. */\n" +
+                "int S;\n" +
+                "int M;\n" +
+                "int L;\n" +
+                "\n" +
+                "/* each size correspond to a different level of consumption */\n" +
+                "int  small_consumption;\n" +
+                "int medium_consumption;\n" +
+                "int  large_consumption;\n" +
+                "\n" +
+                "/* the observable is the global consumption of the system */\n" +
+                "int global_consumption;\n" +
+                "\n" +
+                "/* the secret is the presence */\n" +
+                "h input int presence_target = 0bu{32};\n" +
+                "\n" +
+                "/* e.g. case1 or case2 from the paper */\n" +
+                "int case_value;\n" +
+                "\n" +
+                "N=3;\n" +
+                "\n" +
+                "/* We consider different sizes of houses. S, M and L indicate the number of houses of each size. */\n" +
+                "S=N/3;\n" +
+                "M=N/3;\n" +
+                "L=N-S-M;\n" +
+                "\n" +
+                "/* each size correspond to a different level of consumption */\n" +
+                "small_consumption = 1 ;\n" +
+                "medium_consumption = 3 ;\n" +
+                "large_consumption = 5 ;\n" +
+                "\n" +
+                "/* the observable is the global consumption of the system */\n" +
+                "global_consumption = 0;\n" +
+                "\n" +
+                "/* Initialize the public values */\n" +
+                "N = 64; /*  a valid value for the test case, note in paper */\n" +
+                "S=N/3 ;\n" +
+                "M=N/3 ;\n" +
+                "L=N-S-M ;\n" +
+                "case_value = 1; /* also use case = 0 */\n" +
+                "\n" +
+                " if (case_value == 1) {\n" +
+                "small_consumption = 1 ;\n" +
+                "medium_consumption = 2 ;\n" +
+                "large_consumption = 3 ;\n" +
+                " }\n" +
+                " else {\n" +
+                "small_consumption = 1 ;\n" +
+                "medium_consumption = 3 ;\n" +
+                "large_consumption = 5 ;\n" +
+                " }\n" +
+                "/* Done initializing the public values */\n" +
+                "\n" +
+                "h input int[64] presence = 0b00u;  /* the secret is an array of bools */\n" +
+                "\n" +
+                "int i  = 0;\n" +
+                "while ( i < N ) {\n" +
+                " if ((presence[i]) == 1) {\n" +
+                "   \n" +
+                "if (i<S) {\n" +
+                "  global_consumption = global_consumption + small_consumption ;\n" +
+                "}\n" +
+                "else { if (i<S+M) {\n" +
+                "  global_consumption = global_consumption + medium_consumption ;\n" +
+                "}\n" +
+                "else{\n" +
+                "  global_consumption = global_consumption + large_consumption ;\n" +
+                "} \n" +
+                "}\n" +
+                " }\n" +
+                " i= i + 1;\n" +
+                "}\n" +
+                "l output int out = global_consumption;", 32, 32);
+    }
+
+    @Test
+    public void testGuessPresenceSingleHouse() {
+        check("/* N is the total number of houses */\n" +
+                "int N;\n" +
+                "\n" +
+                "/* indicates the size of the target. Only one of those should be one and all the other 0. */\n" +
+                "int target_is_S;\n" +
+                "int target_is_M;\n" +
+                "int target_is_L;\n" +
+                "\n" +
+                "/* We consider different sizes of houses. S, M and L indicate the number of houses of each size. */\n" +
+                "int S;\n" +
+                "int M;\n" +
+                "int L;\n" +
+                "\n" +
+                "/* each size correspond to a different level of consumption */\n" +
+                "int  small_consumption;\n" +
+                "int medium_consumption;\n" +
+                "int  large_consumption;\n" +
+                "\n" +
+                "/* the observable is the global consumption of the system */\n" +
+                "int global_consumption;\n" +
+                "\n" +
+                "/* the secret is the presence */\n" +
+                "h input int presence_target = 0bu{32};\n" +
+                "\n" +
+                "/* e.g. case1 or case2 from the paper */\n" +
+                "int case_value;\n" +
+                "\n" +
+                "N=3;\n" +
+                "\n" +
+                "/* indicates the size of the target. Only one of those should be one and all the other 0. */\n" +
+                "target_is_S = 1 ;\n" +
+                "target_is_M = 0 ;\n" +
+                "target_is_L = 0 ;\n" +
+                "\n" +
+                "\n" +
+                "/* We consider different sizes of houses. S, M and L indicate the number of houses of each size. */\n" +
+                "S=N/3 - target_is_S;\n" +
+                "M=N/3 - target_is_M;\n" +
+                "L=N/3 - target_is_L;\n" +
+                "\n" +
+                "/* each size correspond to a different level of consumption */\n" +
+                "small_consumption = 1 ;\n" +
+                "medium_consumption = 3 ;\n" +
+                "large_consumption = 5 ;\n" +
+                "\n" +
+                "/* the observable is the global consumption of the system */\n" +
+                "global_consumption = 0;\n" +
+                "\n" +
+                "/* Initialize the public values */\n" +
+                "N = 64; /*  a valid value for the test case, note in paper */\n" +
+                "S=N/3 ;\n" +
+                "M=N/3 ;\n" +
+                "L=N-S-M ;\n" +
+                "case_value = 1; /* also use case = 0 */\n" +
+                "\n" +
+                " if (case_value == 1) {\n" +
+                "small_consumption = 1 ;\n" +
+                "medium_consumption = 2 ;\n" +
+                "large_consumption = 3 ;\n" +
+                " }\n" +
+                " else {\n" +
+                "small_consumption = 1 ;\n" +
+                "medium_consumption = 3 ;\n" +
+                "large_consumption = 5 ;\n" +
+                " }\n" +
+                "int CONST_MODE = 0;\n" +
+                "if (CONST_MODE == 0){\n" +
+                " target_is_S = 0 ;\n" +
+                " target_is_M = 0 ;\n" +
+                " target_is_L = 1 ;\n" +
+                "} else{ if (CONST_MODE == 1){\n" +
+                " target_is_S = 0 ;\n" +
+                " target_is_M = 1 ;\n" +
+                " target_is_L = 0 ;\n" +
+                "} else { if (CONST_MODE == 2){\n" +
+                "\n" +
+                " target_is_S = 1 ;\n" +
+                " target_is_M = 0 ;\n" +
+                " target_is_L = 0 ;\n" +
+                "}\n" +
+                "}\n" +
+                "}\n" +
+                "/* inlined call to numberOfEach() */\n" +
+                "S=N/3 - target_is_S;\n" +
+                "M=N/3 - target_is_M;\n" +
+                "L=N/3 - target_is_L;\n" +
+                "\n" +
+                "/* Done initializing the public values */\n" +
+                "\n" +
+                "h input int[64] presence = 0b00u;  /* the secret is an array of bools */\n" +
+                "\n" +
+                "/* done initializing the values */\n" +
+                "\n" +
+                " if  (presence_target == 1) {\n" +
+                " if  (target_is_S == 1) {\n" +
+                "global_consumption = global_consumption + small_consumption ;\n" +
+                " } \n" +
+                " else { if (target_is_M == 1) {\n" +
+                "global_consumption = global_consumption + medium_consumption ;\n" +
+                " }\n" +
+                " else {\n" +
+                "global_consumption= global_consumption + large_consumption ;\n" +
+                " }\n" +
+                "}\n" +
+                " }\n" +
+                "\n" +
+                "int i  = 0;\n" +
+                "while ( i < N - 1) {\n" +
+                " if (presence[i] == 1) {\n" +
+                "   \n" +
+                "if (i<S) {\n" +
+                "  global_consumption = global_consumption + small_consumption ;\n" +
+                "}\n" +
+                "else { if (i<S+M) {\n" +
+                "  global_consumption = global_consumption + medium_consumption ;\n" +
+                "}\n" +
+                "else{\n" +
+                "  global_consumption = global_consumption + large_consumption ;\n" +
+                "}\n" +
+                "}\n" +
+                " }\n" +
+                " i= i + 1;\n" +
+                "}\n" +
+                "    \n" +
+                "l output int out = global_consumption;", 32, 32);
+    }
+
+    @Test
+    public void testPreferenceRanking() {
+        check("int N = 10;\n" +
+                "\n" +
+                "/* C is the number of candidates */\n" +
+                "int C = 10;\n" +
+                "\n" +
+                "\n" +
+                "/* factorial function */\n" +
+                "int fact(int n){\n" +
+                "  int ret = 1;\n" +
+                "  if (n <= 1) { \n" +
+                "    ret = 1;\n" +
+                "  } else {\n" +
+                "    ret = n*fact(n - 1);\n" +
+                "  }\n" +
+                "  return ret;\n" +
+                "}\n" +
+                "  \n" +
+                "/* the result is the number of votes of each candidate */\n" +
+                "int[10 /* C */] result; /* these are our public (observable) outputs */\n" +
+                "int i = 0;\n" +
+                "while (i < C) {\n" +
+                "\tresult[i] = 0;\n" +
+                "\ti = i + 1;\n" +
+                "}\n" +
+                "\n" +
+                "\n" +
+                "  /* init private values in the intervals defined in QUAIL file */\n" +
+                "\n" +
+                "  /* The secret is the preference of each voter */\n" +
+                "  h input int[10 /* N */] secrets = 0bu{32}; \n" +
+                "  int[10 /* N */] vote; /* these are our secrets */\n" +
+                "  int CFACT= fact(C);\n" +
+                "  i = 0;\n" +
+                "  while (i < N) {\n" +
+                "    vote[i]=secrets[i]%CFACT;\n" +
+                "    i = i + 1;\n" +
+                "  }\n" +
+                "\n" +
+                "  int voter = 0;\n" +
+                "  int vote_val = 0;\n" +
+                "  int[10 /* N */] decl; /* temporary table used by the QUAIL version */\n" +
+                "  /* voting */\n" +
+                "  while (voter<N) {\n" +
+                "    while (vote_val<CFACT) {\n" +
+                "if (vote[voter]==vote_val) {\n" +
+                "  decl[voter]=vote_val;\n" +
+                "}  \n" +
+                "vote_val=vote_val+1;\n" +
+                "    }\n" +
+                "    vote_val=0;\n" +
+                "    voter=voter+1;\n" +
+                "  }\n" +
+                "\n" +
+                "  /* transform the secret of each voter into the order of the preferences */\n" +
+                "  voter=0;\n" +
+                "  while (voter<N) { \n" +
+                "\n" +
+                "    /* build the initial array */\n" +
+                "    int candidate=0;\n" +
+                "    int[10 /* C */] temparray;  /* temporary table used by the QUAIL version */\n" +
+                "    while (candidate<C){\n" +
+                "temparray[candidate]=candidate;\n" +
+                "candidate=candidate+1;\n" +
+                "    }\n" +
+                "\n" +
+                "    int k=C;\n" +
+                "    /* find a position */\n" +
+                "    while (k>0) {\n" +
+                "int pos = decl[voter]%k;\n" +
+                "candidate=C-k;\n" +
+                "/* update the vote of the candidate */\n" +
+                "result[candidate]=(result[candidate])+(temparray[pos]);\n" +
+                "\n" +
+                "/* remove the element from the array */\n" +
+                "int y=pos;\n" +
+                "while (y<C - 1) {\n" +
+                "  temparray[y]=temparray[y+1];\n" +
+                "  y=y+1;\n" +
+                "}\n" +
+                "\n" +
+                "/* update the vote of the voter */\n" +
+                "decl[voter]=decl[voter]/k;\n" +
+                "\n" +
+                "/* decrease the counter */\n" +
+                "k=k - 1;\n" +
+                "    }\n" +
+                "    voter=voter+1;\n" +
+                "  }\n" +
+                "\n" +
+                "l output var out = result;", -1, -1);
+    }
+
+    @Test
+    public void testSinglePreferenceRanking() {
+        check("int N = 10;\n" +
+                "\n" +
+                "/* C is the number of candidates */\n" +
+                "int C = 10;\n" +
+                "\n" +
+                "\n" +
+                "/* factorial function */\n" +
+                "int fact(int n){\n" +
+                "  int ret = 1;\n" +
+                "  if (n <= 1) { \n" +
+                "    ret = 1;\n" +
+                "  } else {\n" +
+                "    ret = n*fact(n - 1);\n" +
+                "  }\n" +
+                "  return ret;\n" +
+                "}\n" +
+                "  \n" +
+                "/* the result is the number of votes of each candidate */\n" +
+                "int[10 /* C */] result; /* these are our public (observable) outputs */\n" +
+                "int i = 0;\n" +
+                "while (i < C) {\n" +
+                "\tresult[i] = 0;\n" +
+                "\ti = i + 1;\n" +
+                "}\n" +
+                "\n" +
+                "\n" +
+                "  /* init private values in the intervals defined in QUAIL file */\n" +
+                "\n" +
+                "  /* The secret is the preference of each voter */\n" +
+                "  h input int[10 /* N */] secrets = 0bu{32}; \n" +
+                "  int[10 /* N */] vote; /* these are our secrets */\n" +
+                "  int CFACT= fact(C);\n" +
+                "  i = 0;\n" +
+                "  while (i < N) {\n" +
+                "    vote[i]=secrets[i]%CFACT;\n" +
+                "    i = i + 1;\n" +
+                "  }\n" +
+                "\n" +
+                "  i = 0;\n" +
+                "    int j  = 0;\n" +
+                "    while (i < N) {\n" +
+                "      j=0;\n" +
+                "      while (j < C) {\n" +
+                "\tif (vote[i] == j) {\n" +
+                "\t  result[j] = (result[j]) + 1 ;\n" +
+                "\t}\n" +
+                "\tj= j+1;\n" +
+                "      }\n" +
+                "      i= i + 1;\n" +
+                "    }\n" +
+                "l output var out = result;", -1, -1);
+    }
+
     public void check(String program, int shouldLeakAt32, int shouldLeakAt5) {
         if (shouldLeakAt32 != -1) {
             parse(program, 32).useSingleMCAlgo().leaks(shouldLeakAt32).run();
         }
-        parse(program, 5).useSingleMCAlgo().leaks(shouldLeakAt5).run();
+        if (shouldLeakAt5 != -1) {
+            parse(program, 5).useSingleMCAlgo().leaks(shouldLeakAt5).run();
+        }
     }
 
 
