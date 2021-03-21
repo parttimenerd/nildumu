@@ -147,6 +147,12 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
             return null;
         }
 
+        @Override
+        public Object visit(ParameterNode parameterNode) {
+            variables.add(parameterNode.name);
+            return null;
+        }
+
         public static VariableSet process(MJNode node) {
             VariableDefinitionVisitor visitor = new VariableDefinitionVisitor();
             node.accept(visitor);

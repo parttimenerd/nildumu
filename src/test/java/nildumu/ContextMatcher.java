@@ -50,8 +50,12 @@ public class ContextMatcher {
         builder.add(() -> assertTrue(actual.isConstant(),
                 String.format("Variable %s should have an integer val, has %s: %s vs %s",
                 variable, actual.toLiteralString(), value, actual.repr())));
-        builder.add(() -> assertEquals(value, actual.asLong(),
-                String.format("Variable %s should have integer val %d", variable, value)));
+        builder.add(() -> {
+            if (actual.isConstant()) {
+                assertEquals(value, actual.asLong(),
+                        String.format("Variable %s should have integer val %d", variable, value));
+            }
+        });
         return this;
     }
 

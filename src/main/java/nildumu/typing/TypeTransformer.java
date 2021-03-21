@@ -7,6 +7,7 @@ import swp.util.Pair;
 
 import java.util.*;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -154,16 +155,48 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
             Type returnType = types.getOrCreateTupleType(types.INT, elemSize);
             Variable returnVariable = new Variable("__br", returnType);
             List<StatementNode> body = new ArrayList<>();
-            body.add(new VariableDeclarationNode(ZERO, returnVariable, null));
+            body.add(new VariableDeclarationNode(ZERO, returnVariable,
+                    new TupleLiteralNode(ZERO, IntStream.range(0, returnType.getNumberOfBlastedVariables())
+                            .mapToObj(i -> literal(0)).collect(Collectors.toList())).setExpressionType(returnType)));
+            List<Integer> is = new ArrayList<>();
             for (int i = 0; i + elemSize - 1 < size; i += packets) {
-                body.add(new IfStatementNode(ZERO, new BinaryOperatorNode(indexAccess, literal(i), LexerTerminal.EQUALS),
-                        new BlockNode(ZERO, Collections.singletonList(new VariableAssignmentNode(ZERO, returnVariable, new TupleLiteralNode(ZERO, IntStream.range(i, i + elemSize).mapToObj(j -> new VariableAccessNode(ZERO, blastedVars.get(j))).collect(Collectors.toList())))))));
+                is.add(i);
             }
+            body.addAll(createIfs(is, indexAccess, i ->
+                    Collections.singletonList(new VariableAssignmentNode(ZERO, returnVariable,
+                            new TupleLiteralNode(ZERO, IntStream.range(i, i + elemSize)
+                                    .mapToObj(j -> new VariableAccessNode(ZERO, blastedVars.get(j)))
+                                    .collect(Collectors.toList()))))));
             body.add(new ReturnStatementNode(ZERO, new VariableAccessNode(ZERO, returnVariable)));
             return new MethodNode(ZERO, "__blasted_get_" + size + "_" + elemSize + "_" + packets, returnType,
                     new ParametersNode(parameters),
                     new BlockNode(ZERO, body), new GlobalVariablesNode(ZERO, new HashMap<>()));
         });
+    }
+
+    private List<StatementNode> createIfs(List<Integer> is, ExpressionNode indexAccess, Function<Integer, List<StatementNode>> innerSupplier) {
+        List<StatementNode> body = new ArrayList<>();
+        if (false) {
+            for (Integer i : is) {
+                body.add(new IfStatementNode(ZERO, new BinaryOperatorNode(indexAccess, literal(i), LexerTerminal.EQUALS), new BlockNode(ZERO, innerSupplier.apply(i))));
+            }
+        } else { // assumes that the index is never out of bounds, uses the first value otherwise
+            BlockNode cur = null;
+            for (Integer i : is) {
+                if (cur == null) {
+                    cur = new BlockNode(ZERO, innerSupplier.apply(i));
+                }
+                cur = new BlockNode(ZERO, Collections.singletonList(
+                        new IfStatementNode(ZERO,
+                                new BinaryOperatorNode(indexAccess, literal(i), LexerTerminal.EQUALS),
+                                new BlockNode(ZERO, innerSupplier.apply(i)),
+                                cur)));
+            }
+            if (cur != null) {
+                body.add(cur);
+            }
+        }
+        return body;
     }
 
     /**
@@ -185,11 +218,14 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
             Type returnType = types.getOrCreateTupleType(IntStream.range(0, size).mapToObj(i -> types.INT).collect(Collectors.toList()));
             List<StatementNode> body = new ArrayList<>();
             // set the return value to the array content
-            for (int i = 0; i < size; i += elemSize) {
-                body.add(new IfStatementNode(ZERO,
-                        new BinaryOperatorNode(indexAccess, literal(i), LexerTerminal.EQUALS),
-                        new BlockNode(ZERO, IntStream.range(i, i + elemSize).mapToObj(j -> new VariableAssignmentNode(ZERO, blastedVars.get(j), new VariableAccessNode(ZERO, blastedNewValues.get(j % elemSize)))).collect(Collectors.toList()))));
+            List<Integer> is = new ArrayList<>();
+            for (int i = 0; i + elemSize - 1 < size; i += packets) {
+                is.add(i);
             }
+            body.addAll(createIfs(is, indexAccess, i -> IntStream.range(i, i + elemSize)
+                    .mapToObj(j -> new VariableAssignmentNode(ZERO, blastedVars.get(j),
+                            new VariableAccessNode(ZERO, blastedNewValues.get(j % elemSize))))
+                    .collect(Collectors.toList())));
             body.add(new ReturnStatementNode(ZERO, new TupleLiteralNode(ZERO, blastedVarAccesses)));
             return new MethodNode(ZERO, "__blasted_set_" + size + "_" + elemSize + "_" + packets, returnType,
                     new ParametersNode(parameters),
@@ -415,6 +451,8 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
             new NameResolution(program).resolve();
             return process(program);
         }
+        //System.err.println("-----------");
+        //System.err.println(program.toPrettyString());
         return program;
     }
 

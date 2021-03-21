@@ -112,7 +112,7 @@ public class Processor {
             @Override
             public Boolean visit(VariableDeclarationNode decl) {
                 context.setVariableValue(decl.definition, decl.hasInitExpression() ?
-                        context.nodeValue(decl.expression) : (decl.hasAppendValue ? AppendOnlyValue.createEmpty() : Value.createEmpty()), decl.expression);
+                        context.nodeValue(decl.expression) : (decl.hasAppendValue ? AppendOnlyValue.createEmpty() : vl.parse(0) /* todo: correct */), decl.expression);
                 return false;
             }
 

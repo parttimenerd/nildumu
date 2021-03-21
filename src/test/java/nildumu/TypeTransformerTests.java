@@ -113,6 +113,11 @@ public class TypeTransformerTests {
         parse("bit_width 5; l input int l = 0buuuu; var x = {{1, 1}, {1, 1}}[l]; var c = x[1];").val("c", 1).run();
     }
 
+    @Test
+    public void testArrayUnknownIndexGet3() {
+        parse("bit_width 5; l input int l = 0buu; var x = {{1, 1}, {1, 1}}[l]; var c = x[1];").val("c", 1).run();
+    }
+
     private String parseToTransformed(String program) {
         Parser.ProgramNode programNode = ProcessingPipeline.createTillBeforeTypeTransformation().process(program);
         programNode = TypeTransformer.process(programNode);
@@ -297,30 +302,23 @@ public class TypeTransformerTests {
     }
 
     @Test
-    public void testArray5() {
-        parse("int[2][2] berths;\n" +
-                "int i = 0;\n" +
-                "while (i < length(berths)) {\n" +
-                "\tberths[i] = {0, 0};\n" +
-                "\ti = i + 1; \n" +
+    public void testUninitializedArray() {
+        parse("h input int secrets = 0bu{5}; int[1] vote; vote[0]=secrets; l output int out = vote[0];").leaks(5).run();
+    }
+
+    @Test
+    public void testUninitializedArray2() {
+        parse("use_sec basic;\n" +
+                "bit_width 5;\n" +
+                "int __blasted_set_1_1_1(int a0, int a1, int a2){\n" +
+                "  int a12; int a11;\n" +
+                "  if ((a0 == 0))\n" +
+                "    {\n" +
+                "      a11 = a2;\n" +
+                "    }\n" +
+                "  a12 = phi(a11, a1);\n" +
+                "  return a12;\n" +
                 "}\n" +
-                "\n" +
-                "int is_solution(int[2][2] berths, int N) {\n" +
-                "\treturn 0;\n" +
-                "}\n" +
-                "\n" +
-                "\n" +
-                "int break = 0;\n" +
-                "while (!break) {\n" +
-                "\tint i = 0;\n" +
-                "\tberths[i] = {0, 1};\n" +
-                "\t\n" +
-                "\tif (is_solution(berths, 1)) {\n" +
-                "\t\tbreak = 1;\n" +
-                "\t}\n" +
-                "\ti = i + 1;\n" +
-                "}\n" +
-                "\n" +
-                "l output int[2][2] b = berths;");
+                "int b = __blasted_set_1_1_1(0, b, 1);\n").val("b", 1).run();
     }
 }

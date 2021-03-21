@@ -1155,6 +1155,11 @@ public interface Operator {
             }
             return "(" + arguments.stream().map(Objects::toString).collect(Collectors.joining(", ")) + ")";
         }
+
+        @Override
+        public boolean allowsUnevaluatedArguments() {
+            return true;
+        }
     };
 
     Operator ARRAY_LITERAL = new Operator() {
@@ -1170,6 +1175,11 @@ public interface Operator {
                 return "{" + arguments.get(0) + ",}";
             }
             return "{" + arguments.stream().map(Objects::toString).collect(Collectors.joining(", ")) + "}";
+        }
+
+        @Override
+        public boolean allowsUnevaluatedArguments() {
+            return true;
         }
     };
 

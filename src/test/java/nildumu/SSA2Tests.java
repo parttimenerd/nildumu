@@ -8,6 +8,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.logging.Level;
 
 import static nildumu.Checks.checkAndThrow;
+import static nildumu.FunctionTests.parse;
 import static nildumu.Parser.generator;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -202,6 +203,17 @@ public class SSA2Tests {
                 ((Parser.MethodInvocationNode) ((Parser.ExpressionStatementNode)
                         whileStatement.body.statementNodes.get(0)).expression)
                         .globalDefs.values().iterator().next().first);
+    }
+
+    @Test
+    public void testSSAInFunctionNamesOverlapping() {
+        parse("use_sec basic;\n" +
+                "bit_width 32;\n" +
+                "int set(int a1, int a11){\n" +
+                "  a1 = a11;\n" +
+                "  return a11;\n" +
+                "}\n" +
+                "var x = set(0, 1);").val("x", 1).run();
     }
 
     public static Parser.ProgramNode toSSA(String program) {
