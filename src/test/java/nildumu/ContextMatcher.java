@@ -2,9 +2,12 @@ package nildumu;
 
 import org.junit.jupiter.api.function.Executable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
-import java.util.stream.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static nildumu.Lattices.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,16 +30,32 @@ public class ContextMatcher {
 
     private final Context context;
     private final TestBuilder builder = new TestBuilder();
+    private MinCut.Algo[] algos = MinCut.Algo.values();
 
     public ContextMatcher(Context context) {
         this.context = context;
     }
 
-    public ContextMatcher val(String variable, int value){
+    public ContextMatcher use(MinCut.Algo algo) {
+        algos = new MinCut.Algo[]{algo};
+        return this;
+    }
+
+    public ContextMatcher useSingleMCAlgo() {
+        return use(MinCut.usedAlgo);
+    }
+
+    public ContextMatcher val(String variable, long value){
         Lattices.Value actual = getValue(variable);
-        builder.add(() -> assertTrue(actual.isConstant(), String.format("Variable %s should have an integer val, has %s", variable, actual.repr())));
-        builder.add(() -> assertEquals(value, actual.asInt(),
-                String.format("Variable %s should have integer val %d", variable, value)));
+        builder.add(() -> assertTrue(actual.isConstant(),
+                String.format("Variable %s should have an integer val, has %s: %s vs %s",
+                variable, actual.toLiteralString(), value, actual.repr())));
+        builder.add(() -> {
+            if (actual.isConstant()) {
+                assertEquals(value, actual.asLong(),
+                        String.format("Variable %s should have integer val %d", variable, value));
+            }
+        });
         return this;
     }
 
@@ -44,7 +63,8 @@ public class ContextMatcher {
         Lattices.Value expected = vl.parse(value);
         Lattices.Value actual = getValue(variable);
         builder.add(() -> assertEquals(expected.toLiteralString(), actual.toLiteralString(),
-                String.format("Variable %s should have val %s, has val %s", variable, expected.repr(), actual.repr())));
+                String.format("Variable %s should have val %s, has val %s: %s vs %s", variable,
+                        expected.toLiteralString(), actual.toLiteralString(), expected.repr(), actual.repr())));
         return this;
     }
 
@@ -88,13 +108,60 @@ public class ContextMatcher {
 
     public class LeakageMatcher {
 
+        private final MinCut.Algo[] algos;
+
+        public LeakageMatcher() {
+            this(ContextMatcher.this.algos);
+        }
+
+        public LeakageMatcher(MinCut.Algo[] algos) {
+            this.algos = algos;
+        }
+
         public LeakageMatcher leaks(Lattices.Sec<?> attackerSec, double leakage){
-            builder.add(() -> {
-                MinCut.ComputationResult comp = MinCut.compute(context, attackerSec);
-                assertEquals(leakage, comp.maxFlow, () -> {
-                    return String.format("The calculated leakage for an attacker of level %s should be %f, leaking %s", attackerSec, leakage, comp.minCut.stream().map(Lattices.Bit::toString).collect(Collectors.joining(", ")));
+            for (MinCut.Algo algo : algos) {
+                Executable inner = () -> {
+                    MinCut.ComputationResult comp = MinCut.compute(context, attackerSec, algo);
+                    assertEquals(leakage, comp.maxFlow, () -> {
+                        return String.format("The calculated leakage for an attacker of level %s should be %f, leaking %s, using %s",
+                                attackerSec, leakage, comp.minCut.stream().map(Lattices.Bit::toString).collect(Collectors.joining(", ")),
+                                algo);
+                    });
+                };
+                if (!algo.supportsAlternatives && context.recordsAlternatives()) {
+                    builder.add(() -> {
+                        boolean prev = context.recordsAlternatives();
+                        try {
+                            context.setRecordAlternatives(false);
+                            inner.execute();
+                        } finally {
+                            context.setRecordAlternatives(prev);
+                        }
+                    });
+                } else {
+                    builder.add(inner);
+                }
+            }
+            return this;
+        }
+
+        /**
+         * Only uses leakage computation algorithms that support intervals.
+         */
+        public LeakageMatcher numberOfOutputs(Lattices.Sec<?> attackerSec, int outputs){
+            for (MinCut.Algo algo : algos) {
+                if (!algo.supportsIntervals()){
+                    continue;
+                }
+                builder.add(() -> {
+                    MinCut.ComputationResult comp = MinCut.compute(context, attackerSec, algo);
+                    int actualOutputs = (int)Math.round(Math.pow(2, comp.maxFlow));
+                    assertEquals(outputs, actualOutputs, () -> {
+                        return String.format("The calculated number of outputs to an attacker of level %s should be %d, but is %d, using %s",
+                                attackerSec, outputs, actualOutputs, algo);
+                    });
                 });
-            });
+            }
             return this;
         }
 
@@ -103,10 +170,14 @@ public class ContextMatcher {
         }
 
         public LeakageMatcher leaksAtLeast(Lattices.Sec sec, double leakage) {
-            builder.add(() -> {
-                MinCut.ComputationResult comp = MinCut.compute(context, sec);
-                assertTrue(comp.maxFlow >= leakage, String.format("The calculated leakage for an attacker of level %s should be at least %f, leaking %f", sec, leakage, comp.maxFlow));
-            });
+            for (MinCut.Algo algo : algos) {
+                builder.add(() -> {
+                    MinCut.ComputationResult comp = MinCut.compute(context, sec, algo);
+                    assertTrue(comp.maxFlow >= leakage,
+                            String.format("The calculated leakage for an attacker of level %s should be at least %f, " +
+                                    "leaking %f, using %s", sec, leakage, comp.maxFlow, algo));
+                });
+            }
             return this;
         }
     }
@@ -130,10 +201,36 @@ public class ContextMatcher {
     }
 
     /**
+     * Only uses leakage computation algorithms that support intervals.
+     */
+    public ContextMatcher numberOfOutputs(int outputs){
+        return leakage(l -> l.numberOfOutputs(context.sl.bot(), outputs));
+    }
+
+    /**
      * Supports "inf"
      */
     public ContextMatcher leaks(String leakage){
         return leakage(l -> l.leaks(context.sl.bot(), leakage.equals("inf") ? Context.INFTY : Double.parseDouble(leakage)));
+    }
+
+    public ContextMatcher benchLeakageComputationAlgorithms(int executionTimes) {
+        for (MinCut.Algo algo : MinCut.Algo.values()) {
+            if (!algo.supportsAlternatives) {
+                continue;
+            }
+            builder.add(() -> {
+                List<Integer> times = IntStream.range(0, executionTimes).mapToObj(i -> {
+                    long start = System.currentTimeMillis();
+                    MinCut.compute(context, context.sl.bot(), algo);
+                    return (int) (System.currentTimeMillis() - start);
+                }).collect(Collectors.toList());
+                double mean = times.stream().mapToInt(i -> i).sum() * 1.0 / times.size();
+                double std = Math.sqrt(1.0 / times.size() * times.stream().mapToInt(i -> i).mapToDouble(i -> (mean - i) * (mean - i)).sum());
+                System.out.printf("Using %25s took %10.3fms +- %10.3fms\n", algo, mean, std);
+            });
+        }
+        return this;
     }
 
     public ContextMatcher leaksAtLeast(int leakage){

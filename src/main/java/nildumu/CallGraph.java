@@ -1,19 +1,26 @@
 package nildumu;
 
-import java.util.*;
-import java.util.function.*;
-import java.util.stream.*;
-
-import guru.nidi.graphviz.attribute.*;
-import guru.nidi.graphviz.model.*;
+import guru.nidi.graphviz.attribute.Attributes;
+import guru.nidi.graphviz.attribute.RankDir;
+import guru.nidi.graphviz.attribute.Records;
+import guru.nidi.graphviz.model.Graph;
 import guru.nidi.graphviz.model.Node;
 import nildumu.util.DefaultMap;
 import nildumu.util.StablePriorityQueue;
 import swp.lexer.Location;
 import swp.parser.lr.BaseAST;
-import swp.util.*;
+import swp.util.Pair;
+import swp.util.TriConsumer;
 
-import static guru.nidi.graphviz.model.Factory.*;
+import java.util.*;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static guru.nidi.graphviz.model.Factory.graph;
+import static guru.nidi.graphviz.model.Factory.node;
 import static nildumu.Parser.*;
 import static nildumu.util.Util.Box;
 
@@ -24,10 +31,10 @@ import static nildumu.util.Util.Box;
 public class CallGraph {
 
     public static class CallNode {
-        final MethodNode method;
+        public final MethodNode method;
         private final Set<CallNode> callees;
         private final Set<CallNode> callers;
-        final boolean isMainNode;
+        public final boolean isMainNode;
 
         CallNode(MethodNode method, Set<CallNode> callees, Set<CallNode> callers, boolean isMainNode) {
             this.method = method;
@@ -114,6 +121,9 @@ public class CallGraph {
 
         @Override
         public Set<MethodNode> visit(MethodInvocationNode methodInvocation) {
+            if (methodInvocation.definition.isPredefined()){
+                return Collections.emptySet();
+            }
             return Stream.concat(Stream.of(methodInvocation.definition), methodInvocation.arguments.accept(this).stream()).collect(Collectors.toSet());
         }
 
@@ -138,6 +148,7 @@ public class CallGraph {
                         new MethodNode(
                                 new Location(0, 0),
                                 "$main$",
+                                program.types.INT,
                                 new ParametersNode(new Location(0, 0), Collections.emptyList()),
                                 program.globalBlock,
                                 new GlobalVariablesNode(new Location(0, 0), new HashMap<>())),
@@ -148,10 +159,14 @@ public class CallGraph {
                 Stream.concat(Stream.of(mainNode), usedMethods.stream().map(CallNode::new))
                         .collect(Collectors.toMap(n -> n.method, n -> n));
         methodToNode
-                .forEach((key, value) -> key
-                        .body
-                        .accept(new CallFinderNode())
-                        .forEach(m -> value.call(methodToNode.get(m))));
+                .forEach((key, value) -> {
+                    if (!key.isPredefined()) {
+                        key
+                                .body
+                                .accept(new CallFinderNode())
+                                .forEach(m -> value.call(methodToNode.get(m)));
+                    }
+                });
         dominators = dominators(mainNode);
         loopDepths = calcLoopDepth(mainNode, dominators);
         DotRegistry.get().store("summary", "call-graph",

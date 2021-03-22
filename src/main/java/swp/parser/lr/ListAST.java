@@ -146,6 +146,20 @@ public class ListAST<AST extends BaseAST> extends BaseAST implements Collection<
 		return ret;
 	}
 
+	public <T> List<T> getAll(Class<T> klass){
+		List<T> ret = new ArrayList<>();
+		for (BaseAST ast : this){
+			if (ast.type().equals("list")){
+				ret.addAll(((ListAST)ast).getAll(klass));
+			} else {
+				if (klass.isAssignableFrom(ast.getClass())) {
+					ret.add((T)ast);
+				}
+			}
+		}
+		return ret;
+	}
+
 	public List<Token> getMatchedTokens(String tokenType) {
 		List<Token> tokens = getMatchedTokens();
 		if (tokens.isEmpty()){

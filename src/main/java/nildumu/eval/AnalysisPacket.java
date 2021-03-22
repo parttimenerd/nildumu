@@ -1,6 +1,6 @@
 package nildumu.eval;
 
-import nildumu.eval.tools.NildumuDemoTool;
+import nildumu.eval.tools.Nildumu;
 import org.apache.commons.lang3.StringEscapeUtils;
 
 import java.nio.file.Path;
@@ -49,7 +49,7 @@ public abstract class AnalysisPacket {
     }
 
     public String toTemciConfigEntry(Duration timeLimit){
-        if (tool instanceof NildumuDemoTool){
+        if (tool instanceof Nildumu){
             return String.format("- attributes: {description: \"%s\"}\n",
                     StringEscapeUtils.escapeJava(toString())) +
                     "  run_config:\n" +

@@ -1,46 +1,56 @@
 package nildumu;
 
+import nildumu.mih.MethodInvocationHandler;
+import nildumu.util.DefaultMap;
+import swp.util.Pair;
+
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import nildumu.util.DefaultMap;
-import swp.util.Pair;
-
-import static nildumu.Lattices.B.*;
 import static nildumu.Lattices.*;
-import static nildumu.Operator.EQUALS;
-import static nildumu.Operator.LESS;
-import static nildumu.Operator.UNEQUALS;
+import static nildumu.Lattices.B.*;
+import static nildumu.Operator.*;
 import static nildumu.Parser.*;
+import static nildumu.util.Util.p;
 
 public class Processor {
 
     public static boolean transformPlus = false;
 
-    public static Context process(String program){
+    public static final int TRANSFORM_PLUS = 0b01;
+    public static final int TRANSFORM_LOOPS = 0b010;
+    public static final int RECORD_ALTERNATIVES = 0b0100;
+
+    public static boolean containsOpt(int opts, int opt) {
+        return (opts & opt) != 0;
+    }
+
+    public static Context process(String program) {
         return process(program, Context.Mode.BASIC);
     }
 
-    public static Context process(String program, Context.Mode mode){
-        return process(program, mode, MethodInvocationHandler.createDefault());
+    public static Context process(String program, Context.Mode mode) {
+        return process(program, mode, MethodInvocationHandler.createDefault(), 0);
     }
 
-    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler){
-        return process(program, mode, handler, transformPlus);
+    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, int opts) {
+        return process(Parser.process(program, containsOpt(opts, TRANSFORM_PLUS)),
+                mode, handler, containsOpt(opts, RECORD_ALTERNATIVES));
     }
 
-    public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, boolean transformPlus){
-        return process(Parser.process(program, transformPlus), mode, handler);
-    }
-
-    public static Context process(ProgramNode node, MethodInvocationHandler handler){
+    public static Context process(ProgramNode node, MethodInvocationHandler handler) {
         handler.setup(node);
         return process(node.context.forceMethodInvocationHandler(handler), node);
     }
 
-    public static Context process(ProgramNode node, Context.Mode mode, MethodInvocationHandler handler){
-        node.context.mode(mode);
+    public static Context process(ProgramNode node, Context.Mode mode, MethodInvocationHandler handler) {
+        return process(node, mode, handler, false);
+    }
+
+    public static Context process(ProgramNode node, Context.Mode mode, MethodInvocationHandler handler,
+                                  boolean recordAlternatives) {
+        node.context.mode(mode).setRecordAlternatives(recordAlternatives);
         handler.setup(node);
         return process(node.context.forceMethodInvocationHandler(handler), node);
     }
@@ -48,6 +58,7 @@ public class Processor {
     public static Context process(Context context, MJNode node) {
 
         final Set<StatementNode> statementNodesToOmitOneTime = new HashSet<>();
+        final Set<Pair<Sec<?>, Variable>> outputVariables = new HashSet<>();
 
         FixpointIteration.worklist2(new NodeVisitor<Boolean>() {
 
@@ -101,7 +112,7 @@ public class Processor {
             @Override
             public Boolean visit(VariableDeclarationNode decl) {
                 context.setVariableValue(decl.definition, decl.hasInitExpression() ?
-                        context.nodeValue(decl.expression) : (decl.hasAppendValue ? AppendOnlyValue.createEmpty() : Value.createEmpty()), decl.expression);
+                        context.nodeValue(decl.expression) : (decl.hasAppendValue ? AppendOnlyValue.createEmpty() : vl.parse(0) /* todo: correct */), decl.expression);
                 return false;
             }
 
@@ -112,9 +123,23 @@ public class Processor {
             }
 
             @Override
+            public Boolean visit(ArrayAssignmentNode assignment) {
+                throw new NildumuError("Array assignments not supported in processor. Requires preprocessing.");
+            }
+
+            @Override
+            public Boolean visit(MultipleVariableAssignmentNode assignment) {
+                List<Value> values = context.nodeValue(assignment.expression).split(assignment.definitions.size());
+                for (int i = 0; i < values.size(); i++) {
+                    context.setVariableValue(assignment.definitions.get(i), values.get(i), assignment.expression);
+                }
+                return false;
+            }
+
+            @Override
             public Boolean visit(OutputVariableDeclarationNode outputDecl) {
-                visit((VariableAssignmentNode)outputDecl);
-                context.addOutputValue(context.sl.parse(outputDecl.secLevel), context.getVariableValue(outputDecl.definition));
+                visit((VariableAssignmentNode) outputDecl);
+                outputVariables.add(p(context.sl.parse(outputDecl.secLevel), outputDecl.definition));
                 return false;
             }
 
@@ -128,6 +153,7 @@ public class Processor {
             @Override
             public Boolean visit(IfStatementNode ifStatement) {
                 Value cond = context.nodeValue(ifStatement.conditionalExpression);
+                context.assertAdditionalModsEmpty();
                 Bit condBit = cond.get(1);
                 Lattices.B condVal = condBit.val();
                 if (condVal == U && unfinishedLoopIterations > 0){
@@ -171,10 +197,10 @@ public class Processor {
                     throw new NildumuError("while-statements are only supported in modes starting at loop mode");
                 }
                 Value cond = context.nodeValue(whileStatement.conditionalExpression);
+                context.assertAdditionalModsEmpty();
                 Bit condBit = cond.get(1);
-                Lattices.B condVal = condBit.val();
                 weightCondBit(condBit);
-                if (condVal == ONE || condVal == U) {
+                if (cond.mightBe(true)) {
                     conditionalBits.put(whileStatement.body, new Pair<>(condBit, bl.create(ONE)));
                     branchOfBlock.put(whileStatement.body,
                             new Context.Branch(whileStatement.conditionalExpression, true));
@@ -275,7 +301,7 @@ public class Processor {
 
             @Override
             public Boolean visit(ReturnStatementNode returnStatement) {
-                if (returnStatement.hasReturnExpression()){
+                if (returnStatement.hasReturnExpression()) {
                     context.setReturnValue(context.nodeValue(returnStatement.expression));
                 }
                 return false;
@@ -287,18 +313,43 @@ public class Processor {
             }
 
             private void weightCondBit(Bit bit){
-                if (bit.isAtLeastUnknown()){
-                    context.weight(bit, Context.INFTY);
-                }
-                if (bit.value() != null && bit.value().node() != null){
-                    MJNode node = bit.value().node();
-                    if (node.getOperator() == EQUALS || node.getOperator() == UNEQUALS || node.getOperator() == LESS){
-                        return;
+                bl.walkBits(bit, b -> {
+                    if (bit.isAtLeastUnknown()){
+                        context.weight(bit, Context.INFTY);
                     }
-                }
-                bit.deps().forEach(this::weightCondBit);
+                    if (bit.value() != null && bit.value().node() != null){
+                        MJNode node = bit.value().node();
+                        if (node.getOperator() == EQUALS || node.getOperator() == UNEQUALS || node.getOperator() == LESS){
+                            return;
+                        }
+                    }
+                }, b -> false);
             }
-        }, context::evaluate, node, statementNodesToOmitOneTime);
+        }, context::evaluate, node, statementNodesToOmitOneTime, b -> {
+            if (b.operator == LexerTerminal.AND) {
+                if (context.nodeValue(b.left).mightBe(true)) {
+                    context.pushMiscMods(context.repl(context.nodeValue(b.left).get(1), bl.create(ONE)));
+                    return true;
+                }
+                return false;
+            }
+            if (b.operator == LexerTerminal.OR) {
+                if (context.nodeValue(b.left).mightBe(false)) {
+                    context.pushMiscMods(context.repl(context.nodeValue(b.left).get(1), bl.create(ZERO)));
+                    return true;
+                }
+                return false;
+            }
+            return true;
+        }, b -> {
+            if ((b.operator == LexerTerminal.AND && context.nodeValue(b.left).mightBe(true)) ||
+                    (b.operator == LexerTerminal.OR && context.nodeValue(b.left).mightBe(false))) {
+                context.popMiscMods();
+            }
+        });
+        for (Pair<Sec<?>, Variable> pair : outputVariables) {
+            context.addOutputValue(pair.first, context.getVariableValue(pair.second));
+        }
         return context;
     }
 }

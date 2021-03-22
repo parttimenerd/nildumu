@@ -1,16 +1,22 @@
 package nildumu;
 
-import java.util.*;
-import java.util.function.BiPredicate;
-import java.util.stream.*;
-
+import nildumu.intervals.Interval;
+import nildumu.mih.MethodInvocationHandler;
+import nildumu.typing.Type;
 import nildumu.util.Util;
 import swp.util.Pair;
+
+import java.util.*;
+import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 import static nildumu.Context.v;
 import static nildumu.Lattices.*;
 import static nildumu.Lattices.B.*;
-import static nildumu.util.Util.log2;
+import static nildumu.util.Util.*;
 
 public interface Operator {
 
@@ -22,7 +28,16 @@ public interface Operator {
 
     static Bit wrapBit(Context c, Bit source) {
         Bit wrap = bl.create(source.val(), ds.create(source));
-        c.repl(wrap, ((con, b, a) -> con.choose(b, a) == a ? new Mods(b, a).add(c.repl(source).apply(con, source, a)) : Mods.empty()));
+        c.repl(wrap, ((con, b, a) -> {
+            Bit choose = con.choose(a, b);
+            return new Mods(con.notChosen(a, b), choose).add(c.repl(source).apply(con, source, choose));
+        }));
+        return wrap;
+    }
+
+    static Interval wrapInterval(Context c, Interval source) {
+        Interval wrap = new Interval(source.start, source.end);
+        wrap.bits.addAll(source.bits);
         return wrap;
     }
 
@@ -104,6 +119,15 @@ public interface Operator {
                 throw new WrongArgumentNumber(symbol, arguments.size(), 1);
             }
         }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, List<Interval> intervals){
+            return computeForIntervals(c, res, intervals.get(0));
+        }
+
+        public Interval computeForIntervals(Context c, Value res, Interval interval){
+            return null;
+        }
     }
 
     abstract class BinaryOperator implements Operator {
@@ -138,6 +162,15 @@ public interface Operator {
             if (arguments.size() != 2){
                 throw new WrongArgumentNumber(symbol, arguments.size(), 2);
             }
+        }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, List<Interval> intervals){
+            return computeForIntervals(c, res, intervals.get(0), intervals.get(1));
+        }
+
+        public Interval computeForIntervals(Context c, Value res, Interval first, Interval second){
+            return null;
         }
     }
 
@@ -201,10 +234,10 @@ public interface Operator {
         }
 
         default Mods defaultOwnBitMod(Context c, Bit r, Bit a) {
-            if (r.isConstant() || c.choose(r, a) == r){
+            if (r.isConstant()) {
                 return Mods.empty();
             }
-            return new Mods(r, a);
+            return new Mods(c.notChosen(a, r), c.choose(a, r));
         }
 
         default Mods assumeUnused(Context c, Bit r, Bit a) {
@@ -383,7 +416,7 @@ public interface Operator {
                     if (v(x) == ZERO){
                         return c.repl(y, a);
                     }
-                    return Mods.empty();
+                    return c.repl(x, a).intersection(c.repl(y, a));
                 }
 
                 @Override
@@ -425,7 +458,7 @@ public interface Operator {
                     if (v(x) == ONE){
                         return c.repl(y, a);
                     }
-                    return Mods.empty();
+                    return c.repl(x, a).union(c.repl(y, a));
                 }
 
                 @Override
@@ -433,6 +466,51 @@ public interface Operator {
                     return c.repl(x, a).add(c.repl(y, a));
                 }
             };
+        }
+    };
+
+    abstract class ShortCircuitOperator implements Operator {
+
+        private final Parser.LexerTerminal op;
+
+        public ShortCircuitOperator(Parser.LexerTerminal op) {
+            this.op = op;
+        }
+
+        @Override
+        public String toString(List<Value> arguments) {
+            return arguments.stream().map(Value::toString).collect(Collectors.joining());
+        }
+
+        @Override
+        public Value compute(Context c, List<Value> arguments) {
+            if (arguments.size() == 1 || arguments.get(1).isBot()) {
+                return arguments.get(0);
+            }
+            return compute(c, arguments.get(0), arguments.get(1));
+        }
+
+        public abstract Value compute(Context c, Value x, Value y);
+
+        @Override
+        public boolean allowsUnevaluatedArguments() {
+            return true;
+        }
+    }
+
+    Operator LOGICAL_AND = new ShortCircuitOperator(Parser.LexerTerminal.AND) {
+
+        @Override
+        public Value compute(Context c, Value x, Value y) {
+            return AND.compute(c, x, y);
+        }
+    };
+
+    Operator LOGICAL_OR = new ShortCircuitOperator(Parser.LexerTerminal.OR) {
+        @Override
+        public Value compute(Context c, Value x, Value y) {
+            // assumes that x is either unknown or false
+            return OR.compute(c, x, y);
         }
     };
 
@@ -514,6 +592,13 @@ public interface Operator {
         }
     };
 
+    UnaryOperator UNPACK = new UnaryOperator("*") {
+        @Override
+        Value compute(Context c, Value argument) {
+            return argument;
+        }
+    };
+
     BinaryOperator EQUALS = new BinaryOperatorStructured("==") {
         @Override
         public Lattices.B computeBitValue(int i, Value x, Value y) {
@@ -556,6 +641,18 @@ public interface Operator {
 
                 @Override
                 public Mods assumeZero(Context c, Bit r, Bit a) {
+                    List<Pair<Bit, Bit>> pairs = zip(x.bits, y.bits, (f, g) -> {
+                        if (f.isUnknown() && g.isConstant()) {
+                            return p(f, g);
+                        }
+                        if (g.isUnknown() && f.isConstant()) {
+                            return p(g, f);
+                        }
+                        return null;
+                    }).stream().filter(Objects::nonNull).collect(Collectors.toList());
+                    if (pairs.size() == 1) {
+                        return c.repl(pairs.get(0).first, bl.create(pairs.get(0).second.val().neg()));
+                    }
                     return Mods.empty();
                 }
             };
@@ -617,11 +714,16 @@ public interface Operator {
     BinaryOperatorStructured LESS = new BinaryOperatorStructured("<") {
 
         Stack<DependencySet> dependentBits = new Stack<>();
+        Stack<Pair<Value, Value>> args = new Stack<>();
 
         @Override
         public B computeBitValue(int i, Value x, Value y) {
+            args.add(new Pair<>(x, y));
             if (i > 1) {
                 return ZERO;
+            }
+            if (x.isConstant() && y.isConstant()) {
+                return x.singleValue() < y.singleValue() ? ONE : ZERO;
             }
             Lattices.B val = U;
             DependencySet depBits = Stream.concat(x.stream(), y.stream()).filter(Bit::isUnknown).collect(DependencySet.collector());
@@ -630,7 +732,7 @@ public interface Operator {
             B v_x_n = a_n.val();
             B v_y_n = b_n.val();
             Optional<Integer> differingNonConstantIndex = firstNonMatching(x, y, (c, d) -> x.isConstant() && c == d);
-            if (v_x_n.isConstant() && v_y_n.isConstant() && v_x_n != v_y_n) {
+            if (v_x_n.isConstant() && v_y_n.isConstant() && v_x_n != v_y_n) { // if signs differ
                 depBits = ds.empty();
                 if (v_x_n == ONE) { // x is negative
                     val = ONE;
@@ -681,7 +783,117 @@ public interface Operator {
 
         @Override
         Context.ModsCreator computeModsCreator(int i, Bit r, Value x, Value y, List<B> bitValues, DependencySet dataDeps) {
-            return (c, b, a) -> Mods.empty();
+            if (i > 1){
+                return (c, b, a) -> Mods.empty();
+            }
+            return new StructuredModsCreator() {
+                @Override
+                public Mods assumeOne(Context c, Bit r, Bit a) {
+                    if (i != 1){
+                        return Mods.empty();
+                    }
+                    int bitWidth = Math.max(x.size(), y.size());
+                    return assumeOneValue(c, x.withBitCount(bitWidth), y.withBitCount(bitWidth));
+                }
+
+                public Mods assumeOneValue(Context c, Value x, Value y) {
+                    // we have 9 different cases, depending on the sign bits
+                    if (x.isNegative()) {
+                        if (y.isNegative()) {
+                            // do something
+                            // x < y   <=>   -y < -x   <=>   ~y + 1 < ~x + 1
+                            // <=>  ~y < ~x  maybe?
+                            Mods mods = Mods.empty();
+                            y.highBitIndicesWOSign(ONE, -1).forEach(i -> mods.add(c.repl(x.get(i), bl.create(ONE)))); // -1?
+                            x.highBitIndicesWOSign(ZERO, 0).forEach(i -> mods.add(c.repl(y.get(i), bl.create(ZERO))));
+                            return mods;
+                        } else if (y.isPositive()) {
+                            return Mods.empty();
+                        } else {
+                            // if !(x < -|y|) { y is positive }
+                            // if !(x.largest < y.largest(sign=1)) { y.assume(sign=0) }
+                            if (!(x.largest() < y.smallest(ONE))) {
+                                Bit ySign = y.signBit();
+                                return assumeOneValue(c, x, y.assume(ZERO)).add(c.repl(ySign, bl.create(ZERO)));
+                            }
+                            return Mods.empty();
+                        }
+                    } else if (x.isPositive()) {
+                        if (y.isNegative()) {
+                            return Mods.empty();
+                        } else if (y.isPositive()) {
+                            Mods mods = Mods.empty();
+                            y.highBitIndicesWOSign(ZERO, -1).forEach(i -> mods.add(c.repl(x.get(i), bl.create(ZERO)))); // -1?
+                            x.highBitIndicesWOSign(ONE, 0).forEach(i -> mods.add(c.repl(y.get(i), bl.create(ONE))));
+                            return mods;
+                        } else {
+                            // y.assume(sign=0): x < y
+                            Bit ySign = y.signBit();
+                            return assumeOneValue(c, x, y.assume(ZERO)).add(c.repl(ySign, bl.create(ZERO)));
+                        }
+                    } else {
+                        if (y.isNegative()) {
+                            // x.assume(sign=1): x < y
+                            Bit xSign = x.signBit();
+                            return assumeOneValue(c, x.assume(ONE), y).add(c.repl(xSign, bl.create(ONE)));
+                        } else if (y.isPositive()) {
+                            // if !(|x| < |y|) { x is negative }
+                            // if !(x.smallest(sign=0) < y.largest) { x.assume(sign=1) }
+                            if (!(x.smallest(ZERO) < y.largest())) {
+                                Bit xSign = x.signBit();
+                                return assumeOneValue(c, x.assume(ONE), y).add(c.repl(xSign, bl.create(ONE)));
+                            }
+                            return Mods.empty();
+                        } else {
+                            return Mods.empty();
+                        }
+                    }
+                }
+
+                @Override
+                public Mods assumeZero(Context c, Bit r, Bit _a) {
+                    // we can assume that a is zero and r is unkndown and therefore ignore it
+                    if (i != 1){
+                        return Mods.empty();
+                    }
+                    // x == y or x > y
+                    // check if x can be y:
+                    if (vl.mapBits(x, y, (a, b) -> a.val() == b.val() || a.isUnknown() || b.isUnknown()).stream().allMatch(Boolean::booleanValue)) {
+                        Mods eqMods = Mods.empty();
+                        vl.mapBits(x, y, (xi, yi) -> c.repl(c.notChosen(xi, yi), c.choose(xi, yi))).forEach(eqMods::add);
+                        return assumeOneValue(c, y, x).intersection(eqMods);
+                    }
+                    return assumeOneValue(c, y, x);
+                }
+            };
+        }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value ret, Interval first, Interval second) {
+            Interval interval = new Interval(0, 1);
+            if (first.end < second.start){
+                interval = new Interval(1, 1);
+            }
+            if (first.start >= second.end){
+                interval = new Interval(0, 0);
+            }
+            Pair<Value, Value> arg = args.pop();
+            c.repl(ret.get(1), new Context.ModsCreator() {
+                @Override
+                public Mods apply(Context context, Bit bit, Bit assumedValue) { Mods mods = Mods.empty();
+                    switch (assumedValue.val()){
+                        case ONE:
+                            if (arg.second.singleValued()){
+                                mods.add(first, new Interval(first.start, Math.min(first.end, arg.second.singleValue() -1)).addBits(c.replace(arg.first).bitSet()));
+                                arg.first.bits.forEach(b -> {
+                                    mods.add(b, wrapBit(context, b));
+                                });
+                            }
+                    }
+                    return mods;
+                }
+            });
+            return interval;
         }
     };
 
@@ -689,7 +901,7 @@ public interface Operator {
 
         @Override
         public boolean supportsArguments(List<Value> arguments) {
-            return PHI.supportsArguments(arguments);
+            return PHI_GENERIC.supportsArguments(arguments);
         }
 
         @Override
@@ -702,6 +914,9 @@ public interface Operator {
             Parser.PhiNode phi = (Parser.PhiNode)currentNode;
             if (phi.controlDeps.size() == 1){
                 B condVal = c.nodeValue(phi.controlDeps.get(0)).get(1).val();
+                if (condVal.isAtLeastUnknown() && c.nodeValue(phi.controlDeps.get(0)).singleValued()){
+                    condVal = vl.parse(c.nodeValue(phi.controlDeps.get(0)).singleValue()).get(1).val();
+                }
                 switch (condVal){
                     case ONE:
                         return wrapBit(c, x);
@@ -768,13 +983,33 @@ public interface Operator {
         public boolean allowsUnevaluatedArguments() {
             return true;
         }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, Interval x, Interval y) {
+            if (x.isDefaultInterval()){
+                return wrapInterval(c, y);
+            } else if (y.isDefaultInterval()|| x == y){
+                return wrapInterval(c, x);
+            }
+            Parser.PhiNode phi = (Parser.PhiNode)currentNode;
+            if (phi.controlDeps.size() == 1){
+                B condVal = c.nodeValue(phi.controlDeps.get(0)).get(1).val();
+                switch (condVal){
+                    case ONE:
+                        return wrapInterval(c, x);
+                    case ZERO:
+                        return wrapInterval(c, y);
+                }
+            }
+            return x.merge(y);
+        }
     };
 
     BitWiseOperator PHI_GENERIC = new BitWiseOperatorStructured("phi") {
 
         @Override
         public boolean supportsArguments(List<Value> arguments) {
-            return !(arguments.get(0) instanceof AppendOnlyValue) || arguments.stream().allMatch(a -> a instanceof AppendOnlyValue);
+            return true; //!(arguments.get(0) instanceof AppendOnlyValue) || arguments.stream().allMatch(a -> a instanceof AppendOnlyValue);
         }
 
         @Override
@@ -828,32 +1063,48 @@ public interface Operator {
 
     class PlaceBit extends UnaryOperator {
 
-        final int index;
+        final long index;
 
-        public PlaceBit(int index) {
+        public PlaceBit(long index) {
             super(String.format("[%d]·", index));
             this.index = index;
         }
 
         @Override
         Value compute(Context c, Value argument) {
-            return IntStream.range(1, index + 2).mapToObj(i -> i == index ? argument.get(1) : bl.create(ZERO)).collect(Value.collector());
+            return LongStream.range(1, index + 2).mapToObj(i -> i == index ? argument.get(1) : bl.create(ZERO)).collect(Value.collector());
         }
     }
 
-    class SelectBit extends UnaryOperator {
+    class SelectBit extends BinaryOperator {
 
-        final int index;
-
-        public SelectBit(int index) {
-            super(String.format("·[%d]", index));
-            this.index = index;
+        public SelectBit() {
+            super("·[·]");
         }
 
         @Override
-        Value compute(Context c, Value argument) {
-            return new Value(argument.get(index));
+        Value compute(Context c, Value first, Value second) {
+            if (!second.isConstant()) {
+                throw new NildumuError("Only constant indices supported for bit select operators");
+            }
+            return new Value(first.get((int)second.asLong()));
         }
+    }
+
+    /**
+     * deals with unpacking on one level
+     */
+    static List<Value> unfoldTuple(List<Parser.ExpressionNode> expressions, List<Value> values) {
+        List<Value> ret = new ArrayList<>();
+        assert expressions.size() == values.size();
+        return zip(expressions, values, (e, v) -> {
+            if (e instanceof Parser.UnpackOperatorNode) {
+                List<Value> vals = v.split();
+                assert vals.size() == ((Type.TupleType) ((Parser.UnpackOperatorNode) e).expression.type).elementTypes.size();
+                return vals;
+            }
+            return Collections.singletonList(v);
+        }).stream().flatMap(List::stream).collect(Collectors.toList());
     }
 
     class MethodInvocation implements Operator {
@@ -866,6 +1117,10 @@ public interface Operator {
 
         @Override
         public Value compute(Context c, List<Value> arguments) {
+            arguments = Operator.unfoldTuple(callSite.arguments.arguments, arguments);
+            if (callSite.definition.isPredefined()){
+                return ((Parser.PredefinedMethodNode)callSite.definition).apply(arguments);
+            }
             Map<Variable, AppendOnlyValue> globals = callSite.globalDefs.entrySet().stream()
                     .collect(Collectors.toMap(Map.Entry::getKey, e -> c.getVariableValue(e.getValue().first).asAppendOnly()));
             MethodInvocationHandler.MethodReturnValue ret = c.methodInvocationHandler().analyze(c, callSite, arguments, globals);
@@ -877,7 +1132,7 @@ public interface Operator {
                 }
             });
             c.getNewlyIntroducedInputs().putAll(ret.inputBits);
-            return ret.value;
+            return Value.combineOrZero(ret.values);
         }
 
         @Override
@@ -886,12 +1141,54 @@ public interface Operator {
         }
     }
 
+    Operator TUPLE_LITERAL = new Operator() {
+
+        @Override
+        public Value compute(Context c, List<Value> arguments) {
+            return Value.combine(arguments);
+        }
+
+        @Override
+        public String toString(List<Value> arguments) {
+            if (arguments.size() == 1) {
+                return "(" + arguments.get(0) + ",)";
+            }
+            return "(" + arguments.stream().map(Objects::toString).collect(Collectors.joining(", ")) + ")";
+        }
+
+        @Override
+        public boolean allowsUnevaluatedArguments() {
+            return true;
+        }
+    };
+
+    Operator ARRAY_LITERAL = new Operator() {
+
+        @Override
+        public Value compute(Context c, List<Value> arguments) {
+            return Value.combine(arguments);
+        }
+
+        @Override
+        public String toString(List<Value> arguments) {
+            if (arguments.size() == 1) {
+                return "{" + arguments.get(0) + ",}";
+            }
+            return "{" + arguments.stream().map(Objects::toString).collect(Collectors.joining(", ")) + "}";
+        }
+
+        @Override
+        public boolean allowsUnevaluatedArguments() {
+            return true;
+        }
+    };
+
     BinaryOperator ADD = new BinaryOperator("+") {
         @Override
         Value compute(Context c, Value first, Value second) {
             Set<Bit> argBits = Stream.concat(first.stream(), second.stream()).collect(Collectors.toSet());
             Util.Box<Bit> carry = new Util.Box<>(bl.create(ZERO));
-            return  vl.mapBitsToValue(first, second, (a, b) -> {
+            return vl.mapBitsToValue(first, second, (a, b) -> {
                 Pair<Bit, Bit> add = fullAdder(c, a, b, carry.val);
                 carry.val = add.second;
                 if (c.USE_REDUCED_ADD_OPERATOR){
@@ -911,25 +1208,39 @@ public interface Operator {
         Pair<Bit, Bit> halfAdder(Context context, Bit first, Bit second) {
             return new Pair<>(XOR.compute(context, first, second), AND.compute(context, first, second));
         }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, Interval first, Interval second) {
+            try {
+                return new Interval(Math.addExact(first.start, second.start),
+                        Math.addExact(first.end, second.end));
+            } catch (ArithmeticException ex){
+                return Interval.forBitWidth(vl.bitWidth);
+            }
+        }
     };
 
     BinaryOperator LEFT_SHIFT = new BinaryOperator("<<") {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isConstant()){
-                int shift = second.asInt();
+                int shift = (int)second.asLong();
                 if (shift >= c.maxBitWidth){
                     return vl.parse(0);
                 }
                 if (shift < 0){
                     return RIGHT_SHIFT.compute(c, first, vl.parse(-shift));
                 }
-                return IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
-                    if (i - shift < 1){
+                if (!first.isPositive()) {
+                    return createUnknownValue(first, second);
+                }
+                Value ret = Stream.concat(IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
+                    if (i - shift < 1) {
                         return bl.create(ZERO);
                     }
                     return first.get(i - shift);
-                }).collect(Value.collector());
+                }), Stream.of(bl.create(ZERO))).collect(Value.collector());
+                return ret;
             }
             return createUnknownValue(first, second);
         }
@@ -937,20 +1248,22 @@ public interface Operator {
 
     BinaryOperator RIGHT_SHIFT = new BinaryOperator(">>") {
 
-
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isConstant()){
-                int shift = second.asInt();
+                int shift = (int)second.asLong();
                 if (shift < 0){
                     return LEFT_SHIFT.compute(c, first, vl.parse(-shift));
                 }
-                return IntStream.range(1, c.maxBitWidth + 1).mapToObj(i -> {
+                if (!first.isPositive()) {
+                    return createUnknownValue(first, second);
+                }
+                return Stream.concat(IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
                     if (i + shift > c.maxBitWidth){
                         return bl.create(ZERO);
                     }
                     return first.get(i + shift);
-                }).collect(Value.collector());
+                }), Stream.of(bl.create(ZERO))).collect(Value.collector());
             }
             return createUnknownValue(first, second);
         }
@@ -976,33 +1289,43 @@ public interface Operator {
         return IntStream.range(0, size).mapToObj(i -> bl.create(U, depBits)).collect(Value.collector());
     }
 
-    BinaryOperator MULTIPLY = new BinaryOperator("+") {
+    BinaryOperator MULTIPLY = new BinaryOperator("*") {
         @Override
         Value compute(Context c, Value first, Value second) {
-            if (second.isPowerOfTwo()){
-                return setMultSign(first, second, LEFT_SHIFT.compute(c, first, vl.parse(Math.abs((int) log2(second.asInt())))));
+            if (second.isPowerOfTwo()) {
+                return setMultSign(first, second, LEFT_SHIFT.compute(c, first, vl.parse(Math.abs((int) log2(second.asLong())))));
             }
-            if (first.isPowerOfTwo()){
+            if (first.isPowerOfTwo()) {
                 return MULTIPLY.compute(c, second, first);
             }
-            if (first.isConstant() && second.isConstant()){
-                return vl.parse(first.asInt() * second.asInt());
+            if (first.isConstant() && second.isConstant()) {
+                return vl.parse(first.asLong() * second.asLong());
             }
             return createUnknownValue(first, second);
         }
+
+        @Override
+        public Interval computeForIntervals(Context c, Value res, Interval first, Interval second) {
+            try {
+                return new Interval(Math.multiplyExact(first.start, second.start),
+                        Math.multiplyExact(first.end, second.end));
+            } catch (ArithmeticException ex){
+                return Interval.forBitWidth(vl.bitWidth);
+            }
+        }
     };
 
-    BinaryOperator DIVIDE = new BinaryOperator("+") {
+    BinaryOperator DIVIDE = new BinaryOperator("/") {
         @Override
         Value compute(Context c, Value first, Value second) {
             if (second.isPowerOfTwo()){
-                return setMultSign(first, second, RIGHT_SHIFT.compute(c, first, vl.parse((int)log2(second.asInt()))));
+                return setMultSign(first, second, RIGHT_SHIFT.compute(c, first, vl.parse((int)log2(second.asLong()))));
             }
             if (first.isPowerOfTwo()){
                 return DIVIDE.compute(c, second, first);
             }
             if (first.isConstant() && second.isConstant()){
-                return vl.parse(first.asInt() * second.asInt());
+                return vl.parse(first.asLong() * second.asLong());
             }
             return createUnknownValue(first, second);
         }
@@ -1013,14 +1336,14 @@ public interface Operator {
         Value compute(Context c, Value first, Value second) {
             if (second.isPowerOfTwo() && !second.isNegative()) {
                 return IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
-                    if (i > log2(second.asInt())) {
+                    if (i > log2(second.asLong())) {
                         return bl.create(ZERO);
                     }
                     return first.get(i);
                 }).collect(Value.collector());
             }
             if (first.isConstant() && second.isConstant()) {
-                return vl.parse(first.asInt() % second.asInt());
+                return vl.parse(first.asLong() % second.asLong());
             }
             return createUnknownValue(first, second);
         }
@@ -1030,7 +1353,7 @@ public interface Operator {
 
         @Override
         public boolean supportsArguments(List<Value> arguments) {
-            return arguments.get(0) instanceof AppendOnlyValue;
+            return true; //return arguments.get(0) instanceof AppendOnlyValue;
         }
 
         @Override
@@ -1051,10 +1374,22 @@ public interface Operator {
         throw new RuntimeException("Not implemented");
     }
 
-    default Value compute(Context c, Parser.MJNode node, List<Value> arguments){
+    default Value computeWithIntervals(Context c, Parser.MJNode node, List<Value> arguments){
         if (!supportsArguments(arguments)){
             throw new NildumuError("Unsupported operation " + toString(arguments));
         }
+        Value val = compute(c, node, arguments);
+        if (val.canHaveInterval() && c.inIntervalMode()){
+            Interval interval = computeForIntervals(c, val, arguments.stream().map(Value::getInterval).collect(Collectors.toList()));
+            if (interval != null){
+                val.setInterval(interval);
+            }
+            bl.reachableBits(val.bits, arguments.stream().flatMap(Value::stream).collect(Collectors.toSet()));
+        }
+        return val;
+    }
+
+    default Value compute(Context c, Parser.MJNode node, List<Value> arguments){
         return compute(c, arguments);
     }
 
@@ -1066,5 +1401,9 @@ public interface Operator {
 
     default boolean supportsArguments(List<Value> arguments){
         return arguments.stream().noneMatch(a -> a instanceof AppendOnlyValue);
+    }
+
+    default Interval computeForIntervals(Context c, Value result, List<Interval> intervals){
+        return null;
     }
 }

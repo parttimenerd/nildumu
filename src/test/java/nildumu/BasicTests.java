@@ -3,7 +3,8 @@ package nildumu;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.*;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static nildumu.Lattices.*;
 import static nildumu.Processor.process;
@@ -11,17 +12,27 @@ import static nildumu.Processor.process;
 public class BasicTests {
 
     @Test
-    public void testParser(){
+    public void testParser() {
         process("h input int l = 0b0u; l output int o = l;");
     }
 
     @Test
-    public void testParser2(){
+    public void testParsingRepeatedBitNotation() {
+        parse("h input int l = 0b0u{2};").val("l", "0b0uu").run();
+    }
+
+    @Test
+    public void testParsingRepeatedBitNotation2() {
+        parse("int l = 0b0{2};").val("l", "0b00").run();
+    }
+
+    @Test
+    public void testParser2() {
         process("if (1) {}");
     }
 
     @Test
-    public void testParser3(){
+    public void testParser3() {
         process("if (1) {} if (1) {}");
     }
 
@@ -30,6 +41,11 @@ public class BasicTests {
     public void testSimpleAssignment(){
         parse("int x = 1").val("x", 1).run();
         parse("int x = -10").val("x", -10).run();
+    }
+
+    @Test
+    public void testBitSelect() {
+        parse("int x = 0b001; int y = x[1]").val("y", -1).run();
     }
 
     @Test
@@ -74,18 +90,23 @@ public class BasicTests {
             "'l input int l = 0b0u; int x = l | 0b11','0b11'",
             "'l input int l = 0b0u; int x = l & 0b11','0b0u'"
     })
-    public void testBitwiseOps(String program, String xVal){
+    public void testBitwiseOps(String program, String xVal) {
         parse(program).val("x", xVal).run();
     }
 
     @Test
-    public void testBitwiseOps2(){
+    public void testBitwiseOps2() {
         parse("h input int l = 0b0u;\n" +
                 "int x = 2 & l;").val("x", "0b00").run();
     }
 
     @Test
-    public void testPlusOperator(){
+    public void testLessThanWithConstants() {
+        parse("int x = 1 < 2;").val("x", "1").run();
+    }
+
+    @Test
+    public void testPlusOperator() {
         parse("int x = 1 + 0").val("x", "1").run();
     }
 
@@ -163,7 +184,7 @@ public class BasicTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"while (a == h){}", "while [] (a == h) {}", "while [a = phi(a, b)] (a == h) {}"})
+    @ValueSource(strings = {"while (a == h){}", "while [[]] (a == h) {}", "while [[a = phi(a, b)]] (a == h) {}"})
     public void testWhileParsing(String program){
         Parser.generator.parse(program);
     }
@@ -177,8 +198,23 @@ public class BasicTests {
         Parser.generator.parse(program);
     }
 
+    @Test
+    public void testAnd() {
+        parse("int x = 0 && 1").val("x", 0).run();
+        parse("int x = 1 && 1").val("x", 1).run();
+    }
+
+    @Test
+    public void testOr() {
+        parse("int x = 1 || 2").val("x", 1).run();
+    }
+
+    @Test
+    public void testDivide() {
+        parse("h input int c = 0bu{10}; int x = c / 2;").val("x", "0bu{10}").run();
+    }
+
     public ContextMatcher parse(String program){
         return new ContextMatcher(process(program));
     }
-
 }

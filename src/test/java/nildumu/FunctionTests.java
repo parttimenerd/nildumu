@@ -1,40 +1,65 @@
 package nildumu;
 
-import org.junit.*;
+import nildumu.mih.MethodInvocationHandler;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.*;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.logging.Level;
 import java.util.stream.Stream;
 
 import static java.time.Duration.ofSeconds;
-import static nildumu.Parser.*;
+import static nildumu.Parser.MethodNode;
+import static nildumu.Parser.ProgramNode;
 import static nildumu.Processor.process;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class FunctionTests {
 
-    @BeforeClass
-    public void setUp(){
+    @BeforeAll
+    public static void setUp() {
         Processor.transformPlus = true;
     }
 
-    @AfterClass
-    public void tearDown(){
+    @AfterAll
+    public static void tearDown() {
         Processor.transformPlus = false;
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "int bla(){}", "int bla1(int blub){}", "int bla1r(int blub){ return blub }" })
-    public void testFunctionDefinition(String program){
+    @ValueSource(strings = {"int bla1r(int blub){ return blub; }", "int bla(){}", "int bla1(int blub){}"})
+    public void testFunctionDefinition(String program) {
         parse(program);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"int bla(){} bla()", "int bla(int i){} bla(1)", "int bla(int i, int j){} bla(1,2)"})
-    public void testBasicFunctionCall(String program){
+    @ValueSource(strings = {"(int, int) bla1_1(int blub){ return (blub, blub) }",
+            "(int, int, int) bla1_1(int blub, int blub2){ return (blub, blub, blub2) }"})
+    public void testFunctionDefinitionWithMultipleReturnValues(String program) {
+        parse(program);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'(int, int) bla1_1(int blub){ return (blub, blub + 2) } int x; int y; x, y = *bla1_1(1);', '1', '3'",
+            "'(int, int) bla1_1(int blub){ return (blub - 2, blub - 3) } int x; int y; x, y = *bla1_1(1);', '-1', '-2'",
+            "'(int, int) bla1_1(int blub){ return (blub, blub) } int x; int y; x, y = *bla1_1(1);', '1', '1'",
+    })
+    public void testBasicFunctionCallWithMultipleReturns(String program, String valX, String valY) {
+        Context.LOG.setLevel(Level.FINE);
+        parse(program, "inlining", 20).val("x", valX).val("y", valY).run();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "int bla(int i){} bla(1)",
+            "int bla(){} bla()",
+            "int bla(int i, int j){} bla(1,2)"
+    })
+    public void testBasicFunctionCall(String program) {
         parse(program);
     }
 
@@ -73,16 +98,17 @@ l output int o = fib(h);
     @ParameterizedTest
     @MethodSource("handlers")
     public void testFibonacci(String handler){
+        Context.LOG.setLevel(Level.WARNING);
         assertTimeoutPreemptively(ofSeconds(5), () -> parse("bit_width 2;\n" +
-"h input int h = 0b0u;\n" +
-"int fib(int a){\n" +
-"	int r = 1;\n" +
-"	if (a > 1){\n" +
-"		r = fib(a - 1) + fib(a - 2);\n" +
-"	}\n" +
-"	return r;\n" +
-"}\n" +
-"l output int o = fib(h);", handler)).leaks(1).run();
+                "h input int h = 0b0u;\n" +
+                "int fib(int a){\n" +
+                "	int r = 1;\n" +
+                "	if (a > 1){\n" +
+                "		r = fib(a - 1) + fib(a - 2);\n" +
+                "	}\n" +
+                "	return r;\n" +
+                "}\n" +
+                "l output int o = fib(h);", handler)).leaks(1).run();
     }
 
     @ParameterizedTest
@@ -152,24 +178,45 @@ l output int o = fib(h);
     @ParameterizedTest
     @MethodSource("handlers")
     public void testWeirdFibonacciTermination(String handler){
-        Context.LOG.setLevel(Level.INFO);
-        assertTimeoutPreemptively(ofSeconds(10000), () -> parse(
+        assertTimeoutPreemptively(ofSeconds(1), () -> parse(
                 "     h input int h = 0b0u;\n" +
-                "     l input int l = 0b0u;\n" +
-                "     int res = 0;\n" +
-                "     int fib(int a){\n" +
-                "         int r = 1;\n" +
-                "         while (a > 0){\n" +
-                "             if (a > 1){\n" +
-                "                r = r + fib(a - 1);\n" +
-                "             }\n" +
-                "         }\n" +
+                        "     l input int l = 0b0u;\n" +
+                        "     int res = 0;\n" +
+                        "     int fib(int a){\n" +
+                        "         int r = 1;\n" +
+                        "         while (a > 0){\n" +
+                        "             if (a > 1){\n" +
+                        "                r = r + fib(a - 1);\n" +
+                        "             }\n" +
+                        "         }\n" +
                 "         return r;\n" +
                 "     }\n" +
                 "     while (l) {\n" +
                 "        res = res + fib(h);\n" +
                 "     }\n" +
                 "     l output int o = fib(h);", handler)).leaks(1).run();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"handler=inlining;maxrec=2;bot=summary"})
+    public void testWeirdFibonacciTermination32(String handler){
+        assertTimeoutPreemptively(ofSeconds(10000), () -> parse(
+                "     h input int h = 0bu{32};\n" +
+                        "     l input int l = 0bu{32};\n" +
+                        "     int res = 0;\n" +
+                        "     int fib(int a){\n" +
+                        "         int r = 1;\n" +
+                        "         while (a > 0){\n" +
+                        "             if (a > 1){\n" +
+                        "                r = r + fib(a - 1);\n" +
+                        "             }\n" +
+                        "         }\n" +
+                        "         return r;\n" +
+                        "     }\n" +
+                        "     while (l) {\n" +
+                        "        res = res + fib(h);\n" +
+                        "     }\n" +
+                        "     l output int o = fib(h);", handler).leaks(32).benchLeakageComputationAlgorithms(3).run());
     }
 
     /**
@@ -229,7 +276,7 @@ l output int o = fib(h);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"basic", "handler=summary;reduction=basic;bot=basic;dot=tmp2"})
+    @ValueSource(strings = {"basic", "handler=summary;reduction=basic;bot=basic"})
     public void testNestedMethodCalls_smaller3(String handler){
         Context.LOG.setLevel(Level.FINE);
         parse("int f(int x) {\n" +
@@ -261,7 +308,7 @@ l output int o = fib(h);
     @ParameterizedTest
     @MethodSource("handlers")
     public void testConditionalRecursion(String handler){
-        parse("bit_width 3;\n" +
+        parse("bit_width 5;\n" +
                 "    int f(int x, int y, int z, int w, int v, int l) {\n" +
                 "\t    int r = 0;\n" +
                 "\t    if (l == 0) {\n" +
@@ -318,7 +365,7 @@ l output int o = fib(h);
                 "     }\n" +
                 "     l output int o = fib(h); ";
         System.err.println(Parser.process(program, false).toPrettyString());
-       parse(program, MethodInvocationHandler.parse("handler=call_string;maxrec=1;bot=summary_mc"));
+       parse(program, MethodInvocationHandler.parse("handler=inlining;maxrec=1;bot=summary"));
     }
 
     @Test
@@ -328,7 +375,7 @@ l output int o = fib(h);
                 "	return a + 1;\n" +
                 "} f(1)" ;
         System.err.println(Parser.process(program).toPrettyString());
-        parse(program, MethodInvocationHandler.parse("handler=summary;maxiter=2;bot=basic;dot=dots23.dot"));
+        parse(program, MethodInvocationHandler.parse("handler=summary;maxiter=2;bot=basic"));
     }
 
     @RepeatedTest(value = 3)
@@ -361,7 +408,7 @@ l output int o = fib(h);
                 "l output int o = f2(h);";
         ProgramNode node = Parser.process(program);
         Context.LOG.setLevel(Level.FINE);
-        Context c1 = Processor.process(node, Context.Mode.LOOP, MethodInvocationHandler.parse("handler=summary;dot=dots1"));
+        Context c1 = Processor.process(node, Context.Mode.LOOP, MethodInvocationHandler.parse("handler=summary"));
         Context.LOG.setLevel(Level.INFO);
         //node = Parser.process(program);
         //Context c2 = Processor.process(node, MethodInvocationHandler.parse("handler=summary"));
@@ -372,16 +419,29 @@ l output int o = fib(h);
         //new ContextMatcher(c2).leaks(1).run();
     }
 
+    @Test
+    public void testAbs() {
+        parse("int i = abs(-1)").val("i", 1).run();
+    }
+
+    @Test
+    @Disabled
+    public void testShippingGlobalNotFound() {
+        parse("int i = 0;\n" +
+                "int is_solution() { return i;\n" +
+                "}").run();
+    }
+
     static ContextMatcher parse(String program){
         return parse(program, MethodInvocationHandler.createDefault());
     }
 
     static ContextMatcher parse(String program, String handler){
-        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(handler)));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(handler), 0));
     }
 
     static ContextMatcher parse(String program, MethodInvocationHandler handler) {
-        return new ContextMatcher(process(program, Context.Mode.LOOP, handler));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, handler, 0));
     }
 
     static ContextMatcher parse(String program, String handler, int bitWidth) {

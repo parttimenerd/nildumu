@@ -35,7 +35,7 @@ public class DefaultMap<K, V> implements Map<K, V> {
         this.extension = extension;
         List<ForbiddenAction> fl = Arrays.asList(forbiddenActions);
         this.forbidValueUpdates = fl.contains(ForbiddenAction.FORBID_VALUE_UPDATES);
-        this.forbidDeletions = fl.contains(ForbiddenAction.FORBID_VALUE_UPDATES);
+        this.forbidDeletions = fl.contains(ForbiddenAction.FORBID_DELETIONS);
     }
 
     @Override

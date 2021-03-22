@@ -155,6 +155,23 @@ public class ExtGrammarBuilder extends GrammarBuilder implements Serializable {
 	}
 
 	/**
+	 * Add a rules with the same action
+	 *
+	 * @param nonTerminal left hand side of the rule
+	 * @param rules right hand sides of the rule
+	 * @see ExtGrammarBuilder format description
+	 * @param action action to execute for this rule
+	 * @return self
+	 */
+	public ExtGrammarBuilder addRule(String nonTerminal, List<String> rules, SerializableFunction<ListAST, BaseAST> action){
+		rules.forEach(rule -> {
+			addRule(nonTerminal, rule);
+			action(action);
+		});
+		return this;
+	}
+
+	/**
 	 * Add precedence ordered operators
 	 *
 	 * @param nonTerminal left hand side of the top most rule

@@ -1,5 +1,6 @@
 package nildumu;
 
+import nildumu.typing.Types;
 import swp.util.Pair;
 
 import java.util.*;
@@ -11,8 +12,9 @@ import static nildumu.util.Util.p;
 /**
  * Does the conversion of a non SSA to a SSA AST,
  * introduces new phi-nodes and variables
- *
- * Version 2: comes in before (!) the name resolution and transforms the program in a program with
+ * <p>
+ * Version 2: comes in before (!) the name resolution and transforms the program in a program with,
+ * but comes after the TypeTransformation (and therefore only deals with ints)
  * Phi-Nodes. This program should then be pretty-printed and processed again (without SSA resolution)
  */
 public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
@@ -51,6 +53,8 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
          * Defined variables
          */
         final Set<String> definedVariables = new HashSet<>();
+        /** contains variables from the defined variables field, that are defined without a value */
+        final Set<String> definedVariablesWOAssigment = new HashSet<>();
         final Map<String, String> newVariablesLocated = new HashMap<>();
 
         Map<String, String> getNewWithoutDefined(){
@@ -80,7 +84,84 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     private final Set<String> appendValueVariables;
 
-    public SSAResolution2(MethodNode method) {
+    private final Types types;
+
+    private final VariableSet collectedVariableNames;
+
+    private static class VariableSet extends AbstractSet<String> {
+
+        private final Set<String> variables;
+
+        private VariableSet(Set<String> variables) {
+            this.variables = variables;
+        }
+
+        @Override
+        public Iterator<String> iterator() {
+            return variables.iterator();
+        }
+
+        @Override
+        public int size() {
+            return variables.size();
+        }
+
+        @Override
+        public boolean contains(Object o) {
+            return variables.contains(o);
+        }
+
+        /** Create a version of the variable name that is not yet present in this set and add it */
+        public String create(String variable) {
+            while (variables.contains(variable)) {
+                variable = variable + "_" + System.nanoTime() % 10000;
+            }
+            variables.add(variable);
+            return variable;
+        }
+    }
+
+    public static class VariableDefinitionVisitor implements NodeVisitor<Object> {
+        final Set<String> variables = new HashSet<>();
+
+        @Override
+        public Object visit(MJNode node) {
+            visitChildrenDiscardReturn(node);
+            return null;
+        }
+
+        @Override
+        public Object visit(VariableDeclarationNode assignment) {
+            variables.add(assignment.variable);
+            return null;
+        }
+
+        @Override
+        public Object visit(StatementNode statementNode) {
+            return null;
+        }
+
+        @Override
+        public Object visit(BlockNode block) {
+            visitChildrenDiscardReturn(block);
+            return null;
+        }
+
+        @Override
+        public Object visit(ParameterNode parameterNode) {
+            variables.add(parameterNode.name);
+            return null;
+        }
+
+        public static VariableSet process(MJNode node) {
+            VariableDefinitionVisitor visitor = new VariableDefinitionVisitor();
+            node.accept(visitor);
+            return new VariableSet(visitor.variables);
+        }
+    }
+
+    public SSAResolution2(Types types, MethodNode method, VariableSet collectedVariableNames) {
+        this.collectedVariableNames = collectedVariableNames;
         reverseMapping = new HashMap<>();
         versionCount = new HashMap<>();
         scopes = new Stack<>();
@@ -89,6 +170,11 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         appendValueVariables = new HashSet<>();
         conditionalScopes = new Stack<>();
         conditionalScopes.push(new Scope());
+        scopes.push(new Scope());
+        if (method != null) {
+            scopes.peek().definedVariables.addAll(method.parameters.parameterNodes.stream().map(p -> p.name).collect(Collectors.toList()));
+        }
+        this.types = types;
     }
 
     public List<String> resolve(MJNode node){
@@ -124,8 +210,16 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     private void defineVariable(String variable){
+        defineVariable(variable, true);
+    }
+
+    private void defineVariable(String variable, boolean hasAssignment) {
         scopes.peek().definedVariables.add(variable);
         conditionalScopes.peek().definedVariables.add(variable);
+        if (!hasAssignment) {
+            scopes.peek().definedVariablesWOAssigment.add(variable);
+            conditionalScopes.peek().definedVariablesWOAssigment.add(variable);
+        }
     }
 
     @Override
@@ -138,14 +232,14 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
 
     @Override
     public VisRet visit(VariableDeclarationNode declaration) {
-        defineVariable(declaration.variable);
+        defineVariable(declaration.variable, declaration.hasInitExpression());
         return visit((MJNode)declaration);
     }
 
     @Override
     public VisRet visit(VariableAssignmentNode assignment) {
         if (assignment.expression instanceof VariableAccessNode){
-            VariableAccessNode variableAccess = (VariableAccessNode)assignment.expression;
+            VariableAccessNode variableAccess = (VariableAccessNode) assignment.expression;
             assignment.expression = new VariableAccessNode(assignment.expression.location, resolve(variableAccess.ident));
         } else {
             assignment.expression.accept(this);
@@ -156,14 +250,37 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     @Override
+    public VisRet visit(MultipleVariableAssignmentNode assignment) {
+        assignment.expression.accept(this);
+        return new VisRet(true,
+                new MultipleVariableAssignmentNode(assignment.location,
+                        assignment.variables.stream().map(this::create).toArray(String[]::new),
+                        assignment.expression));
+    }
+
+    @Override
+    public VisRet visit(ReturnStatementNode returnStatement) {
+        if (returnStatement.hasReturnExpression()) {
+            returnStatement.expression.accept(this);
+        }
+        return VisRet.DEFAULT;
+    }
+
+    @Override
+    public VisRet visit(TupleLiteralNode tupleLiteral) {
+        tupleLiteral.elements.forEach(e -> e.accept(this));
+        return VisRet.DEFAULT;
+    }
+
+    @Override
     public VisRet visit(BlockNode block) {
         return visit(block, false);
     }
 
     public VisRet visit(BlockNode block, boolean assignGlobalVariables) {
         List<StatementNode> blockPartNodes = new ArrayList<>();
-        for (StatementNode child : block.statementNodes){
-            if (child instanceof BlockNode){
+        for (StatementNode child : block.statementNodes) {
+            if (child instanceof BlockNode) {
                 pushNewVariablesScope();
             }
             VisRet ret = child.accept(this);
@@ -189,7 +306,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         Map<String, String> filtered = new HashMap<>();
         scopes.peek().newVariables.forEach((o, n) -> {
             if (scopes.peek().definedVariables.contains(o)){
-                block.prependVariableDeclaration(n, appendValueVariables.contains(o));
+                block.prependVariableDeclaration(n, types.INT, appendValueVariables.contains(o));
                 reverseMapping.remove(n);
                 introducedVariables.remove(n);
             } else {
@@ -270,7 +387,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
     }
 
     public static void process(SSAResolution2 parent, MethodNode method) {
-        SSAResolution2 resolution = new SSAResolution2(method);
+        SSAResolution2 resolution = new SSAResolution2(parent.types, method, VariableDefinitionVisitor.process(method));
         resolution.pushNewVariablesScope();
         Map<String, String> pre = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, v -> {
             resolution.appendValueVariables.add(v);
@@ -280,16 +397,16 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
         resolution.resolve(method.parameters);
         List<String> createdVars = resolution.resolve(method.body);
         createdVars.stream().filter(v -> !pre.values().contains(v))
-                .forEach(v -> method.body.prependVariableDeclaration(v, resolution.appendValueVariables.contains(resolution.resolveOrigin(v))));
+                .forEach(v -> method.body.prependVariableDeclaration(v, parent.types.INT, resolution.appendValueVariables.contains(resolution.resolveOrigin(v))));
         Map<String, String> post = parent.appendOnlyVariables.stream().collect(Collectors.toMap(v -> v, resolution::resolve));
         parent.appendOnlyVariables.forEach(v -> method.globals.globalVarSSAVars.put(v, p(pre.get(v), post.get(v))));
     }
 
     public static void process(ProgramNode program){
-        SSAResolution2 resolution = new SSAResolution2(null);
+        SSAResolution2 resolution = new SSAResolution2(program.types, null, VariableDefinitionVisitor.process(program.globalBlock));
         resolution.pushNewVariablesScope();
         resolution.resolveGlobalBlock(program.globalBlock)
-                .forEach(v -> program.globalBlock.prependVariableDeclaration(v, resolution.appendValueVariables.contains(v)));
+                .forEach(v -> program.globalBlock.prependVariableDeclaration(v, program.types.INT, resolution.appendValueVariables.contains(v)));
         program.methods().forEach(m -> SSAResolution2.process(resolution, m));
     }
 
@@ -374,7 +491,12 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
      */
     private String create(String variable, boolean hasAppendValue){
         String origin = resolveOrigin(variable);
-        String newVariable = origin + (numberOfVersions(origin) + 1);
+        if (scopes.peek().definedVariablesWOAssigment.contains(origin)) {
+            scopes.peek().definedVariablesWOAssigment.remove(origin);
+            scopes.peek().newVariablesLocated.put(origin, origin);
+            return variable;
+        }
+        String newVariable = this.collectedVariableNames.create(origin + (numberOfVersions(origin) + 1));
         String pred = resolveLocated(variable);
         versionCount.put(origin, numberOfVersions(origin) + 1);
         reverseMapping.put(newVariable, origin);

@@ -222,7 +222,43 @@ public class Utils {
 				return false;
 			}
 			Triple triple = (Triple)obj;
-			return triple.first == this.first && triple.second == this.second && triple.third == this.third;
+			return triple.first.equals(this.first) && triple.second.equals(this.second) && triple.third.equals(this.third);
+		}
+	}
+
+	/**
+	 * Simple immutable quadruple (tuple with four entries) implementation.
+	 */
+	public static class Quadruple<T, V, W, X> {
+
+		public final T first;
+
+		public final V second;
+
+		public final W third;
+
+		public final X fourth;
+
+		public Quadruple(T first, V second, W third, X fourth) {
+			this.first = first;
+			this.second = second;
+			this.third = third;
+			this.fourth = fourth;
+		}
+
+		@Override
+		public int hashCode() {
+			return first.hashCode() ^ second.hashCode() ^ third.hashCode() ^ fourth.hashCode();
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (!(obj instanceof Quadruple)){
+				return false;
+			}
+			Quadruple quadruple = (Quadruple)obj;
+			return quadruple.first == this.first && quadruple.second == this.second && quadruple.third == this.third
+					&& quadruple.fourth == this.fourth;
 		}
 	}
 

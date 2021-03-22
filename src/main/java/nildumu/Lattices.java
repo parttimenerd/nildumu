@@ -1,15 +1,24 @@
 package nildumu;
 
-import java.time.temporal.ValueRange;
-import java.util.*;
-import java.util.function.*;
-import java.util.stream.*;
-
+import nildumu.intervals.Interval;
+import nildumu.intervals.Intervals;
 import nildumu.util.Util;
 import swp.util.Pair;
 
+import java.time.temporal.ValueRange;
+import java.util.*;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+
 import static nildumu.Lattices.B.*;
-import static nildumu.util.Util.*;
+import static nildumu.util.Util.log2;
+import static nildumu.util.Util.toBinaryString;
 
 /**
  * The basic lattices needed for the project
@@ -745,8 +754,8 @@ public class Lattices {
         }
     }
 
-    static final DependencySetLattice ds = DependencySetLattice.get();
-    static final B bs = B.U;
+    public static final DependencySetLattice ds = DependencySetLattice.get();
+    public static final B bs = B.U;
     public static final BitLattice bl = BitLattice.get();
     public static final ValueLattice vl = ValueLattice.get();
 
@@ -755,6 +764,19 @@ public class Lattices {
         private final static BitLattice BIT_LATTICE = new BitLattice();
 
         public BitLattice() {
+        }
+
+        /**
+         * Returns the bit of the passed set, that are reachable from the bit
+         */
+        public static Set<Bit> calcReachableBits(Bit bit, Set<Bit> bits){
+            Set<Bit> reachableBits = new HashSet<>();
+            bl.walkBits(bit, b -> {
+                if (bits.contains(b)){
+                    reachableBits.add(b);
+                }
+            }, b -> false);
+            return reachableBits;
         }
 
         @Deprecated
@@ -1060,7 +1082,7 @@ public class Lattices {
             }
         }
 
-        public Bit addDependencies(Collection<Bit> newDependencies){
+        public Bit addDependencies(Iterable<Bit> newDependencies){
             newDependencies.forEach(this::addDependency);
             return this;
         }
@@ -1132,7 +1154,7 @@ public class Lattices {
 
     public static class ValueLattice implements Lattice<Value> {
 
-        int bitWidth = Integer.MAX_VALUE;
+        public int bitWidth = 32;
 
         private static final ValueLattice lattice = new ValueLattice();
 
@@ -1156,44 +1178,59 @@ public class Lattices {
         }
 
         /**
-         * 0b[Bits] or the integer number
+         * 0b[Bits] or the integer number, bits may be followed by "{n}" with n being the number of times the bit
+         * is repeated, e.g. "0bu{3}" is equal to "0buuu"
          */
         @Override
         public Pair<Value, Integer> parse(int start, String str, IdToElement idToElement) {
-            if (str.length() > start + 1 && str.charAt(start) == '0' && str.charAt(start + 1) == 'b') {
-                int i = start + 2;
-                List<Bit> bits = new ArrayList<>();
-                while (i < str.length()) {
-                    while (str.charAt(i) == ' ') {
-                        i++;
+            if (str.length() > start + 1) {
+                if (str.charAt(start) == '0' && str.charAt(start + 1) == 'b') {
+                    int i = start + 2;
+                    List<Bit> bits = new ArrayList<>();
+                    while (i < str.length()) {
+                        while (str.charAt(i) == ' ') {
+                            i++;
+                        }
+                        if (str.charAt(i) == '{') {
+                            i++;
+                            int begin = i;
+                            while (str.charAt(i) != '}') {
+                                i++;
+                            }
+                            int n = Integer.parseInt(str.substring(begin, i));
+                            Bit firstBit = bits.get(0);
+                            bits.addAll(0, Collections.nCopies(n - 1, firstBit));
+                            i++;
+                        } else {
+                            Pair<Bit, Integer> ret = bl.parse(i, str, idToElement);
+                            i = ret.second;
+                            bits.add(0, ret.first);
+                            while (i < str.length() && str.charAt(i) == ' ') {
+                                i++;
+                            }
+                        }
                     }
-                    Pair<Bit, Integer> ret = bl.parse(i, str, idToElement);
-                    i = ret.second;
-                    bits.add(0, ret.first);
-                    while (i < str.length() && str.charAt(i) == ' ') {
-                        i++;
+                    Value val = new Value(bits);
+                    if (val.isConstant()) {
+                        val.setInterval(new Interval(val.asLong(), val.asLong()));
                     }
+                    return new Pair<>(val, i);
                 }
-               /* if (bits.size() == 1){
-                    bits.add(new Bit(ZERO));
-                }*/
-                return new Pair<>(new Value(bits), i);
-            } else {
-                int end = start;
-                char startChar = str.charAt(start);
-                if (startChar != '+' && startChar != '-' && !Character.isDigit(startChar)) {
-                    throw new ParsingError(str, start, "Expected number or sign");
-                }
-                end++;
-                while (end < str.length() && Character.isDigit(str.charAt(end))) {
-                    end++;
-                }
-                return new Pair<>(parse("0b" + toBinaryString(Integer.parseInt(str.substring(start, end)))), end);
             }
+            int end = start;
+            char startChar = str.charAt(start);
+            if (startChar != '+' && startChar != '-' && !Character.isDigit(startChar)) {
+                throw new ParsingError(str, start, "Expected number or sign");
+            }
+            end++;
+            while (end < str.length() && Character.isDigit(str.charAt(end))) {
+                end++;
+            }
+            return new Pair<>(parse("0b" + toBinaryString(Integer.parseInt(str.substring(start, end)))), end);
         }
 
-        public Value parse(int val){
-            return parse(Integer.toString(val));
+        public Value parse(long val){
+            return parse(Long.toString(val));
         }
 
         public static ValueLattice get() {
@@ -1251,6 +1288,8 @@ public class Lattices {
         private String description = "";
         private Parser.MJNode node = null;
 
+        Interval interval = null;
+
         protected Value(){
             this.bits = new ArrayList<>();
         }
@@ -1266,8 +1305,28 @@ public class Lattices {
             assert !ENABLE_MISC_CHECKS || !hasDuplicateBits();
         }
 
+        private Value(Vector<Bit> bits) {
+            //assert bits.size() > 1;
+            this.bits = bits;
+            assert !ENABLE_MISC_CHECKS || !hasDuplicateBits();
+        }
+
         public Value(Bit... bits) {
             this(Arrays.asList(bits));
+        }
+
+        public static Value combine(List<Value> values) {
+            return values.stream().flatMap(v -> v.withBitCountMultipleOf(ValueLattice.get().bitWidth).bits.stream()).collect(Value.collector());
+        }
+
+        /**
+         * Combine the values to a single value and return a zero value if the passed list is empty
+         */
+        public static Value combineOrZero(List<Value> values) {
+            if (values.isEmpty()) {
+                return vl.parse("0");
+            }
+            return combine(values);
         }
 
         @Override
@@ -1291,7 +1350,8 @@ public class Lattices {
         public String toString() {
             List<Bit> reversedBits = new ArrayList<>(bits);
             Collections.reverse(reversedBits);
-            return reversedBits.stream().map(b -> b.val.toString()).collect(Collectors.joining(""));
+            return reversedBits.stream().map(b -> b.val.toString()).collect(Collectors.joining("")) +
+                    mapInterval(Interval::toString, "");
         }
 
         public String repr() {
@@ -1301,7 +1361,7 @@ public class Lattices {
             if (!description.equals("")) {
                 return String.format("(%s|%s)", description, ret);
             }
-            return ret;
+            return ret +  mapInterval(i -> i.toString() + "#" + entropy(), "");
         }
 
         public String toString(Function<Bit, String> bitToId) {
@@ -1335,17 +1395,35 @@ public class Lattices {
         }
 
         public boolean isConstant(){
-            return bits.stream().allMatch(Bit::isConstant) && bits.size() > 0;
+            return (bits.stream().allMatch(Bit::isConstant) && bits.size() > 0);
         }
 
-        public int asInt(){
+        public long asLong(){
             assert isConstant();
-            int result = 0;
+            long result = 0;
             boolean neg = signBit().val == ONE;
             int signBitVal = signBit().val.value.get();
             for (int i = bits.size() - 1; i >= 0; i--){
-                result = result * 2;
+                result = result * 2l;
                 int bitVal = bits.get(i).val.value.get();
+                if (signBitVal != bitVal){
+                    result += 1l;
+                }
+            }
+            if (neg){
+                return -result - 1l;
+            }
+            return result;
+        }
+
+        public long asLong(B sign, B assumedUnknown){
+            long result = 0;
+            boolean neg = sign == ONE;
+            int signBitVal = sign.value.get();
+            for (int i = bits.size() - 1; i >= 0; i--){
+                result = result * 2;
+                B val = bits.get(i).val;
+                int bitVal = (val == U ? assumedUnknown : val).value.get();
                 if (signBitVal != bitVal){
                     result += 1;
                 }
@@ -1355,7 +1433,6 @@ public class Lattices {
             }
             return result;
         }
-
 
         @Override
         public Iterator<Bit> iterator() {
@@ -1401,8 +1478,8 @@ public class Lattices {
         }
 
         public String toLiteralString(){
-            if (isConstant()){
-                return Integer.toString(asInt());
+            if (isConstant() && bits.size() <= vl.bitWidth){
+                return Long.toString(asLong());
             }
             List<Bit> reversedBits = new ArrayList<>(bits);
             Collections.reverse(reversedBits);
@@ -1411,6 +1488,10 @@ public class Lattices {
 
         public boolean isNegative(){
             return signBit().val == ONE;
+        }
+
+        public boolean isPositive(){
+            return signBit().val == ZERO;
         }
 
         public Value map(Function<Bit, Bit> mapper){
@@ -1425,7 +1506,7 @@ public class Lattices {
             if (!isConstant()){
                 return false;
             }
-            double twoLog = log2(asInt());
+            double twoLog = log2(asLong());
             return ((int)twoLog) == twoLog;
         }
 
@@ -1473,12 +1554,185 @@ public class Lattices {
         public boolean valueGreaterEquals(Value other) {
             return vl.mapBits(this, other, Bit::valueGreaterEquals).stream().allMatch(Boolean::booleanValue);
         }
+
+        public Intervals.Constraints asConstraints(){
+            return new Intervals.Constraints(){
+
+                @Override
+                public B get(int index) {
+                    return Value.this.get(index + 1).val;
+                }
+
+                @Override
+                public int size() {
+                    return Value.this.size();
+                }
+            };
+        }
+
+        public boolean hasInterval(){
+            return interval != null;
+        }
+
+        public boolean canHaveInterval(){
+            return true;
+        }
+
+        public Interval getInterval(){
+            if (canHaveInterval() && interval == null) {
+                interval = Interval.forBitWidth(vl.bitWidth);
+            }
+            return interval;
+        }
+
+        public <T> T mapInterval(Function<Interval, T> func, T defaultVal){
+            if (hasInterval()){
+                return func.apply(getInterval());
+            }
+            return defaultVal;
+        }
+
+        public void setInterval(Interval interval){
+            //Objects.requireNonNull(interval);
+            this.interval = interval;
+        }
+
+        /**
+         * Entropy of this value in bits
+         *
+         * @return entropy
+         */
+        public double entropy(){
+            if (hasInterval()){
+                return Util.log2(Intervals.countPattern(interval, asConstraints()));
+            }
+            return this.stream().filter(Bit::isAtLeastUnknown).count();
+        }
+
+        public boolean singleValued() {
+            if (isConstant()){
+                return true;
+            }
+            return hasInterval() && interval.start == interval.end; // TODO
+        }
+
+        public long singleValue() {
+            assert singleValued();
+            if (isConstant()) {
+                return asLong();
+            }
+            return interval.start;
+        }
+
+        public List<Value> split() {
+            assert bits.size() % vl.bitWidth == 0;
+            return split(bits.size() / vl.bitWidth);
+        }
+
+        public List<Value> split(int partCount) {
+            if (partCount == 0) {
+                return Collections.emptyList();
+            }
+            if (isBot()) {
+                return IntStream.range(0, partCount).mapToObj(i -> vl.bot()).collect(Collectors.toList());
+            }
+            assert bits.size() % partCount == 0;
+            int partSize = bits.size() / partCount;
+            return IntStream.range(0, partCount)
+                    .mapToObj(i -> new Value(bits.subList(i * partSize, (i + 1) * partSize)))
+                    .collect(Collectors.toList());
+        }
+
+        /**
+         * create a value that mirrors this value but has a specific number of bits, fill with zeros
+         */
+        public Value withBitCount(int width) {
+            List<Bit> newBits = bits.subList(0, Math.min(width, bits.size()));
+            while (newBits.size() < width) {
+                newBits.add(this.signBit().copy());
+            }
+            return new Value(newBits);
+        }
+
+        public Value withBitCountMultipleOf(int width) {
+            return withBitCount((int) (Math.ceil(bits.size() * 1.0 / width) * width));
+        }
+
+        public boolean isNotEmpty() {
+            return bits.size() > 0;
+        }
+
+        /**
+         * Add deps to each bit and returns the current value
+         */
+        public Value addDeps(Iterable<Bit> deps) {
+            bits.forEach(b -> b.addDependencies(deps));
+            return this;
+        }
+
+        public boolean mightBe(boolean b) {
+            /*if (singleValued()) {
+                return (asInt() != 0) == b;
+            }
+            return b || bits.stream().allMatch(bit -> bit.val != ONE);*/
+            return get(1).val == U || is(b);
+        }
+
+        public boolean is(boolean b) {
+            return b ? (get(1).val == ONE) : (get(1).val == ZERO);
+        }
+
+        public Value assume(B sign) {
+            assert sign.isConstant();
+            if (sign == signBit().val) {
+                return this;
+            }
+            Vector<Bit> newBits = new Vector<>(bits);
+            newBits.set(bits.size() - 1, bl.create(sign));
+            return new Value(newBits);
+        }
+
+        public long largest() {
+            return largest(signBit().val);
+        }
+
+        public long largest(B sign) {
+            assert sign.isConstant();
+            if (sign == ZERO) {
+                return asLong(sign, ONE);
+            }
+            return asLong(sign, ZERO);
+        }
+
+        public long smallest() {
+            return smallest(signBit().val);
+        }
+
+        public long smallest(B sign) {
+            assert sign.isConstant();
+            if (sign == ZERO) {
+                return asLong(sign, ZERO);
+            }
+            return asLong(sign, ONE);
+        }
+
+        /**
+         * Returns the bit indices (without the sign indices),
+         * indices = highest non sign bit indices, …, last consecutive val bit indices + app
+         */
+        public IntStream highBitIndicesWOSign(B val, int app) {
+            int smallest = bits.size();
+            for (int i = bits.size() - 1; i >= 1 && get(i).val == val; i--) {
+                smallest = i;
+            }
+            return IntStream.range(Math.max(1, smallest + app), bits.size());
+        }
     }
 
     /**
      * Only appending bits is possible, but not accessing the individual
      */
-    static class AppendOnlyValue extends Value {
+    public static class AppendOnlyValue extends Value {
 
         public AppendOnlyValue(Bit... bits) {
             super(Arrays.stream(bits).map(b -> b.val == X ? bl.create(E) : b).toArray(Bit[]::new));
@@ -1487,7 +1741,7 @@ public class Lattices {
         @Override
         public Bit get(int index) {
             assert index > 0;
-            while (size() < index){
+            while (size() < index) {
                 add(new Bit(E));
             }
             return super.get(index);
@@ -1504,7 +1758,7 @@ public class Lattices {
             return append(value, vl.bitWidth);
         }
 
-        static AppendOnlyValue createEmpty(){
+        public static AppendOnlyValue createEmpty() {
             AppendOnlyValue val = new AppendOnlyValue();
             for (int i = 0; i < vl.bitWidth; i++) {
                 val.add(new Bit(E));
@@ -1543,7 +1797,7 @@ public class Lattices {
             super.add(bit);
         }
 
-        int sizeWithoutEs(){
+        public int sizeWithoutEs() {
             // TODO: improve
             return (int) bits.stream().filter(b -> b.val != E).count();
         }
@@ -1562,6 +1816,15 @@ public class Lattices {
 
         public AppendOnlyValue cloneWithoutEs(){
             return new AppendOnlyValue(stream().filter(b -> b.val != E).toArray(Bit[]::new));
+        }
+
+        public double entropy(){
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean hasInterval() {
+            return false;
         }
     }
 }

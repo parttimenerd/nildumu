@@ -18,6 +18,14 @@ Run a basic UI via the `gui` script in the main directory. This allows
 to run the analysis and see the computed leakage and the bit dependency
 graph.
 
+Setup
+-----
+```shell script
+./download_solvers   # download MaxSAT solvers from the MaxSAT Evaluation webpage
+./gui                # build and run the gui
+./evaluate           # build and run the evaluation
+```
+
 Language
 --------
 - the language has a C like syntax
@@ -39,6 +47,7 @@ program
   using the syntax `X input int VAR_NAME = INPUT_LITERAL`
     - `INPUT_LITERAL` can be a signed integer literal or a binary literal
       (`0b…`) where bits can also be specified as `u` (statically unknown)
+        - `ɑ{n}` repeats a bit ɑ n times
     - this the only case where variability can be introduced
     - typically unknown bits of high input variables are considered the
       secret
@@ -112,7 +121,8 @@ All configurations and inputs are stored continously in the
       if-statement and doesn't take into account that conditions fixate
       specific bits in the then- and the else-branch of if-statements
    - `extended`: takes the last point into account
-   - `loop`: full support of the whole language
+   - `loop`: full support of the whole language, contains still bugs, it is advised
+     to enable the transformation of loops to recursion
 - the big combobox below
    - it allows to select and configure the method handler the handles
      the method invocations
@@ -207,5 +217,11 @@ All configurations and inputs are stored continously in the
     - the graphs are not created in the `MIN` output mode
     - zooming in the graph works by pressing the *Shift* key and
       moving the mouse up or down while pressing an arbitrary mouse key
+
+Requirements
+------------
+Some code requires the [pysat](https://github.com/pysathq/pysat) library to be installed and
+the content of [Open-WBO.zip](https://maxsat-evaluations.github.io/2018/mse18-solver-src/complete/Open-WBO.zip)
+placed into the `dist` folder.
 
 It's licensed under the GPLv3 and MIT license.

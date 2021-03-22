@@ -1,17 +1,21 @@
 package nildumu;
 
-import java.util.*;
-import java.util.function.*;
-import java.util.stream.Collectors;
-
 import nildumu.util.DefaultMap;
 import swp.util.Pair;
+
+import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static nildumu.Lattices.vl;
 import static nildumu.Parser.*;
 import static nildumu.Parser.LexerTerminal.*;
 import static nildumu.util.Util.p;
 
+/**
+ * Only runs after the type transformation
+ */
 public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
 
     private final int maxBitWidth;
@@ -20,8 +24,6 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     private final DefaultMap<ExpressionNode, ExpressionNode> replacedMap = new DefaultMap<>((map, node) -> repl(node));
 
     private final DefaultMap<ConditionalStatementNode, ConditionalStatementNode> replacedCondStmtsMap = new DefaultMap<>((map, stmt) -> stmt);
-
-    private final Map<WhileStatementNode, WhileStatementNode> whileStmtMap = new HashMap<>();
 
     MetaOperatorTransformator(int maxBitWidth, boolean transformPlus) {
         this.maxBitWidth = maxBitWidth;
@@ -53,7 +55,8 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
             }
 
             ExpressionNode wrap(ExpressionNode expr){
-                return new BinaryOperatorNode(new SingleUnaryOperatorNode(expr, SELECT_OP, 1), new IntegerLiteralNode(expr.location, vl.parse(1)), EQUALS);
+                return new BinaryOperatorNode(new BracketedAccessOperatorNode(expr, new IntegerLiteralNode(expr.location, vl.parse(1))),
+                        new IntegerLiteralNode(expr.location, vl.parse(1)), EQUALS);
             }
         });
         replacedMap.put(expression, repl(tmpExpr));
@@ -120,10 +123,11 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
         ExpressionNode result = zero;
         ExpressionNode carry = zero;
         for (int i = 1; i <= maxBitWidth; i++){
-            Pair<ExpressionNode, ExpressionNode> rCarry = fullAdder(new SingleUnaryOperatorNode(node.left, SELECT_OP, i),
-                    new SingleUnaryOperatorNode(node.right, SELECT_OP, i), carry);
+            Pair<ExpressionNode, ExpressionNode> rCarry = fullAdder(new BracketedAccessOperatorNode(node.left,
+                            new IntegerLiteralNode(node.location, vl.parse(i))),
+                    new BracketedAccessOperatorNode(node.right, new IntegerLiteralNode(node.location, vl.parse(i))), carry);
             carry = rCarry.second;
-            result = binop(BOR, result, new SingleUnaryOperatorNode(rCarry.first, PLACE_OP, i));
+            result = binop(BOR, result, new BitPlaceOperatorNode(rCarry.first, i));
         }
         return result;
     }
@@ -155,13 +159,19 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
             }
 
             @Override
-            public ExpressionNode visit(SingleUnaryOperatorNode unaryOperator) {
-                return replace(new SingleUnaryOperatorNode(visitAndReplace(unaryOperator.expression), unaryOperator.operator, unaryOperator.index));
+            public ExpressionNode visit(BitPlaceOperatorNode unaryOperator) {
+                return replace(new BitPlaceOperatorNode(visitAndReplace(unaryOperator.expression), unaryOperator.index));
             }
 
             @Override
             public ExpressionNode visit(BinaryOperatorNode binaryOperator) {
                 return replace(new BinaryOperatorNode(visitAndReplace(binaryOperator.left), visitAndReplace(binaryOperator.right), binaryOperator.operator));
+            }
+
+            @Override
+            public ExpressionNode visit(BracketedAccessOperatorNode bracketedAccess) {
+                return replace(new BracketedAccessOperatorNode(visitAndReplace(bracketedAccess.left),
+                        visitAndReplace(bracketedAccess.right)));
             }
 
             @Override
@@ -208,6 +218,23 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
                 assignment.expression = assignment.expression.accept(this);
                 return null;
             }
+
+            @Override
+            public ExpressionNode visit(ArrayAssignmentNode assignment) {
+                assignment.expression = assignment.expression.accept(this);
+                assignment.arrayIndex = assignment.arrayIndex.accept(this);
+                return null;
+            }
+
+            @Override
+            public ExpressionNode visit(ArrayLiteralNode primaryExpression) {
+                return new ArrayLiteralNode(primaryExpression.location, primaryExpression.elements.stream().map(e -> e.accept(this)).collect(Collectors.toList()));
+            }
+
+            @Override
+            public ExpressionNode visit(TupleLiteralNode primaryExpression) {
+                return new TupleLiteralNode(primaryExpression.location, primaryExpression.elements.stream().map(e -> e.accept(this)).collect(Collectors.toList()));
+            }
         });
         replacedMap.put(node, replExpr);
         return replExpr;
@@ -247,8 +274,16 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     }
 
     @Override
+    public MJNode visit(ArrayAssignmentNode assignment){
+        VariableAssignmentNode node = new ArrayAssignmentNode(assignment.location, assignment.variable,
+                replace(assignment.arrayIndex), replace(assignment.expression));
+        node.definition = assignment.definition;
+        return node;
+    }
+
+    @Override
     public MJNode visit(VariableDeclarationNode variableDeclaration){
-        VariableDeclarationNode node = new VariableDeclarationNode(variableDeclaration.location, variableDeclaration.variable, replace(variableDeclaration.expression),
+        VariableDeclarationNode node = new VariableDeclarationNode(variableDeclaration.location, variableDeclaration.variable, variableDeclaration.getVarType(), replace(variableDeclaration.expression),
                 variableDeclaration.hasAppendValue);
         node.definition = variableDeclaration.definition;
         return node;
@@ -256,28 +291,28 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
 
     @Override
     public MJNode visit(OutputVariableDeclarationNode decl){
-        OutputVariableDeclarationNode node = new OutputVariableDeclarationNode(decl.location, decl.variable, replace(decl.expression), decl.secLevel);
+        OutputVariableDeclarationNode node = new OutputVariableDeclarationNode(decl.location, decl.variable, decl.getVarType(), replace(decl.expression), decl.secLevel);
         node.definition = decl.definition;
         return node;
     }
 
     @Override
     public MJNode visit(InputVariableDeclarationNode decl){
-        InputVariableDeclarationNode node = new InputVariableDeclarationNode(decl.location, decl.variable, (IntegerLiteralNode) replace(decl.expression), decl.secLevel);
+        InputVariableDeclarationNode node = new InputVariableDeclarationNode(decl.location, decl.variable, decl.getVarType(), (IntegerLiteralNode) replace(decl.expression), decl.secLevel);
         node.definition = decl.definition;
         return node;
     }
 
     @Override
     public MJNode visit(TmpInputVariableDeclarationNode decl){
-        TmpInputVariableDeclarationNode node = new TmpInputVariableDeclarationNode(decl.location, decl.variable, (IntegerLiteralNode) replace(decl.expression), decl.secLevel);
+        TmpInputVariableDeclarationNode node = new TmpInputVariableDeclarationNode(decl.location, decl.variable, decl.getVarType(), (IntegerLiteralNode) replace(decl.expression), decl.secLevel);
         node.definition = decl.definition;
         return node;
     }
 
     @Override
     public MJNode visit(AppendOnlyVariableDeclarationNode decl){
-        AppendOnlyVariableDeclarationNode node = new AppendOnlyVariableDeclarationNode(decl.location, decl.variable, decl.secLevel, decl.isInput);
+        AppendOnlyVariableDeclarationNode node = new AppendOnlyVariableDeclarationNode(decl.location, decl.variable, decl.getVarType(), decl.secLevel, decl.isInput);
         node.definition = decl.definition;
         return node;
     }
@@ -325,7 +360,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
     @Override
     public MJNode visit(ReturnStatementNode returnStatement){
         if (returnStatement.hasReturnExpression()){
-            return new ReturnStatementNode(replace(returnStatement.expression));
+            return new ReturnStatementNode(returnStatement.location, replace(returnStatement.expression));
         }
         return new ReturnStatementNode(returnStatement.location);
     }

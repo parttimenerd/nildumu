@@ -1,19 +1,20 @@
 package nildumu;
 
+import nildumu.solver.LeakageAlgorithm;
+import nildumu.solver.PMSATSolverImpl;
+import nildumu.util.DefaultMap;
 import org.jgrapht.alg.flow.PushRelabelMFImpl;
-import org.jgrapht.graph.*;
+import org.jgrapht.graph.DefaultWeightedEdge;
+import org.jgrapht.graph.SimpleDirectedWeightedGraph;
+import swp.util.Pair;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import nildumu.util.*;
-import swp.util.Pair;
-
 import static nildumu.Context.INFTY;
-import static nildumu.Lattices.B.U;
 import static nildumu.Lattices.*;
-import static nildumu.util.Util.p;
 
 /**
  * Computation of the minimum cut on graphs.
@@ -26,17 +27,55 @@ public class MinCut {
     public static Algo usedAlgo = Algo.GRAPHT_PP;
 
     public enum Algo {
-        GRAPHT_PP("JGraphT Preflow-Push");
+        GRAPHT_PP("JGraphT Preflow-Push", false, false, null, ""),
+        OPENWBO_GLUCOSE("Open-WBO GL PMSAT", "Open-WBO/bin/open-wbo-g", ""),
+        OPENWBO_MERGESAT("Open-WBO MS PMSAT", "Open-WBO/bin/open-wbo-ms", ""),
+        UWRMAXSAT("UWrMaxSat PMSAT", "UWrMaxSat-1.1w/bin/uwrmaxsat", "-m");
 
         public final String description;
+        public final boolean supportsIntervals;
+        public final boolean supportsAlternatives;
+        public final String binaryPath;
+        public final String options;
 
-        Algo(String description){
+        Algo(String description, boolean supportsIntervals, boolean supportsAlternatives, String binaryPath, String options) {
             this.description = description;
+            this.supportsIntervals = supportsIntervals;
+            this.supportsAlternatives = supportsAlternatives;
+            this.binaryPath = binaryPath;
+            this.options = options;
+        }
+
+        Algo(String description, String binaryPath, String options) {
+            this(description, true, true, binaryPath, options);
         }
 
         @Override
         public String toString() {
             return description;
+        }
+
+        public boolean supportsIntervals() {
+            return supportsIntervals;
+        }
+
+        public <T> T use(Supplier<T> func) {
+            Algo prev = usedAlgo;
+            usedAlgo = this;
+            T t;
+            try {
+                t = func.get();
+            } finally {
+                usedAlgo = prev;
+            }
+            return t;
+        }
+
+        public void use(Runnable func) {
+            use(() -> {
+                func.run();
+                return null;
+            });
         }
     }
 
@@ -61,8 +100,8 @@ public class MinCut {
 
     public static abstract class Algorithm {
 
-        final Context.SourcesAndSinks sourcesAndSinks;
-        final Function<Bit, Double> weights;
+        protected final Context.SourcesAndSinks sourcesAndSinks;
+        protected final Function<Bit, Double> weights;
 
         protected Algorithm(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights) {
             this.sourcesAndSinks = sourcesAndSinks;
@@ -103,6 +142,7 @@ public class MinCut {
 
         protected GraphTPP(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights) {
             super(sourcesAndSinks, weights);
+            assert !sourcesAndSinks.context.recordsAlternatives();
         }
 
         private double infty(){
@@ -167,7 +207,7 @@ public class MinCut {
             PushRelabelMFImpl<Vertex, DefaultWeightedEdge> pp = new PushRelabelMFImpl<Vertex, DefaultWeightedEdge>(graph, 0.5);
             double maxFlow = pp.calculateMinCut(initialSource, initialSink);
             Set<Bit> minCut = pp.getCutEdges().stream().map(e -> graph.getEdgeSource(e).bit).collect(Collectors.toSet());
-            // Problem: if soome of the sink nodes or source nodes have weight different than 1, then this should be noted
+            // Problem: if some of the sink nodes or source nodes have weight different than 1, then this should be noted
             double flow = Math.min(Math.round(maxFlow), Math.min(weightSum(sourcesAndSinks.sources), weightSum(sourcesAndSinks.sinks)));
             if (flow > infty / 2){
                 flow = Double.POSITIVE_INFINITY;
@@ -176,27 +216,32 @@ public class MinCut {
         }
     }
 
-    /**
-     * Choose the algorithm by setting the static {@link MinCut#usedAlgo} variable
-     */
-    public static ComputationResult compute(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights){
-        return new GraphTPP(sourcesAndSinks, weights).compute();
+    public static ComputationResult compute(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights, Algo algo){
+        switch (algo) {
+            case GRAPHT_PP:
+                if (sourcesAndSinks.context.recordsAlternatives()) {
+                    throw new NildumuError(String.format("Algo %s cannot be used when recording alternatives", algo));
+                }
+                return new GraphTPP(sourcesAndSinks, weights).compute();
+            default:
+                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new PMSATSolverImpl<>(algo.binaryPath, algo.options, false), sourcesAndSinks.context.inIntervalMode()).compute();
+        }
     }
 
-    public static ComputationResult compute(Context context, Sec<?> sec){
+    public static ComputationResult compute(Context context, Sec<?> sec, Algo algo){
         con = context;
         if (sec == context.sl.top()){
             return new ComputationResult(Collections.emptySet(), 0);
         }
-        return compute(context.sourcesAndSinks(sec), context::weight);
+        return compute(context.sourcesAndSinks(sec), context::weight, algo);
     }
 
     private static Context con;
 
-    public static Map<Sec<?>, ComputationResult> compute(Context context){
+    public static Map<Sec<?>, ComputationResult> compute(Context context, Algo algo){
         return context.sl.elements().stream()
                 .collect(Collectors.toMap(s -> s, s -> s == context.sl.top() ?
                         new ComputationResult(Collections.emptySet(), 0) :
-                        compute(context, s)));
+                        compute(context, s, algo)));
     }
 }
