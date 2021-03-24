@@ -40,6 +40,7 @@ public class PMSATSolverImpl<V> extends PMSATSolver<V> {
         File file;
         try {
             file = Files.createTempFile("pmsat", "wdimacs").toFile();
+            file.deleteOnExit();
             writeInWDIMACSFormat(new FileWriter(file));
         } catch (IOException e) {
             e.printStackTrace();
