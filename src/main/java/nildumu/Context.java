@@ -782,7 +782,7 @@ public class Context {
         return mode.ordinal() >= Mode.LOOP.ordinal();
     }
 
-    boolean inIntervalMode(){
+    public boolean inIntervalMode(){
         return mode.ordinal() >= Mode.INTERVAL.ordinal();
     }
 

@@ -108,29 +108,17 @@ public class SummaryHandler extends MethodInvocationHandler {
                         iteration.val += 1;
                         BitGraph graph = methodIteration(program.context, callSites.get(node.method), handler, s.get(node).value.parameters);
                         String name = String.format("%3d %s", iteration.val, node.method.name);
-                        if (dotFolder != null) {
-                            graph.writeDotGraph(dotFolder, name, true);
-                        }
-                        DotRegistry.get().store("summary", name,
-                                () -> () -> graph.createDotGraph("", true));
+                        GraphRegistry.get().store("summary", name, graph, "", true);
                         BitGraph reducedGraph = reduce(c, graph);
                         PrintHistory.HistoryEntry newHist = PrintHistory.HistoryEntry.create(reducedGraph, history.containsKey(node) ? Optional.of(history.get(node)) : Optional.empty());
                         PrintHistory.ReduceResult<BitGraph> furtherReducedGraph = reduceGlobals(node, reducedGraph, newHist, c);
                         history.put(node, PrintHistory.HistoryEntry.create(furtherReducedGraph.value, newHist.prev));
-                        if (dotFolder != null) {
-                            graph.writeDotGraph(dotFolder, name + " [reduced]", false);
-                        }
-                        DotRegistry.get().store("summary", name + " [reduced]",
-                                () -> () -> furtherReducedGraph.value.createDotGraph("", false));
+                        GraphRegistry.get().store("summary", name + " [reduced]", furtherReducedGraph.value, "", false);
                         return furtherReducedGraph;
                     }, node -> {
                         BitGraph graph = bot(program, node.method, callSites, usedMode);
                         String name = String.format("%3d %s", iteration.val, node.method.name);
-                        if (dotFolder != null) {
-                            graph.writeDotGraph(dotFolder, name, false);
-                        }
-                        DotRegistry.get().store("summary", name,
-                                () -> () -> graph.createDotGraph("", false));
+                        GraphRegistry.get().store("summary", name, graph, "", false);
                         return new PrintHistory.ReduceResult<>(graph);
                     }
                     , node -> node.getCallers().stream().filter(n -> !n.isMainNode).collect(Collectors.toSet()),

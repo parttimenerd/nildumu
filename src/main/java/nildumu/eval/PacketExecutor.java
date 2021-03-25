@@ -23,33 +23,35 @@ public class PacketExecutor {
         this.timeLimit = timeLimit;
     }
 
-    public AnalysisResult analyse(AnalysisPacket packet, int runs) {
-          List<AnalysisResult> results = new ArrayList<>();
-          for (int i = 0; i < runs; i++){
-              AnalysisResult res = analyse(packet);
-              if (!res.isValid() || res.hasTimeout){
-                  return new AnalysisResult(res.isValid(), -1, Duration.ofNanos(-1), res.hasTimeout);
-              }
-              results.add(res);
+    public AnalysisResult analyse(AnalysisPacket packet, int runs, boolean print, boolean verbose) {
+        System.out.println("run shell command " + packet.getShellCommand(timeLimit));
+        List<AnalysisResult> results = new ArrayList<>();
+        analyse(packet, verbose);
+        for (int i = 0; i < runs; i++){
+          AnalysisResult res = analyse(packet, verbose);
+          if (!res.isValid() || res.hasTimeout){
+              return new AnalysisResult(res.isValid(), -1, Duration.ofNanos(-1), res.hasTimeout);
           }
-          float leakageAvg = (float)results.stream().mapToDouble(r -> r.leakage).average().getAsDouble();
-          float leakageStd = (float)Math.sqrt(results.stream().mapToDouble(r -> Math.pow(r.leakage - leakageAvg, 2)).average().getAsDouble() / (runs - 1));
-          long runtimeAvg = (long)results.stream().mapToLong(r -> r.runtime.toNanos()).average().getAsDouble();
-          float runtimeStd = (float)(Math.sqrt(results.stream().mapToDouble(r -> Math.pow(r.runtime.toNanos() - runtimeAvg, 2)).average().getAsDouble() / (runs - 1)));
-          AnalysisResult res = new AnalysisResult(true, leakageAvg, Duration.ofNanos(runtimeAvg), false, leakageStd / leakageAvg, runtimeStd / runtimeAvg);
-        System.out.println("#####################################################");
-        System.out.println(String.format("-------------- %fs +-%.3f %.3f +-%.3f -------------", res.runtime.toMillis() / 1000.0, res.runtimeStddev, res.leakage, res.leakageStddev));
-        System.out.println("#####################################################");
-          return res;
+          results.add(res);
+        }
+        float leakageAvg = (float)results.stream().mapToDouble(r -> r.leakage).average().getAsDouble();
+        float leakageStd = (float)Math.sqrt(results.stream().mapToDouble(r -> Math.pow(r.leakage - leakageAvg, 2)).average().getAsDouble() / (runs - 1));
+        long runtimeAvg = (long)results.stream().mapToLong(r -> r.runtime.toNanos()).average().getAsDouble();
+        float runtimeStd = (float)(Math.sqrt(results.stream().mapToDouble(r -> Math.pow(r.runtime.toNanos() - runtimeAvg, 2)).average().getAsDouble() / (runs - 1)));
+        AnalysisResult res = new AnalysisResult(true, leakageAvg, Duration.ofNanos(runtimeAvg), false, leakageStd / leakageAvg, runtimeStd / runtimeAvg);
+        if (print) {
+            System.out.println("#####################################################");
+            System.out.println(String.format("-------------- %fs +-%.3f %.3f +-%.3f -------------", res.runtime.toMillis() / 1000.0, res.runtimeStddev, res.leakage, res.leakageStddev));
+            System.out.println("#####################################################");
+        }
+        return res;
     }
 
-    public AnalysisResult analyse(AnalysisPacket packet) {
+    public AnalysisResult analyse(AnalysisPacket packet, boolean verbose) {
         if (packet.emptyPacket){
             return new AnalysisResult(false, -1, null, false);
         }
-        System.out.println("Start analysis of " + packet);
-        System.out.println(String.format("   Using shell command %s",
-                packet.getShellCommand(timeLimit)));
+        System.out.print("+");
         long start = System.nanoTime();
         Process process_ = null;
         try {
@@ -101,7 +103,7 @@ public class PacketExecutor {
             e.printStackTrace();
         }
         try {
-            if (output.get().length() > 0) {
+            if (output.get().length() > 0 && verbose) {
                 System.out.println("OUT: " + output.get());
             }
             if (error.get().length() > 0) {
@@ -120,7 +122,7 @@ public class PacketExecutor {
         return new AnalysisResult(false, -1, Duration.ofNanos(-1), false);
     }
 
-    public AnalysisResults analysePackets(Iterable<AnalysisPacket> packets, int parallelism, int runs) {
+    public AnalysisResults analysePackets(Iterable<AnalysisPacket> packets, int parallelism, int runs, boolean verbose) {
         if (parallelism == 1) {
             Map<AnalysisPacket, AnalysisResult> results = new HashMap<>();
             int i = 1;
@@ -130,7 +132,7 @@ public class PacketExecutor {
                 System.out.println("#####################################################");
                 System.out.println(String.format("------------------- Packet %d of %d -------------", i, ps.size()));
                 System.out.println("#####################################################");
-                results.put(packet, analyse(packet, runs));
+                results.put(packet, analyse(packet, runs, true, verbose));
                 i++;
             }
             return new AnalysisResults(results);
@@ -139,7 +141,7 @@ public class PacketExecutor {
             ExecutorService pool = Executors.newWorkStealingPool(parallelism);
             List<Future<AnalysisResult>> futures = new ArrayList<>();
             for (AnalysisPacket packet : packets) {
-                futures.add(pool.submit(() -> results.put(packet, analyse(packet, runs))));
+                futures.add(pool.submit(() -> results.put(packet, analyse(packet, runs, true, verbose))));
                 //results.put(packet, analyse(packet));
             }
             futures.forEach(f -> {

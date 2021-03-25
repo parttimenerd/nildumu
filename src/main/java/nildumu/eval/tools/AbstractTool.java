@@ -3,11 +3,10 @@ package nildumu.eval.tools;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import nildumu.MinCut;
 import nildumu.NildumuError;
 import nildumu.eval.*;
 
@@ -35,6 +34,12 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
      */
     public abstract AnalysisPacket createPacket(TestProgram program, Path folder);
 
+    public AnalysisPacket createDirectPacket(TestProgram program) {
+        return createDirectPacket(program, program.getVersionPath(fileEnding));
+    }
+
+    public abstract AnalysisPacket createDirectPacket(TestProgram program, Path testFile);
+
     protected Path writeOrDie(Path folder, String filename, String content){
         Path path = folder.resolve(filename);
         try {
@@ -52,7 +57,15 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
     }
 
     public static List<AbstractTool> getDefaultTools(int... unwindLimits){
-        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.of(new Nildumu(unwind), new ApproxFlow(unwind)))
+        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.of(new ApproxFlow(unwind), new Nildumu(unwind, MinCut.Algo.OPENWBO_GLUCOSE, true)))
+                .flatMap(identity()).collect(Collectors.toList());
+    }
+
+    public static List<AbstractTool> getAllTools(int... unwindLimits){
+        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.concat(
+                Stream.of(new ApproxFlow(unwind)),
+                Stream.of(true, false).flatMap(b -> Stream.of(new Nildumu(unwind, MinCut.Algo.OPENWBO_GLUCOSE, b),
+                        new Nildumu(unwind, MinCut.Algo.UWRMAXSAT, b), new Nildumu(unwind, MinCut.Algo.GRAPHT_PP, b)))))
                 .flatMap(identity()).collect(Collectors.toList());
     }
 

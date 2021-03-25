@@ -110,7 +110,7 @@ public abstract class MethodInvocationHandler {
         register("basic", s -> {
         }, ps -> new BasicBotInvocationHandler());
         examplePropLines.add("handler=basic");
-        register("inlining", s -> s.add("maxrec", "2").add("bot", "basic"), ps -> {
+        register("inlining", s -> s.add("maxrec", "2").add("bot", "summary"), ps -> {
             return new InliningHandler(Integer.parseInt(ps.getProperty("maxrec")), parse(ps.getProperty("bot")));
         });
         examplePropLines.add("handler=inlining;maxrec=5;bot=summary");

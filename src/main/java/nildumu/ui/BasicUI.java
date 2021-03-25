@@ -545,7 +545,7 @@ public class BasicUI {
             launchedDotFrames.forEach(DotPanel::outerUpdate);
             context.sl.elements().forEach(s -> {
                 DotRegistry.get().store("main", "Attacker level: " + s,
-                        () -> () -> LeakageCalculation.visuDotGraph(context, "", s));
+                        () -> () -> DotRegistry.visuLeakageDotGraph(context, "", s));
             });
             updateLeakageTable(c);
             context.checkInvariants();

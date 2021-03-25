@@ -1,7 +1,5 @@
 package nildumu.eval;
 
-import com.beust.jcommander.*;
-
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.Duration;
@@ -11,12 +9,14 @@ import java.util.stream.*;
 
 import nildumu.*;
 import nildumu.eval.tools.*;
+import picocli.CommandLine;
+import static picocli.CommandLine.*;
 import swp.util.*;
 
 public class Evaluation {
 
     public static final Path DEFAULT_SPECIMEN_DIR =
-            Paths.get("src/main/java/nildumu/eval/specimen");
+            Paths.get("eval-specimen");
 
     public final Path specimenDirectory;
     public final IntegerType integerType;
@@ -35,23 +35,18 @@ public class Evaluation {
     }
 
     public TestProgram loadSpecimen(Path path) {
+        assert path.toString().endsWith(".nd");
         try {
-            TestProgram program = new TestProgram(path.toFile().getName(),
+            TestProgram program = new TestProgram(path, path.toFile().getName(),
                     (Parser.ProgramNode) Parser.generator.parse(String.join("\n",
                     Files.readAllLines(path))), integerType);
+            String baseName = path.getFileName().toString().split("\\.")[0];
             Files.list(path.getParent())
-                    .filter(f -> !f.toString().endsWith(".nd"))
-                    .map(f -> {
-                        try {
-                            return new Pair<>(f.toFile().getName().split("\\.nd\\.")[1],
-                                    String.join("\n", Files.readAllLines(f)));
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull)
-                    .forEach(p -> program.addSpecialVersion(p.first, p.second));
+                    .filter(f -> !f.toString().endsWith(".nd") && f.getFileName().toString().startsWith(baseName + "."))
+                    .forEach(p -> {
+                        String[] split = p.getFileName().toString().split("\\.");
+                        program.addSpecialVersion(split[1], split[0]);
+                    });
             return program;
         } catch (IOException e) {
             return null;
@@ -70,20 +65,21 @@ public class Evaluation {
                 .collect(Collectors.toList());
     }
 
-    public PacketList getAllPackets(Path baseFolder) throws IOException {
-        return getPacketsForToolsOrDie(AbstractTool.getDefaultTools(), getAllSpecimen(), baseFolder);
+    public PacketList getAllPackets(Path baseFolder, boolean buildOwnVersions) throws IOException {
+        return getPacketsForToolsOrDie(AbstractTool.getDefaultTools(), getAllSpecimen(), baseFolder, buildOwnVersions);
     }
 
     public static PacketList getPacketsForToolsOrDie(List<AbstractTool> tools,
                                                      List<TestProgram> programs,
-                                                     Path baseFolder){
+                                                     Path baseFolder,
+                                                     boolean buildOwnVersions){
         return programs.stream()
-                .flatMap(p -> getPacketsForToolsOrDie(tools, p, baseFolder.resolve(p.name)).stream())
+                .flatMap(p -> getPacketsForToolsOrDie(tools, p, baseFolder.resolve(p.name), buildOwnVersions).stream())
                 .collect(PacketList.collector());
     }
 
     public static PacketList getPacketsForToolsOrDie(List<AbstractTool> tools, TestProgram program,
-                                                     Path baseFolder){
+                                                     Path baseFolder, boolean buildOwnVersions){
         PacketList packets = new PacketList();
         tools.forEach(t -> {
             Path folder = baseFolder.resolve(t.name);
@@ -93,21 +89,29 @@ public class Evaluation {
                 e.printStackTrace();
                 System.exit(0);
             }
-            try {
-                packets.add(t.createPacket(program, folder));
-            } catch (UnsupportedLanguageFeatureException ex){
-                packets.add(AnalysisPacket.empty(t, program));
+            if (!buildOwnVersions) {
+                if (!program.hasSpecialVersion(t.fileEnding) && !t.fileEnding.equals("nd")) {
+                    packets.add(AnalysisPacket.empty(t, program));
+                } else {
+                    packets.add(t.createDirectPacket(program));
+                }
+            } else {
+                try {
+                    packets.add(t.createPacket(program, folder));
+                } catch (UnsupportedLanguageFeatureException ex) {
+                    packets.add(AnalysisPacket.empty(t, program));
+                }
             }
         });
         return packets;
     }
 
-    public static PacketList getPacketsForToolsOrDie(TestProgram program, Path baseFolder){
-        return getPacketsForToolsOrDie(AbstractTool.getDefaultTools(), program, baseFolder);
+    public static PacketList getPacketsForToolsOrDie(TestProgram program, Path baseFolder, boolean buildOwnVersions){
+        return getPacketsForToolsOrDie(AbstractTool.getDefaultTools(), program, baseFolder, buildOwnVersions);
     }
 
-    public PacketList getPacketList(String name, String program, Path baseFolder){
-        return getPacketsForToolsOrDie(new TestProgram(name, Parser.process(program), integerType), baseFolder);
+    public PacketList getPacketList(Path path, String name, String program, Path baseFolder, boolean buildOwnVersions){
+        return getPacketsForToolsOrDie(new TestProgram(path, name, Parser.process(program), integerType), baseFolder, buildOwnVersions);
     }
 
     enum Mode {
@@ -115,55 +119,62 @@ public class Evaluation {
         NORMAL
     }
 
-    @Parameters(commandDescription="Evaluation tool")
+    @Command(description="Evaluation tool")
     static class Cmd {
 
-        @Parameter(description="scal or normal or list")
+        @Parameters(description="scal or normal or list", defaultValue = "normal")
         private String mode = "normal";
 
-        @Parameter(description="scalability benchmark", names = "--scal")
+        @Option(description="scalability benchmark", names = "--scal")
         private List<String> scalBench = Collections.singletonList(ScalBench.ALL.name().toLowerCase());
 
-        @Parameter(names={"--maxScalAlpha", "--alpha"})
+        @Option(names={"--maxScalAlpha", "--alpha"})
         private int maxScalAlpha = 5;
 
-        @Parameter(names={"--minScalAlpha", "--start"})
+        @Option(names={"--minScalAlpha", "--start"})
         private int minScalAlpha = 0;
 
-        @Parameter(names="--duration")
-        private String maxDuration = "PT10S";
+        @Option(names="--duration")
+        private String maxDuration = "PT2H";
 
-        @Parameter(names="--normal")
+        @Option(names="--normal")
         private List<String> normalBench = Collections.singletonList("all");
-        
-        @Parameter(names="--dont_split_temci")
+
+        @Option(names="--dont_split_temci")
         private boolean dontSplitTemciFiles = false;
-        
-        @Parameter(names="--tools")
+
+        @Option(names="--tools", description = "all (paper), full (+ other MAXSAT and GraphTT)")
         private List<String> tools = Collections.singletonList("all");
 
-        @Parameter(names="--parallelism", description = "cores to use")
+        @Option(names="--parallelism", description = "cores to use")
         private int parallelism = 1;
 
-        @Parameter(names = {"--unwind", "-u"}, description = "unwinds used")
-        private List<Integer> unwinds = new ArrayList<>(AbstractTool.DEFAULT_UNWIND);
+        @Option(names = {"--unwind", "-u"}, description = "unwinds used")
+        private List<Integer> unwinds = Arrays.asList(2, 8, 32);
 
-        @Parameter(names="--runs")
-        private int runs = 1;
+        @Option(names="--runs")
+        private int runs = 5;
+
+        @Option(names="--verbose", description = "log all tool output")
+        private boolean verbose = false;
     }
 
     public static void main(String[] args) {
         Cmd cmd = new Cmd();
-        JCommander com = JCommander.newBuilder().addObject(cmd).build();
+        CommandLine commandLine = new CommandLine(cmd);
+        commandLine.parseArgs(args);
         Evaluation evaluation = new Evaluation(IntegerType.INT, "eval");
         try {
-            System.out.println(String.join(" ", args));
-            com.parse(args);
 
             List<AbstractTool> tools_ = AbstractTool.getDefaultTools(cmd.unwinds.isEmpty() ?
                     new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray());
             if (!cmd.tools.get(0).equals("all")){
-                tools_ = tools_.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
+                if (cmd.tools.get(0).equals("full")) {
+                    tools_ = AbstractTool.getAllTools(cmd.unwinds.isEmpty() ?
+                            new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray());
+                } else {
+                    tools_ = tools_.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
+                }
             }
             List<AbstractTool> tools = tools_;
             System.out.println(cmd.maxDuration);
@@ -196,35 +207,32 @@ public class Evaluation {
                         ex.printStackTrace();
                     }
                 });
-                PacketList packets = getPacketsForToolsOrDie(tools, specimen, Paths.get("eval"));
+                PacketList packets = getPacketsForToolsOrDie(tools, specimen, Paths.get("eval"), false);
                 if (!cmd.dontSplitTemciFiles){
                     packets.writeTemciConfigOrDiePerProgram(Paths.get("eval"), "run.yaml", duration);
                 } else {
                     packets.writeTemciConfigOrDie("run.yaml", duration);
                 }
                 AggregatedAnalysisResults results =
-                        new PacketExecutor(duration).analysePackets(packets, cmd.parallelism, cmd.runs).aggregate();
+                        new PacketExecutor(duration).analysePackets(packets, cmd.parallelism, cmd.runs, cmd.verbose).aggregate();
                 storeAndPrintAnalysisResults(results, "eval/results.csv");
             }
           } catch (ParameterException | IOException e) {
             System.out.println(e.getMessage());
-            com.usage();
+            commandLine.usage(System.out);
         }
     }
 
-    public static void evalPackets(PacketList packets, String temciFile, String csvFile, Duration duration, int parallelism, int runs){
-        Evaluation eval = new Evaluation(IntegerType.INT, "");
+    public static void evalPackets(PacketList packets, String temciFile, String csvFile, Duration duration, int parallelism, int runs, boolean verbose){
         packets.writeTemciConfigOrDie(temciFile, duration);
         AggregatedAnalysisResults results =
-                new PacketExecutor(duration).analysePackets(packets, parallelism, runs).aggregate();
+                new PacketExecutor(duration).analysePackets(packets, parallelism, runs, verbose).aggregate();
         storeAndPrintAnalysisResults(results, csvFile);
     }
 
     public static void storeAndPrintAnalysisResults(AggregatedAnalysisResults results, String csvFile){
-        String csv = results.toStringPerProgram(AggregatedAnalysisResults.LEAKAGE) + "\n" +
-                results.toStringPerProgram(AggregatedAnalysisResults.RUNTIME) + "\n" +
-                results.toStringPerTool(AggregatedAnalysisResults.LEAKAGE) + "\n" +
-                results.toStringPerTool(AggregatedAnalysisResults.RUNTIME);
+        String csv = results.toStringPerProgram(AggregatedAnalysisResults.LEAKAGE, AggregatedAnalysisResults.Mode.NICE) + "\n\n" +
+                results.toStringPerProgram(AggregatedAnalysisResults.RUNTIME, AggregatedAnalysisResults.Mode.NICE);
         System.out.println(csv);
         try {
             Files.write(Paths.get(csvFile), Arrays.asList(csv.split("\n")));
@@ -253,10 +261,10 @@ public class Evaluation {
             @Override
             void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, Function<Integer, List<AbstractTool>> toolsForUnwind) {
                 evalPackets(IntStream.rangeClosed(start, endIncl)
-                        .mapToObj(alpha -> getPacketsForToolsOrDie(toolsForUnwind.apply(1 << alpha), new TestProgram("while_unwinding_" + alpha, programGenerator.apply(1 << alpha), IntegerType.INT), Paths.get("bench").resolve("while_unwinding_" + alpha)))
+                        .mapToObj(alpha -> getPacketsForToolsOrDie(toolsForUnwind.apply(1 << alpha), new TestProgram(null, "while_unwinding_" + alpha, programGenerator.apply(1 << alpha), IntegerType.INT), Paths.get("bench").resolve("while_unwinding_" + alpha), true))
                         .flatMap(PacketList::stream)
                         .collect(PacketList.collector()),"bench/temci_run.yaml",
-                        "bench/results.csv", duration, parallelism, runs);       }
+                        "bench/results.csv", duration, parallelism, runs, true);       }
         };
         final Function<Integer, Parser.ProgramNode> programGenerator;
 
@@ -271,9 +279,9 @@ public class Evaluation {
 
     public static void evalBenchmark(String name, int start, int endIncl, String folder, Function<Integer, Parser.ProgramNode> programGenerator, Duration duration, int parallelism, int runs, List<AbstractTool> tools){
         evalPackets(getPacketsForToolsOrDie(tools, IntStream.rangeClosed(start, endIncl)
-                .mapToObj(alpha -> new TestProgram(name + "_" + alpha, programGenerator.apply(1 << alpha), IntegerType.INT))
-                .collect(Collectors.toList()), Paths.get(folder)), folder + "/temci_run.yaml",
-                folder + "/results.csv", duration, parallelism, runs);
+                .mapToObj(alpha -> new TestProgram(null, name + "_" + alpha, programGenerator.apply(1 << alpha), IntegerType.INT))
+                .collect(Collectors.toList()), Paths.get(folder), true), folder + "/temci_run.yaml",
+                folder + "/results.csv", duration, parallelism, runs, true);
     }
 
 }

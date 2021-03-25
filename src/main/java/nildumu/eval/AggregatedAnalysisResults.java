@@ -1,5 +1,8 @@
 package nildumu.eval;
 
+import de.vandermeer.asciitable.AsciiTable;
+import de.vandermeer.asciithemes.TA_GridThemes;
+import de.vandermeer.skb.interfaces.transformers.textformat.TextAlignment;
 import org.apache.commons.lang3.StringEscapeUtils;
 
 import java.util.*;
@@ -12,26 +15,26 @@ public class AggregatedAnalysisResults {
 
     public static final AnalysisResultFormatter LEAKAGE =
             r -> {
-                if (r == null){
+                if (r == null) {
                     return "";
                 }
-                if (r.hasTimeout){
+                if (r.hasTimeout) {
                     return "(timeout)";
                 }
-                if (!r.isValid()){
+                if (!r.isValid()) {
                     return "-";
                 }
                 return String.format("%.3f +-%.3f", r.leakage, r.leakageStddev);
             };
     public static final AnalysisResultFormatter RUNTIME =
             r -> {
-                if (r == null){
+                if (r == null) {
                     return "";
                 }
-                if (r.hasTimeout){
+                if (r.hasTimeout) {
                     return "(timeout)";
                 }
-                if (!r.isValid()){
+                if (!r.isValid()) {
                     return "-";
                 }
                 long seconds = r.runtime.getSeconds();
@@ -51,26 +54,31 @@ public class AggregatedAnalysisResults {
                         Collectors.toMap(e -> e.getKey().tool, Map.Entry::getValue)));
     }
 
-    public String toStringPerTool(AnalysisResultFormatter formatter){
-        return toString(perTool, formatter);
+    enum Mode {
+        NICE,
+        CSV
     }
 
-    public String toStringPerProgram(AnalysisResultFormatter formatter){
-        return toString(perProgram, formatter);
+    public String toStringPerTool(AnalysisResultFormatter formatter, Mode... modes) {
+        return toString(perTool, formatter, modes);
+    }
+
+    public String toStringPerProgram(AnalysisResultFormatter formatter, Mode... modes) {
+        return toString(perProgram, formatter, modes);
     }
 
     /**
      * Returns a string representation of the sorted table in a CSV format
      *
-     * @param map table
+     * @param map       table
      * @param formatter call formatter
-     * @param <A> row type
-     * @param <B> column type
+     * @param <A>       row type
+     * @param <B>       column type
      * @return csv representation
      */
     public static <A extends Comparable<A>,
             B extends Comparable<B>> String toString(Map<A, Map<B, AnalysisResult>> map,
-                                                     AnalysisResultFormatter formatter){
+                                                     AnalysisResultFormatter formatter, Mode... modes) {
         List<List<String>> lines = new ArrayList<>();
         List<A> sortedRowHeaders = map.keySet().stream()
                 .sorted().collect(Collectors.toList());
@@ -92,7 +100,7 @@ public class AggregatedAnalysisResults {
         BiConsumer<String, List<String>> addColumnWHeader = (header, col) -> {
             addColumn.accept(
                     Stream.concat(Stream.of(header), col.stream())
-                    .collect(Collectors.toList()));
+                            .collect(Collectors.toList()));
         };
 
         // add the row header column
@@ -111,8 +119,23 @@ public class AggregatedAnalysisResults {
                             })
                             .collect(Collectors.toList()));
         }
-        return lines.stream()
-                .map(cols -> String.join(",",cols))
-                .collect(Collectors.joining("\n"));
+        return Arrays.stream(modes).map(mode -> {
+            if (mode == Mode.NICE) {
+                AsciiTable at = new AsciiTable();
+                at.setTextAlignment(TextAlignment.RIGHT);
+                at.addRule();
+                for (List<String> line : lines) {
+                    at.addRow(line);
+                    at.addRule();
+                }
+                at.setTextAlignment(TextAlignment.RIGHT);
+                at.getContext().setGridTheme(TA_GridThemes.TOPBOTTOM);
+                return at.render(150);
+            } else {
+                return lines.stream()
+                        .map(cols -> String.join(",", cols))
+                        .collect(Collectors.joining("\n"));
+            }
+        }).collect(Collectors.joining("\n\n"));
     }
 }

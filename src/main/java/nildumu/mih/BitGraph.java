@@ -1,18 +1,11 @@
 package nildumu.mih;
 
-import guru.nidi.graphviz.engine.Format;
-import guru.nidi.graphviz.engine.Graphviz;
-import guru.nidi.graphviz.model.Graph;
 import nildumu.*;
 import nildumu.util.DefaultMap;
 import swp.util.Pair;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static nildumu.Context.*;
@@ -151,28 +144,6 @@ public class BitGraph {
         return MinCut.compute(new SourcesAndSinks(INFTY, outputBits, INFTY, inputBits, context), b -> outputBits.contains(b) ? outputWeight : context.weight(b), MinCut.usedAlgo).minCut;
     }
 
-    public Graph createDotGraph(String name, boolean withMinCut) {
-        Lattices.Value ret = new Lattices.Value(returnValues.stream()
-                .flatMap(Lattices.Value::stream).collect(Collectors.toList()));
-        return DotRegistry.createDotGraph(context, name, Stream.concat(IntStream.range(0, parameters.size())
-                        .mapToObj(i -> new DotRegistry.Anchor(String.format("param %d", i), parameters.get(i))),
-                this.methodReturnValue.globals.entrySet().stream().map(e ->
-                        new DotRegistry.Anchor(e.getKey().name, e.getValue()))
-                ).collect(Collectors.toList()),
-                new DotRegistry.Anchor("return", Lattices.Value.combine(returnValues)),
-                withMinCut ? minCutBits(ret.bitSet(), parameterBits, INFTY) : Collections.emptySet());
-    }
-
-    public void writeDotGraph(Path folder, String name, boolean withMinCut) {
-        Path path = folder.resolve(name + ".dot");
-        try {
-            Files.createDirectories(folder);
-            Graphviz.fromGraph(createDotGraph(name, withMinCut)).render(Format.XDOT).toFile(path.toFile());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     /**
      * Used only for the fix point iteration
      *
@@ -195,5 +166,25 @@ public class BitGraph {
                             other.methodReturnValue.globals.get(k).sizeWithoutEs());
         }
         return false;
+    }
+
+    public Context getContext() {
+        return context;
+    }
+
+    public List<Lattices.Value> getParameters() {
+        return Collections.unmodifiableList(parameters);
+    }
+
+    public List<Lattices.Value> getReturnValues() {
+        return Collections.unmodifiableList(returnValues);
+    }
+
+    public MethodInvocationHandler.MethodReturnValue getMethodReturnValue() {
+        return methodReturnValue;
+    }
+
+    public Set<Lattices.Bit> getParameterBits() {
+        return Collections.unmodifiableSet(parameterBits);
     }
 }

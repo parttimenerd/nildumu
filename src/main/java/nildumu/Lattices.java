@@ -953,7 +953,7 @@ public class Lattices {
         /**
          * Like the identity in the thesis
          */
-        final long bitNo;
+        public final long bitNo;
         private int valueIndex = 0;
         private Value value = null;
         /**
@@ -1283,12 +1283,12 @@ public class Lattices {
 
     public static class Value implements LatticeElement<Value, ValueLattice>, Iterable<Bit> {
 
-        final List<Bit> bits;
+        public final List<Bit> bits;
 
         private String description = "";
         private Parser.MJNode node = null;
 
-        Interval interval = null;
+        public Interval interval = null;
 
         protected Value(){
             this.bits = new ArrayList<>();

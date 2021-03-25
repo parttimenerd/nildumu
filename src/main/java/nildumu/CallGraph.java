@@ -1,10 +1,5 @@
 package nildumu;
 
-import guru.nidi.graphviz.attribute.Attributes;
-import guru.nidi.graphviz.attribute.RankDir;
-import guru.nidi.graphviz.attribute.Records;
-import guru.nidi.graphviz.model.Graph;
-import guru.nidi.graphviz.model.Node;
 import nildumu.util.DefaultMap;
 import nildumu.util.StablePriorityQueue;
 import swp.lexer.Location;
@@ -19,8 +14,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static guru.nidi.graphviz.model.Factory.graph;
-import static guru.nidi.graphviz.model.Factory.node;
 import static nildumu.Parser.*;
 import static nildumu.util.Util.Box;
 
@@ -32,7 +25,7 @@ public class CallGraph {
 
     public static class CallNode {
         public final MethodNode method;
-        private final Set<CallNode> callees;
+        public final Set<CallNode> callees;
         private final Set<CallNode> callers;
         public final boolean isMainNode;
 
@@ -71,7 +64,7 @@ public class CallGraph {
             return alreadyVisited;
         }
 
-        Set<CallNode> calledCallNodesAndSelf() {
+        public Set<CallNode> calledCallNodesAndSelf() {
             Set<CallNode> nodes = calledCallNodes();
             nodes.add(this);
             return nodes;
@@ -87,13 +80,6 @@ public class CallGraph {
                     .filter(n -> !alreadyVisited.contains(n))
                     .flatMap(n -> n.calledCallNodesAndSelfInPostOrder(alreadyVisited).stream()),
                     Stream.of(this)).collect(Collectors.toList());
-        }
-
-        Graph createDotGraph(Function<CallNode, Attributes> attrSupplier){
-            return graph().graphAttr().with(RankDir.TOP_TO_BOTTOM).directed().with((Node[])calledCallNodesAndSelf()
-                    .stream().map(n -> node(n.method.name)
-                            .link((String[])n.callees.stream()
-                            .map(m -> m.method.name).toArray(String[]::new)).with().with(attrSupplier.apply(n))).toArray(Node[]::new));
         }
 
         Set<CallNode> getCallees() {
@@ -134,10 +120,10 @@ public class CallGraph {
     }
 
     private final ProgramNode program;
-    final CallNode mainNode;
+    public final CallNode mainNode;
     final Map<MethodNode, CallNode> methodToNode;
     private final Map<CallNode, Set<CallNode>> dominators;
-    private final Map<CallNode, Integer> loopDepths;
+    public final Map<CallNode, Integer> loopDepths;
     private final Set<MethodNode> usedMethods;
 
     public CallGraph(ProgramNode program) {
@@ -169,8 +155,7 @@ public class CallGraph {
                 });
         dominators = dominators(mainNode);
         loopDepths = calcLoopDepth(mainNode, dominators);
-        DotRegistry.get().store("summary", "call-graph",
-                () -> () -> mainNode.createDotGraph(n -> Records.of(loopDepths.get(n) + "", n.method.name)));
+        GraphRegistry.get().store("summary", "call-graph", this);
     }
 
     private Set<MethodNode> calcUsedMethods(ProgramNode program){

@@ -1,19 +1,22 @@
-package nildumu;
-
-import org.jgrapht.graph.DefaultWeightedEdge;
+package nildumu.ui;
 
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 import java.util.function.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import guru.nidi.graphviz.attribute.*;
 import guru.nidi.graphviz.engine.*;
 import guru.nidi.graphviz.model.*;
+import nildumu.*;
 import nildumu.intervals.Intervals;
+import nildumu.mih.BitGraph;
 import nildumu.util.DefaultMap;
 import swp.util.Pair;
+import swp.util.Utils;
 
 import static guru.nidi.graphviz.attribute.Attributes.attr;
 import static guru.nidi.graphviz.model.Factory.*;
@@ -103,10 +106,12 @@ public class DotRegistry {
 
     public void enable(){
         enabled = true;
+        GraphRegistry.get().enable();
     }
 
     public void disable(){
         enabled = false;
+        GraphRegistry.get().disable();
     }
 
     public Map<String, LinkedHashMap<String, DotFile>> getFilesPerTopic() {
@@ -116,6 +121,7 @@ public class DotRegistry {
     public void reset(){
         filesPerTopic.values().stream().flatMap(l -> l.values().stream()).forEach(DotFile::delete);
         filesPerTopic.clear();
+        GraphRegistry.get().reset();
         try {
             for (Path path : Files.list(tmpDir).collect(Collectors.toList())){
                 Files.deleteIfExists(path);
@@ -155,14 +161,17 @@ public class DotRegistry {
     }
 
     public LinkedHashMap<String, DotFile> getFilesPerTopic(String topic){
+        loadGraphRegistry();
         return filesPerTopic.getOrDefault(topic == null ? "" : topic, new LinkedHashMap<>());
     }
 
     public boolean has(String topic, String name){
+        loadGraphRegistry();
         return getFilesPerTopic(topic).containsKey(name);
     }
 
     public Optional<DotFile> get(String topic, String name){
+        loadGraphRegistry();
         return Optional.ofNullable(getFilesPerTopic(topic).getOrDefault(name, null));
     }
 
@@ -250,7 +259,7 @@ public class DotRegistry {
             }
         }
         topAnchors.stream().sorted(Comparator.comparing(s -> s.name)).forEach(anchor -> {
-            Lattices.Value val = anchor.value;
+            Value val = anchor.value;
             String nodeId = anchor.name;
             MutableNode paramNode = mutNode(nodeId);
             paramNode.add(Color.GREEN, Color.GREEN.font());
@@ -262,5 +271,55 @@ public class DotRegistry {
         nodeList.add(ret);
         ret.addLink((MutableNode[])botAnchor.value.stream().map(nodes::get).toArray(MutableNode[]::new));
         return graph(name).directed().nodeAttr().with(Font.name("Helvetica")).graphAttr().with(RankDir.BOTTOM_TO_TOP).graphAttr().with(Font.name("Helvetica")).with((MutableNode[])nodeList.toArray(new MutableNode[0]));
+    }
+
+    public static Graph createDotGraph(BitGraph bg, String name, boolean withMinCut) {
+        Lattices.Value ret = new Lattices.Value(bg.getReturnValues().stream()
+                .flatMap(Lattices.Value::stream).collect(Collectors.toList()));
+        return DotRegistry.createDotGraph(bg.getContext(), name, Stream.concat(IntStream.range(0, bg.getParameters().size())
+                        .mapToObj(i -> new DotRegistry.Anchor(String.format("param %d", i), bg.getParameters().get(i))),
+                bg.getMethodReturnValue().globals.entrySet().stream().map(e ->
+                        new DotRegistry.Anchor(e.getKey().name, e.getValue()))
+                ).collect(Collectors.toList()),
+                new DotRegistry.Anchor("return", Lattices.Value.combine(bg.getReturnValues())),
+                withMinCut ? bg.minCutBits(ret.bitSet(), bg.getParameterBits(), INFTY) : Collections.emptySet());
+    }
+
+    public static void writeDotGraph(BitGraph bg, Path folder, String name, boolean withMinCut) {
+        Path path = folder.resolve(name + ".dot");
+        try {
+            Files.createDirectories(folder);
+            Graphviz.fromGraph(createDotGraph(bg, name, withMinCut)).render(Format.XDOT).toFile(path.toFile());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static Graph createDotGraph(CallGraph.CallNode node, Function<CallGraph.CallNode, Attributes> attrSupplier){
+        return graph().graphAttr().with(RankDir.TOP_TO_BOTTOM).directed().with((Node[])node.calledCallNodesAndSelf()
+                .stream().map(n -> node(n.method.name)
+                        .link((String[])n.callees.stream()
+                                .map(m -> m.method.name).toArray(String[]::new)).with().with(attrSupplier.apply(n))).toArray(Node[]::new));
+    }
+
+    public void loadGraphRegistry() {
+        for (Utils.Triple<String, String, CallGraph> cgTriple : GraphRegistry.get().getCallGraphsPerTopic()) {
+            if (!has(cgTriple.first, cgTriple.second)) {
+                store(cgTriple.first, cgTriple.second, () -> () -> createDotGraph(cgTriple.third.mainNode,
+                        (CallGraph.CallNode n) -> Records.of(cgTriple.third.loopDepths.get(n) + "", n.method.name)));
+            }
+        }
+        for (Utils.Quadruple<Pair<String, String>, BitGraph, String, Boolean> quadruple : GraphRegistry.get().getBitGraphsPerTopic()) {
+            if (!has(quadruple.first.first, quadruple.first.second)) {
+                store(quadruple.first.first, quadruple.first.second, () -> () -> createDotGraph(quadruple.second, quadruple.third, quadruple.fourth));
+            }
+        }
+    }
+
+    public static Graph visuLeakageDotGraph(Context context, String name, Sec<?> sec){
+        Set<Bit> minCut = context.computeLeakage(MinCut.usedAlgo).get(sec).minCut;
+        return createDotGraph(context, name,
+                Collections.singletonList(new Anchor("input", context.sinks(sec).stream().collect(Value.collector()))),
+                new Anchor("output", context.sources(sec).stream().collect(Value.collector())), minCut);
     }
 }

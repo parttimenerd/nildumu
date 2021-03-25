@@ -5,6 +5,7 @@ import nildumu.Parser;
 import nildumu.Parser.ProgramNode;
 import swp.util.Pair;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -18,6 +19,7 @@ import java.util.stream.Stream;
 public class TestProgram implements Comparable<TestProgram> {
 
     private static int counter = 0;
+    public final Path path;
     public final String name;
     public final ProgramNode program;
     public final IntegerType integerType;
@@ -26,7 +28,8 @@ public class TestProgram implements Comparable<TestProgram> {
      */
     private Map<String, String> specialVersions = new HashMap<>();
 
-    public TestProgram(String name, ProgramNode program, IntegerType integerType) {
+    public TestProgram(Path path, String name, ProgramNode program, IntegerType integerType) {
+        this.path = path;
         this.name = name;
         this.program = program;
         this.integerType = integerType;
@@ -342,5 +345,12 @@ public class TestProgram implements Comparable<TestProgram> {
 
     public String getUniqueCodeName(String ending){
         return "code" + counter++ + ending;
+    }
+
+    public Path getVersionPath(String fileEnding) {
+        if (!fileEnding.equals("nd")) {
+            return path.getParent().resolve(getSpecialVersion(fileEnding) + "." + fileEnding);
+        }
+        return path;
     }
 }

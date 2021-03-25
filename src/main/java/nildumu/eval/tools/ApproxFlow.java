@@ -23,7 +23,7 @@ public class ApproxFlow extends AbstractTool {
     }
 
     ApproxFlow(int unwindLimit) {
-        super("ApproxFlow" + unwindLimit, unwindLimit, "c");
+        super(String.format("ApproxFlow%02d", unwindLimit), unwindLimit, "c");
     }
 
     static String toCCode(TestProgram program){
@@ -58,15 +58,18 @@ public class ApproxFlow extends AbstractTool {
             e.printStackTrace();
             System.exit(1);
         }
+        return createDirectPacket(program, sourceFile);
+    }
+
+    @Override
+    public AnalysisPacket createDirectPacket(TestProgram program, Path path) {
         return new AnalysisPacket(this, program) {
             @Override
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
-                return String.format("cd %s; cp %s %s; UNWIND=%d python ApproxFlow.py %s %s",
+                return String.format("cd %s; cp %s code.c; UNWIND=%d PARTIAL_LOOPS=true python ApproxFlow.py code.c %s",
                         formatter.format(approxFlowFolder),
-                        sourceFile.toAbsolutePath(),
-                        codeFileName,
+                        path.toAbsolutePath(),
                         unwind,
-                        codeFileName,
                         GLOBAL_FUNCTION);
             }
 

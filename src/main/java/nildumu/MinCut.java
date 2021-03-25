@@ -6,6 +6,7 @@ import nildumu.util.DefaultMap;
 import org.jgrapht.alg.flow.PushRelabelMFImpl;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
+import picocli.CommandLine;
 import swp.util.Pair;
 
 import java.util.*;
@@ -24,30 +25,32 @@ import static nildumu.Lattices.*;
  */
 public class MinCut {
 
-    public static Algo usedAlgo = Algo.GRAPHT_PP;
+    public static Algo usedAlgo = Algo.OPENWBO_GLUCOSE;
 
     public enum Algo {
-        GRAPHT_PP("JGraphT Preflow-Push", false, false, null, ""),
-        OPENWBO_GLUCOSE("Open-WBO GL PMSAT", "Open-WBO/bin/open-wbo-g", ""),
-        OPENWBO_MERGESAT("Open-WBO MS PMSAT", "Open-WBO/bin/open-wbo-ms", ""),
-        UWRMAXSAT("UWrMaxSat PMSAT", "UWrMaxSat-1.1w/bin/uwrmaxsat", "-m");
+        GRAPHT_PP("JGraphT Preflow-Push", "JGT", false, false, null, ""),
+        OPENWBO_GLUCOSE("Open-WBO GL PMSAT", "OWG", "Open-WBO/bin/open-wbo-g", ""),
+        OPENWBO_MERGESAT("Open-WBO MS PMSAT", "OWM", "Open-WBO/bin/open-wbo-ms", ""),
+        UWRMAXSAT("UWrMaxSat PMSAT", "UWr", "UWrMaxSat-1.1w/bin/uwrmaxsat", "-m");
 
         public final String description;
+        public final String shortName;
         public final boolean supportsIntervals;
         public final boolean supportsAlternatives;
         public final String binaryPath;
         public final String options;
 
-        Algo(String description, boolean supportsIntervals, boolean supportsAlternatives, String binaryPath, String options) {
+        Algo(String description, String shortName, boolean supportsIntervals, boolean supportsAlternatives, String binaryPath, String options) {
             this.description = description;
+            this.shortName = shortName;
             this.supportsIntervals = supportsIntervals;
             this.supportsAlternatives = supportsAlternatives;
             this.binaryPath = binaryPath;
             this.options = options;
         }
 
-        Algo(String description, String binaryPath, String options) {
-            this(description, true, true, binaryPath, options);
+        Algo(String description, String shortName, String binaryPath, String options) {
+            this(description, shortName, true, true, binaryPath, options);
         }
 
         @Override
@@ -76,6 +79,15 @@ public class MinCut {
                 func.run();
                 return null;
             });
+        }
+
+        public static MinCut.Algo from(String s) {
+            try {
+                return MinCut.Algo.valueOf(s.toUpperCase());
+            } catch (IllegalArgumentException ex){
+                throw new IllegalArgumentException(String.format("%s is not a valid algorithm, use one of %s",
+                        s, Arrays.stream(MinCut.Algo.values()).map(MinCut.Algo::name).collect(Collectors.joining(", "))));
+            }
         }
     }
 
