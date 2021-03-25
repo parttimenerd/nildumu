@@ -1,6 +1,6 @@
 package swp.parser.lr;
 
-import java.io.Serializable;
+import java.io.*;
 import java.util.*;
 
 import swp.grammar.*;
@@ -14,32 +14,56 @@ public class LRParserTable implements Serializable {
 
 	public final Grammar grammar;
 
-	/**
-	 * Mapping of terminal id to actions for each state.
-	 */
-	public List<Map<Integer, Action>> actionTable;
+	public static class RawTables implements Serializable {
+		/**
+		 * Mapping of non terminal to next state (for each state).
+		 */
+		public List<Map<NonTerminal, Integer>> gotoTable;
 
-	/**
-	 * Mapping of non terminal to next state (for each state).
-	 */
-	public List<Map<NonTerminal, Integer>> gotoTable;
+		public Map<Integer, Pair<NonTerminal, Integer>> productionInformation;
 
-	public Map<Integer, Pair<NonTerminal, Integer>> productionInformation;
+		/**
+		 * Mapping of terminal id to actions for each state.
+		 */
+		public List<Map<Integer, LRParserTable.Action>> actionTable;
 
-	public int[] _ignoredTerminals = new int[0];
+		public Map<Integer, Integer> prodToReductionId = new HashMap<>();
+		
+		public int[] _ignoredTerminals = new int[0];
+
+		public RawTables(List<Map<NonTerminal, Integer>> gotoTable, Map<Integer, Pair<NonTerminal, Integer>> productionInformation,
+						 List<Map<Integer, LRParserTable.Action>> actionTable) {
+			this.gotoTable = gotoTable;
+			this.productionInformation = productionInformation;
+			this.actionTable = actionTable;
+		}
+
+		public static RawTables load(File file) throws IOException, ClassNotFoundException {
+			try (ObjectInput oi = new ObjectInputStream(new FileInputStream(file))) {
+				return (RawTables) oi.readObject();
+			}
+		}
+
+		public void store(File file) throws IOException {
+			try (ObjectOutput oo = new ObjectOutputStream(new FileOutputStream(file))) {
+				oo.writeObject(this);
+			}
+		}
+	}
+
+	public RawTables rt;
 
 
-	public LRParserTable(Grammar grammar, List<Map<Integer, Action>> actionTable,
-	                     List<Map<NonTerminal, Integer>> gotoTable, Map<Integer, Pair<NonTerminal, Integer>> productionInformation) {
+	public LRParserTable(Grammar grammar,
+	                     RawTables rt) {
 		this.grammar = grammar;
-		this.actionTable = actionTable;
-		this.gotoTable = gotoTable;
-		this.productionInformation = productionInformation;
+		this.rt = rt;
+		this.rt.prodToReductionId.putAll(grammar.prodToReductionId);
 	}
 
 	public LRParserTable(Grammar grammar){
-		this(grammar, new ArrayList<Map<Integer, Action>>(), new ArrayList<Map<NonTerminal, Integer>>(),
-				new HashMap<>());
+		this(grammar, new RawTables(new ArrayList<>(),
+				new HashMap<>(), new ArrayList<>()));
 	}
 
 	public static class Action implements Serializable {
@@ -101,16 +125,16 @@ public class LRParserTable implements Serializable {
 	}
 
 	private void initState(int state){
-		while (state >= actionTable.size()){
-			int s = actionTable.size();
-			actionTable.add(new HashMap<>());
-			gotoTable.add(new HashMap<>());
+		while (state >= rt.actionTable.size()){
+			int s = rt.actionTable.size();
+			rt.actionTable.add(new HashMap<>());
+			rt.gotoTable.add(new HashMap<>());
 		}
 	}
 
 	private void insert(State state, Terminal terminal, Action action){
 		initState(state.id);
-		Map<Integer, Action> row = actionTable.get(state.id);
+		Map<Integer, Action> row = rt.actionTable.get(state.id);
 		if (row.containsKey(terminal.id)){
 			Action cur = row.get(terminal.id);
 			printError(state, terminal, action, cur);
@@ -140,7 +164,7 @@ public class LRParserTable implements Serializable {
 	}
 
 	public void addReduce(State state, Terminal terminal, Production production){
-		productionInformation.put(production.id, new Pair<>(production.left, production.rightSize()));
+		rt.productionInformation.put(production.id, new Pair<>(production.left, production.rightSize()));
 		insert(state, terminal, new ReduceAction(production.id));
 	}
 
@@ -150,18 +174,18 @@ public class LRParserTable implements Serializable {
 
 	public void addGoto(State state, NonTerminal nonTerminal, State newState){
 		initState(state.id);
-		gotoTable.get(state.id).put(nonTerminal, newState.id);
+		rt.gotoTable.get(state.id).put(nonTerminal, newState.id);
 	}
 
 	public String toString(TerminalSet set) {
 		StringBuilder builder = new StringBuilder();
-		for (int i = 0; i < actionTable.size(); i++){
+		for (int i = 0; i < rt.actionTable.size(); i++){
 			if (i != 0){
 				builder.append("\n");
 			}
 			builder.append(String.format("State = %5d: ", i));
 			builder.append(" Actions = [");
-			Map<Integer, Action> row = actionTable.get(i);
+			Map<Integer, Action> row = rt.actionTable.get(i);
 			Integer[] keys = new Integer[row.keySet().size()];
 			row.keySet().toArray(keys);
 			Arrays.sort(keys);
@@ -174,7 +198,7 @@ public class LRParserTable implements Serializable {
 				builder.append(row.get(keys[j]));
 			}
 			builder.append("] GOTO = ");
-			builder.append(gotoTable.get(i));
+			builder.append(rt.gotoTable.get(i));
 		}
 		return builder.toString();
 	}
@@ -182,15 +206,15 @@ public class LRParserTable implements Serializable {
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
-		for (int i = 0; i < actionTable.size(); i++){
+		for (int i = 0; i < rt.actionTable.size(); i++){
 			if (i != 0){
 				builder.append("\n");
 			}
 			builder.append(String.format("State = %5d: ", i));
 			builder.append(" Actions = ");
-			builder.append(actionTable.get(i));
+			builder.append(rt.actionTable.get(i));
 			builder.append(" GOTO = ");
-			builder.append(gotoTable.get(i));
+			builder.append(rt.gotoTable.get(i));
 		}
 		return builder.toString();
 	}

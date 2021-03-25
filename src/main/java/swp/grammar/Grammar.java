@@ -1,6 +1,6 @@
 package swp.grammar;
 
-import java.io.Serializable;
+import java.io.*;
 import java.util.*;
 import java.util.function.Function;
 
@@ -18,6 +18,42 @@ import static swp.util.Utils.join;
  * @see ExtGrammarBuilder ExtGrammarBuilder
  */
 public class Grammar implements Serializable {
+
+	public static class ReduceActions implements Serializable {
+
+		public static int DEFAULT_ACTION = 1;
+
+		protected List<SerializableFunction<ListAST, BaseAST>> reduceActions;
+
+		public ReduceActions(List<SerializableFunction<ListAST, BaseAST>> reduceActions) {
+			this.reduceActions = reduceActions;
+		}
+
+		/**
+		 * Reduce the passed production with the passed expression asts
+		 *
+		 * @param reduceId id of the reduction
+		 * @param asts passed asts
+		 * @return self
+		 */
+		public BaseAST reduce(int reduceId, List<BaseAST> asts){
+			if (reduceId < 0 || reduceId >= reduceActions.size()) {
+				if (asts.size() != 1) {
+					return new ListAST(asts);
+				} else {
+					return asts.get(0);
+				}
+			} else {
+				return reduceActions.get(reduceId).apply(new ListAST(asts));
+			}
+		}
+
+		public int add(SerializableFunction<ListAST, BaseAST> action) {
+			reduceActions.add(action);
+			return reduceActions.size() - 1;
+		}
+
+	}
 
 	/**
 	 * Symbols in this grammar, symbols = nonTerminals ∪ terminals (but without epsilon!)
@@ -45,7 +81,8 @@ public class Grammar implements Serializable {
 	private Map<NonTerminal, Set<Terminal>> follow1Sets;
 	private Set<NonTerminal> epsilonableNonTerminals;
 
-	protected Map<Integer, SerializableFunction<ListAST, BaseAST>> reduceActions = new HashMap<>();
+	public ReduceActions reduceActions = new ReduceActions(new ArrayList<>());
+	public Map<Integer, Integer> prodToReductionId = new HashMap<>();
 
 	/**
 	 * Create a new Grammar object
@@ -185,35 +222,8 @@ public class Grammar implements Serializable {
 				"Productions: \n" + join(productions, "\n");
 	}
 
-	protected void setReduceAction(int productionId, SerializableFunction<ListAST, BaseAST> action){
-		reduceActions.put(productionId, action);
-	}
-
-	/**
-	 * Reduce the passed production with the passed expression asts
-	 *
-	 * @param productionId id of the production
-	 * @param asts passed asts
-	 * @return self
-	 */
-	public BaseAST reduce(int productionId, List<BaseAST> asts){
-		if (!reduceActions.containsKey(productionId)) {
-			/*List<BaseAST> flattenedASTs = new ArrayList<>();
-			for (BaseAST ast : asts){
-				for (BaseAST expression : ast.children()){
-					if (expression instanceof ListAST )
-					flattenedASTs.add(new ASTLeaf(token));
-				}
-			}
-			return new ListAST(flattenedASTs);*/
-			if (asts.size() != 1) {
-				return new ListAST(asts);
-			} else {
-				return asts.get(0);
-			}
-		} else {
-			return reduceActions.get(productionId).apply(new ListAST(asts));
-		}
+	protected void addReduceAction(int productionId, SerializableFunction<ListAST, BaseAST> action){
+		prodToReductionId.put(productionId, reduceActions.add(action));
 	}
 
 	/**
@@ -922,5 +932,9 @@ public class Grammar implements Serializable {
 		}
 
 		return ret;
+	}
+
+	public BaseAST reduce(int productionId, List<BaseAST> asts) {
+		return reduceActions.reduce(prodToReductionId.getOrDefault(productionId, -1), asts);
 	}
 }

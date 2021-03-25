@@ -65,6 +65,10 @@ public class Generator {
 				parserBuilder, parserStartSymbol, (g) -> {});
 	}
 
+	private static boolean onlySerializeRawTables() {
+		return System.getProperty("java.vm.name").equals("Substrate VM"); // the GraalVM does not currently support serialization of lambdas
+	}
+
 	private static Generator getCachedIfPossible(String id, Function<LexerDescriptionParser, Table> lexerBuilder,
 	                                            String[] ignoredTerminals,
 	                                            Consumer<ExtGrammarBuilder> parserBuilder,
@@ -79,8 +83,14 @@ public class Generator {
 			if (Config.cacheInFile() && !id.isEmpty()) {
 				if (doFilesForIdExist(id)) {
 					try {
-						pair = load(id);
+						if (onlySerializeRawTables()) {
+							Pair<File, File> filePair = getFilePair(id);
+							pair = generatePair(id, parserBuilder, parserStartSymbol);
+						} else {
+							pair = load(id);
+						}
 					} catch (ClassNotFoundException | IOException e) {
+						e.printStackTrace();
 						pair = null;
 					}
 				}
@@ -133,14 +143,37 @@ public class Generator {
 			lrGraph.toImage(fileNames.second.getAbsolutePath(), "svg");
 		}
 		LRParserTable parserTable = lrGraph.toParserTable();
-		parserTable._ignoredTerminals = new int[ignoredTerminals.length];
+		parserTable.rt._ignoredTerminals = new int[ignoredTerminals.length];
 		for (int i = 0; i < ignoredTerminals.length; i++) {
-			parserTable._ignoredTerminals[i] = table.terminalSet.stringToType(ignoredTerminals[i]);
+			parserTable.rt._ignoredTerminals[i] = table.terminalSet.stringToType(ignoredTerminals[i]);
 		}
 		return new Pair<>(table, parserTable);
 	}
 
+	private static Pair<Table, LRParserTable> generatePair(String id,
+														   Consumer<ExtGrammarBuilder> parserBuilder,
+														   String parserStartSymbol) throws IOException, ClassNotFoundException {
+		Pair<File, File> filePair = getFilePair(id);
+		return generatePair(loadLexerTable(filePair.first),
+				LRParserTable.RawTables.load(filePair.second), parserBuilder, parserStartSymbol);
+	}
+
+
+	private static Pair<Table, LRParserTable> generatePair(Table lexerTable,
+														   LRParserTable.RawTables parserTables,
+														   Consumer<ExtGrammarBuilder> parserBuilder,
+														   String parserStartSymbol) {
+		ExtGrammarBuilder extBuilder = new ExtGrammarBuilder(lexerTable.terminalSet);
+		parserBuilder.accept(extBuilder);
+		Grammar grammar = extBuilder.toGrammar(parserStartSymbol);
+		LRParserTable parserTable = new LRParserTable(grammar, parserTables);
+		return new Pair<>(lexerTable, parserTable);
+	}
+
 	private static Pair<File, File> getFilePair(String id) {
+		if (onlySerializeRawTables()) {
+			id = id + "rt_";
+		}
 		if (id.startsWith("./")) {
 			return new Pair<>(new File(id + "lexer.ser"), new File(id + "parser.ser"));
 		}
@@ -160,8 +193,12 @@ public class Generator {
 		try (ObjectOutput oo = new ObjectOutputStream(new FileOutputStream(fileNames.first))) {
 			oo.writeObject(pair.first);
 		}
-		try (ObjectOutput oo = new ObjectOutputStream(new FileOutputStream(fileNames.second))) {
-			oo.writeObject(pair.second);
+		if (onlySerializeRawTables()) {
+			pair.second.rt.store(fileNames.second);
+		} else {
+			try (ObjectOutput oo = new ObjectOutputStream(new FileOutputStream(fileNames.second))) {
+				oo.writeObject(pair.second);
+			}
 		}
 	}
 
@@ -169,13 +206,19 @@ public class Generator {
 		Pair<File, File> fileNames = getFilePair(id);
 		Table table = null;
 		LRParserTable parserTable = null;
-		try (ObjectInput oi = new ObjectInputStream(new FileInputStream(fileNames.first))) {
-			table = (Table)oi.readObject();
-		}
+		table = loadLexerTable(fileNames.first);
 		try (ObjectInput oi = new ObjectInputStream(new FileInputStream(fileNames.second))) {
 			parserTable = (LRParserTable) oi.readObject();
 		}
 		return new Pair<>(table, parserTable);
+	}
+
+	private static Table loadLexerTable(File file) throws IOException, ClassNotFoundException {
+		Table table;
+		try (ObjectInput oi = new ObjectInputStream(new FileInputStream(file))) {
+			table = (Table)oi.readObject();
+		}
+		return table;
 	}
 
 	public interface LexerTerminalEnum {
@@ -201,6 +244,6 @@ public class Generator {
 	}
 
 	public Lexer createLexer(String input){
-		return new AutomatonLexer(lexerTable, input, new int[]{}, parserTable._ignoredTerminals);
+		return new AutomatonLexer(lexerTable, input, new int[]{}, parserTable.rt._ignoredTerminals);
 	}
 }

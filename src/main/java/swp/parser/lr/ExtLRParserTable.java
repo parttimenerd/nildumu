@@ -19,7 +19,7 @@ public class ExtLRParserTable extends LRParserTable {
 	public Map<Integer, List<Utils.Triple<Set<Integer>, NonTerminal, Integer>>> infoForStates = new HashMap<>();
 
 	public ExtLRParserTable(LRParserTable table) {
-		super(table.grammar, table.actionTable, table.gotoTable, table.productionInformation);
+		super(table.grammar, table.rt);
 	}
 
 	public ExtLRParserTable(Grammar grammar) {

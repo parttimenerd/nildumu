@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+set -e
+case "$(uname -s)" in
+   Darwin)
+     SCRIPT_PATH=$(greadlink -f "$0")
+     ;;
+
+   *)
+     SCRIPT_PATH=$(readlink -f "$0")
+     ;;
+esac
+
+PROJECT_DIR=$(dirname "$SCRIPT_PATH")
+cd $PROJECT_DIR
+cd dist
+(stat graalvm > /dev/null) || (
+wget https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-21.0.0.2/graalvm-ce-java8-linux-amd64-21.0.0.2.tar.gz;
+tar -xzf graalvm-ce-java8-linux-amd64-21.0.0.2.tar.gz; mv graalvm-ce-java8-21.0.0.2 graalvm;
+rm graalvm-ce-java8-linux-amd64-21.0.0.2.tar.gz;
+graalvm/lib/installer/bin/gu install native-image)

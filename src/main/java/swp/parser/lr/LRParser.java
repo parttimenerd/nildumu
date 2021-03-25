@@ -12,7 +12,7 @@ import swp.util.*;
  */
 public class LRParser {
 
-	private final Grammar grammar;
+	private final Grammar.ReduceActions reduceActions;
 	private final Lexer lexer;
 	private final LRParserTable table;
 	private ArrayList<StackFrame> stack = new ArrayList<>();
@@ -21,16 +21,19 @@ public class LRParser {
 	private boolean hadError = false;
 
 	public LRParser(Lexer lexer, LRParserTable table, boolean includeEOFToken){
-		this(table.grammar, lexer, table);
+		this(table.grammar.reduceActions, lexer, table);
 		this.includeEOFToken = includeEOFToken;
 	}
 
 	public LRParser(Lexer lexer, LRParserTable table){
-		this(table.grammar, lexer, table);
+		this(table.grammar.reduceActions, lexer, table);
 	}
 
 	public LRParser(Grammar grammar, Lexer lexer, LRParserTable table){
-		this.grammar = grammar;
+		this(grammar.reduceActions, lexer, table);
+	}
+	public LRParser(Grammar.ReduceActions reduceActions, Lexer lexer, LRParserTable table){
+		this.reduceActions = reduceActions;
 		this.lexer = lexer;
 		this.table = table;
 		stack.add(new StackFrame(0));
@@ -39,7 +42,7 @@ public class LRParser {
 	public BaseAST parse(){
 		while (true){
 			int tokenId = lexer.cur().type;
-			Map<Integer, LRParserTable.Action> row = table.actionTable.get(currentState());
+			Map<Integer, LRParserTable.Action> row = table.rt.actionTable.get(currentState());
 			if (!row.containsKey(tokenId)){
 				if (table instanceof ExtLRParserTable && extTableRecover()){
 					continue;
@@ -68,7 +71,7 @@ public class LRParser {
 					break;
 				case "reduce":
 					int prodId = ((LRParserTable.ReduceAction) action).productionId;
-					Pair<NonTerminal, Integer> prodInfo = table.productionInformation.get(prodId);
+					Pair<NonTerminal, Integer> prodInfo = table.rt.productionInformation.get(prodId);
 					List<BaseAST> reducedASTs = new ArrayList<>();
 					for (int i = 0; i < prodInfo.second; i++){
 						if (!hadError) {
@@ -79,7 +82,7 @@ public class LRParser {
 					}
 					if (!hadError) {
 						try {
-							astStack.add(grammar.reduce(prodId, reducedASTs));
+							astStack.add(reduceActions.reduce(table.rt.prodToReductionId.getOrDefault(prodId, -1), reducedASTs));
 						} catch (SWPException ex){
 							String newErrorMsg = String.format("Error around %s: %s", lexer.cur(), ex.getMessage());
 							SWPException newEx = new ParserError(lexer.cur(), newErrorMsg, lexer.getSource());
@@ -88,7 +91,7 @@ public class LRParser {
 						}
 					}
 					int newState = currentState();
-					stack.add(new StackFrame(table.gotoTable.get(newState).get(prodInfo.first)));
+					stack.add(new StackFrame(table.rt.gotoTable.get(newState).get(prodInfo.first)));
  				    break;
 				case "accept":
 					if (hadError){
@@ -124,10 +127,10 @@ public class LRParser {
 				for (int i = 0; i < recoverState.info.third; i++){
 					recoverState.stackFrames.remove(recoverState.stackFrames.size() - 1);
 				}
-				int newTopState = table.gotoTable.get(recoverState.stackFrames.get(recoverState.stackFrames.size() - 1).state).get(recoverState.info.second);
+				int newTopState = table.rt.gotoTable.get(recoverState.stackFrames.get(recoverState.stackFrames.size() - 1).state).get(recoverState.info.second);
 				recoverState.stackFrames.add(new StackFrame(newTopState, false));
 
-				if (table.actionTable.get(newTopState).containsKey(lexer.cur().type)){
+				if (table.rt.actionTable.get(newTopState).containsKey(lexer.cur().type)){
 					stack = recoverState.stackFrames;
 					return true;
 				} else {

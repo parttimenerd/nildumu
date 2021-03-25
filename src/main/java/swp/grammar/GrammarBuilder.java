@@ -292,7 +292,7 @@ public class GrammarBuilder implements Serializable {
 			g = g.insertStartNonTerminal();
 		}
 		for (int prod : reduceActions.keySet()) {
-			g.setReduceAction(prod, reduceActions.get(prod));
+			g.addReduceAction(prod, reduceActions.get(prod));
 		}
 		return g;
 	}
