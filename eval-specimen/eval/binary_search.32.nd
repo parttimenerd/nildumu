@@ -1,0 +1,20 @@
+/* Z. Meng and G. Smith, Calculating Bounds on Information Leakage Using Two-bit Patterns, in Proceedings of the ACM SIGPLAN 6th Workshop on Programming Languages and Analysis for Security, 2011, p. 1:1--1:12. */
+/* Should leak 16 bits */
+h input int I = 0b0u{32}; /* nildumu does not have direct support for uint, therefore simulate uint here */
+/* no overflows in this code and therefore okay */
+
+int BITS = 32;
+
+int O = 0;
+
+int m = 0;
+int i = 0;
+
+while (i < BITS){
+    m = 1<<(31-i);
+    if (O + m <= I) {
+        O = O + m;
+    }
+    i = i + 1;
+}
+l output int o = O;

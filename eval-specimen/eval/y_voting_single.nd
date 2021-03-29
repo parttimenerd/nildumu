@@ -1,0 +1,56 @@
+/* adopted from the ApproxFlow repo, which in turn is based on */
+/* F. Biondi, A. Legay, and J. Quilbeuf, "Comparative analysis of leakage tools on scalable case studies,"*/
+
+bit_width 32;
+
+int N = 10;
+
+/* C is the number of candidates */
+int C = 10;
+
+
+/* factorial function */
+int fact(int n){
+  int ret = 1;
+  if (n <= 1) { 
+    ret = 1;
+  } else {
+    ret = n*fact(n - 1);
+  }
+  return ret;
+}
+  
+/* the result is the number of votes of each candidate */
+int[10 /* C */] result; /* these are our public (observable) outputs */
+int i = 0;
+while (i < C) {
+	result[i] = 0;
+	i = i + 1;
+}
+
+
+  /* init private values in the intervals defined in QUAIL file */
+
+  /* The secret is the preference of each voter */
+  h input int[10 /* N */] secrets = 0bu{32}; 
+  int[10 /* N */] vote; /* these are our secrets */
+  int CFACT= fact(C);
+  i = 0;
+  while (i < N) {
+    vote[i]=secrets[i]%CFACT;
+    i = i + 1;
+  }
+
+  i = 0;
+    int j  = 0;
+    while (i < N) {
+      j=0;
+      while (j < C) {
+	if (vote[i] == j) {
+	  result[j] = (result[j]) + 1 ;
+	}
+	j= j+1;
+      }
+      i= i + 1;
+    }
+l output var out = result;

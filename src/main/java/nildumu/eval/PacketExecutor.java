@@ -6,6 +6,10 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static nildumu.util.Util.p;
 
 /**
  * Allows to execute {@link AnalysisPacket}s and return the
@@ -23,10 +27,12 @@ public class PacketExecutor {
         this.timeLimit = timeLimit;
     }
 
-    public AnalysisResult analyse(AnalysisPacket packet, int runs, boolean print, boolean verbose) {
+    public AnalysisResult analyse(AnalysisPacket packet, int runs, int dryruns, boolean print, boolean verbose) {
         System.out.println("run shell command " + packet.getShellCommand(timeLimit));
         List<AnalysisResult> results = new ArrayList<>();
-        analyse(packet, verbose);
+        for (int i = 0; i < dryruns; i++) {
+            analyse(packet, verbose);
+        }
         for (int i = 0; i < runs; i++){
           AnalysisResult res = analyse(packet, verbose);
           if (!res.isValid() || res.hasTimeout){
@@ -41,7 +47,7 @@ public class PacketExecutor {
         AnalysisResult res = new AnalysisResult(true, leakageAvg, Duration.ofNanos(runtimeAvg), false, leakageStd / leakageAvg, runtimeStd / runtimeAvg);
         if (print) {
             System.out.println("#####################################################");
-            System.out.println(String.format("-------------- %fs +-%.3f %.3f +-%.3f -------------", res.runtime.toMillis() / 1000.0, res.runtimeStddev, res.leakage, res.leakageStddev));
+            System.out.println(String.format("-------------- %s %fs +-%.3f %.3f +-%.3f -------------", packet.toString(), res.runtime.toMillis() / 1000.0, res.runtimeStddev, res.leakage, res.leakageStddev));
             System.out.println("#####################################################");
         }
         return res;
@@ -122,7 +128,7 @@ public class PacketExecutor {
         return new AnalysisResult(false, -1, Duration.ofNanos(-1), false);
     }
 
-    public AnalysisResults analysePackets(Iterable<AnalysisPacket> packets, int parallelism, int runs, boolean verbose) {
+    public AnalysisResults analysePackets(PacketList packets, int parallelism, int runs, int dryruns, boolean verbose) {
         if (parallelism == 1) {
             Map<AnalysisPacket, AnalysisResult> results = new HashMap<>();
             int i = 1;
@@ -132,27 +138,27 @@ public class PacketExecutor {
                 System.out.println("#####################################################");
                 System.out.println(String.format("------------------- Packet %d of %d -------------", i, ps.size()));
                 System.out.println("#####################################################");
-                results.put(packet, analyse(packet, runs, true, verbose));
+                results.put(packet, analyse(packet, runs, dryruns, true, verbose));
                 i++;
             }
             return new AnalysisResults(results);
         } else {
             Map<AnalysisPacket, AnalysisResult> results = new ConcurrentHashMap<>();
             ExecutorService pool = Executors.newWorkStealingPool(parallelism);
-            List<Future<AnalysisResult>> futures = new ArrayList<>();
-            for (AnalysisPacket packet : packets) {
-                futures.add(pool.submit(() -> results.put(packet, analyse(packet, runs, true, verbose))));
-                //results.put(packet, analyse(packet));
-            }
-            futures.forEach(f -> {
-                try {
-                    f.get();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (ExecutionException e) {
-                    e.printStackTrace();
-                }
+            pool.execute(() -> {
+                packets.stream().parallel()
+                        .map(packet -> {
+                            System.out.println(Thread.currentThread().getId());
+                            return p(packet, analyse(packet, runs, dryruns, true, verbose));
+                        }).collect(Collectors.toList())
+                        .forEach(p -> results.put(p.first, p.second));
+                pool.shutdownNow();
             });
+            try {
+                pool.awaitTermination(10000, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             return new AnalysisResults(results);
         }
     }

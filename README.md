@@ -26,6 +26,13 @@ Setup
 ./evaluate           # build and run the evaluation
 ```
 
+Requirements for the evaluation
+-------------------------------
+- python2 with pycparser package
+- CBMC
+- libc6-dev package
+- openjdk-8
+
 Language
 --------
 - the language has a C like syntax

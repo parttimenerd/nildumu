@@ -57,15 +57,14 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
     }
 
     public static List<AbstractTool> getDefaultTools(int... unwindLimits){
-        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.of(new ApproxFlow(unwind), new Nildumu(unwind, MinCut.Algo.OPENWBO_GLUCOSE, true)))
+        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.of(new ApproxFlow(unwind), new Nildumu(unwind, MinCut.Algo.OPENWBO_GLUCOSE)))
                 .flatMap(identity()).collect(Collectors.toList());
     }
 
     public static List<AbstractTool> getAllTools(int... unwindLimits){
         return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.concat(
-                Stream.of(new ApproxFlow(unwind)),
-                Stream.of(true, false).flatMap(b -> Stream.of(new Nildumu(unwind, MinCut.Algo.OPENWBO_GLUCOSE, b),
-                        new Nildumu(unwind, MinCut.Algo.UWRMAXSAT, b), new Nildumu(unwind, MinCut.Algo.GRAPHT_PP, b)))))
+                Stream.of(new ApproxFlow(unwind)), Stream.of(new Nildumu(unwind, MinCut.Algo.OPENWBO_GLUCOSE),
+                        new Nildumu(unwind, MinCut.Algo.UWRMAXSAT), new Nildumu(unwind, MinCut.Algo.GRAPHT_PP))))
                 .flatMap(identity()).collect(Collectors.toList());
     }
 

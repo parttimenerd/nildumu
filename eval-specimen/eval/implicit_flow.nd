@@ -2,7 +2,7 @@
 /* https://github.com/qif/jpf-qif/blob/master/src/examples/plas/ImplicitFlow.java */
 /* Should leak log 7 = 2.8074 */
 
-h input int S = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu;
+h input int S = 0bu{32};
 int O;
 if (S == 0) {
     O = 0;

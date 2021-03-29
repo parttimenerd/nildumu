@@ -1,0 +1,134 @@
+/* adopted from the ApproxFlow repo, which in turn is based on */
+/* F. Biondi, A. Legay, and J. Quilbeuf, "Comparative analysis of leakage tools on scalable case studies," */
+
+
+/* N is the total number of houses */
+int N;
+
+/* indicates the size of the target. Only one of those should be one and all the other 0. */
+int target_is_S;
+int target_is_M;
+int target_is_L;
+
+/* We consider different sizes of houses. S, M and L indicate the number of houses of each size. */
+int S;
+int M;
+int L;
+
+/* each size correspond to a different level of consumption */
+int  small_consumption;
+int medium_consumption;
+int  large_consumption;
+
+/* the observable is the global consumption of the system */
+int global_consumption;
+
+/* the secret is the presence */
+h input int presence_target = 0bu{32};
+
+/* e.g. case1 or case2 from the paper */
+int case_value;
+
+N=3;
+
+/* indicates the size of the target. Only one of those should be one and all the other 0. */
+target_is_S = 1 ;
+target_is_M = 0 ;
+target_is_L = 0 ;
+
+
+/* We consider different sizes of houses. S, M and L indicate the number of houses of each size. */
+S=N/3 - target_is_S;
+M=N/3 - target_is_M;
+L=N/3 - target_is_L;
+
+/* each size correspond to a different level of consumption */
+small_consumption = 1 ;
+medium_consumption = 3 ;
+large_consumption = 5 ;
+
+/* the observable is the global consumption of the system */
+global_consumption = 0;
+
+/* Initialize the public values */
+N = 64; /*  a valid value for the test case, note in paper */
+S=N/3 ;
+M=N/3 ;
+L=N-S-M ;
+case_value = 1; /* also use case = 0 */
+
+ if (case_value == 1) {
+small_consumption = 1 ;
+medium_consumption = 2 ;
+large_consumption = 3 ;
+ }
+ else {
+small_consumption = 1 ;
+medium_consumption = 3 ;
+large_consumption = 5 ;
+ }
+int CONST_MODE = 0;
+if (CONST_MODE == 0){
+ target_is_S = 0 ;
+ target_is_M = 0 ;
+ target_is_L = 1 ;
+} else{ if (CONST_MODE == 1){
+ target_is_S = 0 ;
+ target_is_M = 1 ;
+ target_is_L = 0 ;
+} else { if (CONST_MODE == 2){
+
+ target_is_S = 1 ;
+ target_is_M = 0 ;
+ target_is_L = 0 ;
+}
+}
+}
+/* inlined call to numberOfEach() */
+S=N/3 - target_is_S;
+M=N/3 - target_is_M;
+L=N/3 - target_is_L;
+
+/* Done initializing the public values */
+
+h input int[64] presence = 0bu{32};  /* the secret is an array of bools */
+int u = 0;
+while (u < length(presence)) {
+    presence[u] = presence[u] & 0b001;
+    u = u + 1;
+}
+
+/* done initializing the values */
+
+ if  (presence_target == 1) {
+ if  (target_is_S == 1) {
+global_consumption = global_consumption + small_consumption ;
+ } 
+ else { if (target_is_M == 1) {
+global_consumption = global_consumption + medium_consumption ;
+ }
+ else {
+global_consumption= global_consumption + large_consumption ;
+ }
+}
+ }
+
+int i  = 0;
+while ( i < N - 1) {
+ if (presence[i] == 1) {
+   
+if (i<S) {
+  global_consumption = global_consumption + small_consumption ;
+}
+else { if (i<S+M) {
+  global_consumption = global_consumption + medium_consumption ;
+}
+else{
+  global_consumption = global_consumption + large_consumption ;
+}
+}
+ }
+ i= i + 1;
+}
+    
+l output int out = global_consumption;

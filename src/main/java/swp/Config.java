@@ -13,7 +13,6 @@ public class Config {
 	private static final Map<String, String> config = new HashMap<String, String>(){{
 		put("useLALR", "yes");
 		put("tmpDir", "/tmp");
-		put("cacheInFile", "yes");
 	}};
 
 	/** Use LARL instead of LR? */
@@ -26,7 +25,7 @@ public class Config {
 	}
 
 	public static boolean cacheInFile(){
-		return config.get("cacheInFile").equals("yes");
+		return true;
 	}
 
 	private static void loadConfig(){
