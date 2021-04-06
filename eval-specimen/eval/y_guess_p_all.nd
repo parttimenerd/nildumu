@@ -1,4 +1,4 @@
-/* adopted from the ApproxFlow repo, which in turn is based on */
+</* adopted from the ApproxFlow repo, which in turn is based on */
 /* F. Biondi, A. Legay, and J. Quilbeuf, "Comparative analysis of leakage tools on scalable case studies," */
 
 bit_width 32;

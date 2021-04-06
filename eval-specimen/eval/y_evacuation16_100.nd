@@ -1,20 +1,20 @@
 /* adapted from I. Sweet, J. M. C. Trilla, C. Scherrer, M. Hicks, and S. Magill */
 /* "What's the Over Under? Probabilistic Bounds on Information Leakage" */
-/* with 20 ships and 20 evacuees */
-bit_width 16;
-h input int[20] Capacity = 0bu{16};
-h input int[2][20] Loc = 0bu{16};
+/* with 16 ships and 100 evacuees */
+
+h input int[16] Capacity = 0bu{16};
+h input int[2][16] Loc = 0bu{16};
 int[2] L = {100, 100};
 int D = 10;
 int N = 100;
-int[2][20] berths;
+int[2][16] berths;
 int i = 0;
 while (i < length(berths)) {
 	berths[i] = {0, 1000};
 	i = i + 1; 
 }
 
-int is_solution(int[2][20] berths, int N) {
+int is_solution(int[2][16] berths, int N) {
 	int sum = 0;
 	int i = 0;
 	while (i < length(berths)) {
@@ -28,9 +28,9 @@ int mid(int[2] pos) {
 	return ((pos[0]) + (pos[1])) / 2;
 }
 
-int AtLeast(int[20] Capacity, int z, int b) { return Capacity[z] >= b; }
+int AtLeast(int[16] Capacity, int z, int b) { return Capacity[z] >= b; }
 
-int Nearby(int[2][20] Loc, int z, int[2] l, int d) {
+int Nearby(int[2][16] Loc, int z, int[2] l, int d) {
 	return abs((Loc[z][0]) - (l[0])) + abs((Loc[z][0]) - (l[0])) <= d;
 }
 
@@ -52,4 +52,4 @@ while (!break) {
 	}
 }
 
-l output int[2][20] b = berths;
+l output int[2][16] b = berths;

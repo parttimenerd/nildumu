@@ -225,10 +225,6 @@ All configurations and inputs are stored continously in the
     - zooming in the graph works by pressing the *Shift* key and
       moving the mouse up or down while pressing an arbitrary mouse key
 
-Requirements
-------------
-Some code requires the [pysat](https://github.com/pysathq/pysat) library to be installed and
-the content of [Open-WBO.zip](https://maxsat-evaluations.github.io/2018/mse18-solver-src/complete/Open-WBO.zip)
-placed into the `dist` folder.
-
+License
+-------
 It's licensed under the GPLv3 and MIT license.
