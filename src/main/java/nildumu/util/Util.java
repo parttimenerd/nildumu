@@ -14,6 +14,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static nildumu.Lattices.Bit;
+import static nildumu.Lattices.vl;
 
 public class Util {
 
@@ -90,6 +91,9 @@ public class Util {
             vals.add(0, !one);
         }
         vals.add(!one);
+        while (vals.size() < vl.bitWidth) {
+            vals.add(!one);
+        }
         Collections.reverse(vals);
         return vals.stream().map(b -> b ? "1" : "0").collect(Collectors.joining(""));
     }

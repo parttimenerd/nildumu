@@ -21,6 +21,10 @@ public class Nildumu extends AbstractTool {
         this(unwind, 0, algo);
     }
 
+    public Nildumu(int unwind, boolean summaryUnwind, MinCut.Algo algo) {
+        this(unwind, summaryUnwind ? unwind : 0, algo);
+    }
+
     /**
      *  @param csrec maximum recursion depth for the call string handler
      * @param scsrec maximum recusion depth for the call string handler used by the summary handler

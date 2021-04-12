@@ -291,6 +291,11 @@ public class ContextMatcher {
             builder.add(() -> assertTrue(value.endsWithStar(), String.format("%s ends with a s bit", value)));
             return this;
         }
+
+        public ValueMatcher size(int expected){
+            builder.add(() -> assertEquals(expected, value.size(), String.format("%s has size %s", value, expected)));
+            return this;
+        }
     }
 
     public void run(){

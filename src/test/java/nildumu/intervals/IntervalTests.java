@@ -33,7 +33,7 @@ public class IntervalTests {
 
     @Test
     public void testBasicIf(){
-        new ContextMatcher(Processor.process(" h input int h = 0buu;\n" +
+        new ContextMatcher(Processor.process("bit_width 2; h input int h = 0buu;\n" +
                 "int x = 0;\n" +
                 "if (h < 1){\n" +
                 "    x = h;\n" +

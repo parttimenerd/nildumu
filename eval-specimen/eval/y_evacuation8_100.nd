@@ -24,6 +24,14 @@ int is_solution(int[2][8] berths, int N) {
 	return sum >= N;
 }
 
+int abs(int i){
+    int z = i;
+    if (z < 0) {
+        z = -1 * z;
+    }
+    return z
+}
+
 int mid(int[2] pos) {
 	return ((pos[0]) + (pos[1])) / 2;
 }

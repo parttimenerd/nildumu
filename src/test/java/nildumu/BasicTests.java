@@ -8,6 +8,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static nildumu.Lattices.*;
 import static nildumu.Processor.process;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class BasicTests {
 
@@ -41,6 +42,13 @@ public class BasicTests {
     public void testSimpleAssignment(){
         parse("int x = 1").val("x", 1).run();
         parse("int x = -10").val("x", -10).run();
+    }
+
+    @Test
+    public void testSimpleBinaryAssignment() {
+        parse("bit_width 3; h input int h = 0buuu; int x = 0b111").val("x", m -> {
+            m.size(3);
+        }).run();
     }
 
     @Test
@@ -91,7 +99,7 @@ public class BasicTests {
             "'l input int l = 0b0u; int x = l & 0b11','0b0u'"
     })
     public void testBitwiseOps(String program, String xVal) {
-        parse(program).val("x", xVal).run();
+        parse("bit_width 2;" + program).val("x", xVal).run();
     }
 
     @Test
@@ -170,12 +178,6 @@ public class BasicTests {
         parse(program).leaks(0).run();
     }
 
-    @ParameterizedTest
-    @CsvSource({"'int x = 0b0', 1", "'int x = 0b00', 2", "'int x = 0b000', 3", "'l input int x = 0b0u', 2", "'int x = 1', 2"})
-    public void testBitWidthDetection(String program, int expectedBitWidth){
-        parse(program).bitWidth(expectedBitWidth).run();
-    }
-
     @Test
     public void testParsePhi(){
         Assert.assertEquals(Parser.PhiNode.class,
@@ -211,7 +213,7 @@ public class BasicTests {
 
     @Test
     public void testDivide() {
-        parse("h input int c = 0bu{10}; int x = c / 2;").val("x", "0bu{10}").run();
+        parse("bit_width 10; h input int c = 0bu{10}; int x = c / 2;").val("x", "0bu{10}").run();
     }
 
     public ContextMatcher parse(String program){

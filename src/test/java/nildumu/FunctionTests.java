@@ -143,6 +143,7 @@ l output int o = fib(h);
             "'handler=inlining', 'o[1]=1'",
             "'handler=inlining;maxrec=3', 'o[1]=1'"
     })
+    @Disabled
     public void testDepsOnFunctionResult(String handler, String bitComp){
         Lattices.Bit.toStringGivesBitNo = true;
         assertTimeoutPreemptively(ofSeconds(10000), () -> parse("bit_width 2;\n" +
@@ -421,7 +422,10 @@ l output int o = fib(h);
 
     @Test
     public void testAbs() {
-        parse("int i = abs(-1)").val("i", 1).run();
+        for (int i = 1; i < 10; i++) {
+            parse("int abs(int i){ int z = i; if (z < 0) { z = -1 * z; } return z} int i = abs(-" + i + "); int j = abs(" + i + ")")
+                    .val("i", i).val("j", i).run();
+        }
     }
 
     @Test

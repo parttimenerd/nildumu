@@ -28,6 +28,14 @@ int mid(int[2] pos) {
 	return ((pos[0]) + (pos[1])) / 2;
 }
 
+int abs(int i){
+    int z = i;
+    if (z < 0) {
+        z = -1 * z;
+    }
+    return z
+}
+
 int AtLeast(int[16] Capacity, int z, int b) { return Capacity[z] >= b; }
 
 int Nearby(int[2][16] Loc, int z, int[2] l, int d) {

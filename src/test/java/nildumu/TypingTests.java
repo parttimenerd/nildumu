@@ -10,19 +10,19 @@ public class TypingTests {
 
     @ParameterizedTest
     @CsvSource({
-            "'(int, int) value = (1, 1)', 'use_sec basic;\nbit_width 2;\n(int, int) value = (1, 1);'",
-            "'(int, (int, int)) value = (1, 1)', 'use_sec basic;\nbit_width 2;\n(int, (int, int)) value = (1, 1);'",
-            "'int[2] value = {1, 1}', 'use_sec basic;\nbit_width 2;\nint[2] value = {1, 1};'",
-            "'var value = {1, 1}', 'use_sec basic;\nbit_width 2;\nvar value = {1, 1};'",
-            "'var value = {1, 1}; value, value = *value', 'use_sec basic;\nbit_width 2;\nvar value = {1, 1};\nvalue, value = *value;'",
-            "'var value = {1, 1}; var val = (*value,)', 'use_sec basic;\nbit_width 2;\nvar value = {1, 1};\nvar val = (*value,);'",
-            "'var value = {1, 1}; var val = (1, *value)', 'use_sec basic;\nbit_width 2;\nvar value = {1, 1};\nvar val = (1, *value);'",
-            "'var value = {1, 1}; var val = (1, *value, 1)', 'use_sec basic;\nbit_width 2;\nvar value = {1, 1};\nvar val = (1, *value, 1);'",
+            "'(int, int) value = (1, 1)', 'use_sec basic;\nbit_width 3;\n(int, int) value = (1, 1);'",
+            "'(int, (int, int)) value = (1, 1)', 'use_sec basic;\nbit_width 3;\n(int, (int, int)) value = (1, 1);'",
+            "'int[2] value = {1, 1}', 'use_sec basic;\nbit_width 3;\nint[2] value = {1, 1};'",
+            "'var value = {1, 1}', 'use_sec basic;\nbit_width 3;\nvar value = {1, 1};'",
+            "'var value = {1, 1}; value, value = *value', 'use_sec basic;\nbit_width 3;\nvar value = {1, 1};\nvalue, value = *value;'",
+            "'var value = {1, 1}; var val = (*value,)', 'use_sec basic;\nbit_width 3;\nvar value = {1, 1};\nvar val = (*value,);'",
+            "'var value = {1, 1}; var val = (1, *value)', 'use_sec basic;\nbit_width 3;\nvar value = {1, 1};\nvar val = (1, *value);'",
+            "'var value = {1, 1}; var val = (1, *value, 1)', 'use_sec basic;\nbit_width 3;\nvar value = {1, 1};\nvar val = (1, *value, 1);'",
             "'var value = {1, 1}; var val = (1, *value, 1, 2)', 'use_sec basic;\nbit_width 3;\nvar value = {1, 1};\nvar val = (1, *value, 1, 2);'",
             "'var value = {1, 1}; var val = {1, *value, 1, 2}', 'use_sec basic;\nbit_width 3;\nvar value = {1, 1};\nvar val = {1, *value, 1, 2};'"
     })
     public void testParseExpressions(String program, String expectedParsingResult) {
-        assertEquals(expectedParsingResult, Parser.generator.parse(program).toPrettyString());
+        assertEquals(expectedParsingResult, Parser.generator.parse("bit_width 3; " + program).toPrettyString());
     }
 
     @ParameterizedTest

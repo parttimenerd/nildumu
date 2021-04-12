@@ -66,10 +66,6 @@ public class Evaluation {
                 .collect(Collectors.toList());
     }
 
-    public PacketList getAllPackets(Path baseFolder, boolean buildOwnVersions) throws IOException {
-        return getPacketsForToolsOrDie(AbstractTool.getDefaultTools(), getAllSpecimen(), baseFolder, buildOwnVersions);
-    }
-
     public static PacketList getPacketsForToolsOrDie(List<AbstractTool> tools,
                                                      List<TestProgram> programs,
                                                      Path baseFolder,
@@ -105,14 +101,6 @@ public class Evaluation {
             }
         });
         return packets;
-    }
-
-    public static PacketList getPacketsForToolsOrDie(TestProgram program, Path baseFolder, boolean buildOwnVersions){
-        return getPacketsForToolsOrDie(AbstractTool.getDefaultTools(), program, baseFolder, buildOwnVersions);
-    }
-
-    public PacketList getPacketList(Path path, String name, String program, Path baseFolder, boolean buildOwnVersions){
-        return getPacketsForToolsOrDie(new TestProgram(path, name, Parser.process(program), integerType), baseFolder, buildOwnVersions);
     }
 
     enum Mode {
@@ -151,16 +139,19 @@ public class Evaluation {
         private List<String> tools = Collections.singletonList("all");
 
         @Option(names="--parallelism", description = "cores to use")
-        private int parallelism = (int)Math.ceil(Runtime.getRuntime().availableProcessors() / 4f);
+        private int parallelism = 1;//(int)Math.ceil(Runtime.getRuntime().availableProcessors() / 4f);
 
         @Option(names = {"--unwind", "-u"}, description = "unwinds used")
         private List<Integer> unwinds = Arrays.asList(2, 8, 32);
 
+        @Option(names = "--summary_unwind", description = "Unwind in the nildumu summary handler")
+        private boolean summaryUnwind = false;
+
         @Option(names="--runs")
-        private int runs = 1;
+        private int runs = 5;
 
         @Option(names="--dryruns")
-        private int dryruns = 0;
+        private int dryruns = 1;
 
         @Option(names="--verbose", description = "log all tool output")
         private boolean verbose = false;
@@ -173,11 +164,11 @@ public class Evaluation {
         Evaluation evaluation = new Evaluation(IntegerType.INT, "eval");
         try {
 
-            List<AbstractTool> tools_ = AbstractTool.getDefaultTools(cmd.unwinds.isEmpty() ?
+            List<AbstractTool> tools_ = AbstractTool.getDefaultTools(cmd.summaryUnwind, cmd.unwinds.isEmpty() ?
                     new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray());
             if (!cmd.tools.get(0).equals("all")) {
                 if (cmd.tools.get(0).equals("full")) {
-                    tools_ = AbstractTool.getAllTools(cmd.unwinds.isEmpty() ?
+                    tools_ = AbstractTool.getAllTools(cmd.summaryUnwind, cmd.unwinds.isEmpty() ?
                             new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray());
                 } else if (cmd.tools.get(0).equals("exact")) {
                     tools_ = Arrays.asList(new ApproxFlow(64, 0.5, 0.05));
@@ -197,7 +188,7 @@ public class Evaluation {
                 }
             } else if (!cmd.mode.equals("normal")){
                 cmd.scalBench.forEach(s -> ScalBench.valueOf(s.toUpperCase()).benchmark(cmd.minScalAlpha, cmd.maxScalAlpha, duration, cmd.parallelism, cmd.runs, cmd.dryruns, unwind -> {
-                    List<AbstractTool> ts = AbstractTool.getDefaultTools(unwind);
+                    List<AbstractTool> ts = AbstractTool.getDefaultTools(cmd.summaryUnwind, unwind);
                     if (!cmd.tools.get(0).equals("all")){
                         ts = ts.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
                     }
@@ -243,7 +234,8 @@ public class Evaluation {
     public static void storeAndPrintAnalysisResults(AggregatedAnalysisResults results, String csvFile){
         String csv = results.toStringPerProgram(AggregatedAnalysisResults.LEAKAGE, AggregatedAnalysisResults.Mode.CSV) + "\n\n" +
                 results.toStringPerProgram(AggregatedAnalysisResults.RUNTIME, AggregatedAnalysisResults.Mode.CSV);
-        System.out.println(csv);
+        System.out.println(results.toStringPerProgram(AggregatedAnalysisResults.LEAKAGE, AggregatedAnalysisResults.Mode.NICE) + "\n\n" +
+                results.toStringPerProgram(AggregatedAnalysisResults.RUNTIME, AggregatedAnalysisResults.Mode.NICE));
         try {
             Files.write(Paths.get(csvFile), Arrays.asList(csv.split("\n")));
         } catch (IOException e) {

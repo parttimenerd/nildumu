@@ -95,7 +95,7 @@ public class Parser implements Serializable {
         ARROW("\\->", "->"),
         APPEND("@"),
         SEMICOLON("(\\;|\\n)+", ";"),
-        INTEGER_LITERAL("(([1-9][0-9]*)|0)|(0b([01e]((\\{([0-9]+)\\})?))*)|(\\-([1-9][0-9]*))"),
+        INTEGER_LITERAL("(([1-9][0-9]*)|0)|(0b([01e]((\\{([0-9]+)\\})?))*)|(\\-([1-9][0-9]*)|(\\-0))"),
         INPUT_LITERAL("(0b([01ux]((\\{([0-9]+)\\})?))+)"),
         IDENT("[A-Za-z_][A-Za-z0-9_]*"),
         LCURLY("\\{"),
@@ -141,39 +141,18 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static final Generator generator = Generator.getCachedIfPossible("./parser/1", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+    public static final Generator generator = Generator.getCachedIfPossible("./parser/3", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
             (builder) -> {
                 Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
                 Types types = new Types();
-                builder.addRule("program", "use_sec? bit_width? lines", asts -> {
+                builder.addRule("program", "use_sec? bit_width lines", asts -> {
                     SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>) asts.get(0)).get(0).wrapped;
-                    int declaredBitWidth = asts.get(1).children().isEmpty() ? -1 : ((ListAST<WrapperNode<Integer>>) asts.get(1)).get(0).wrapped;
+                    int declaredBitWidth = vl.bitWidth;
                     /*
                      * Calc bit width
                      */
                     List<MJNode> topLevelNodes = asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped;
-                    int lowerBitWidthBound = topLevelNodes.stream().mapToInt(n -> n.accept(new NodeVisitor<Integer>() {
-
-                        @Override
-                        public Integer visit(MJNode node) {
-                            return visitChildren(node).stream().max(Integer::compare).orElse(0);
-                        }
-
-                        @Override
-                        public Integer visit(IntegerLiteralNode literal) {
-                            int bitWidth = literal.value.size();
-                            if (bitWidth > declaredBitWidth && declaredBitWidth != -1) {
-                                //Token literalToken = literal.getMatchedTokens().get(0);
-                                //System.err.println(String.format("Declared bit width of %d is lower than the bit width of literal %s, only use for arrays", declaredBitWidth, bitWidth));
-                            }
-                            return bitWidth;
-                        }
-                    })).max().orElse(0);
-                    int bitWidth = declaredBitWidth;
-                    if (declaredBitWidth == -1) {
-                        bitWidth = lowerBitWidthBound;
-                    }
-                    ProgramNode node = new ProgramNode(new Context(secLattice, bitWidth), types);
+                    ProgramNode node = new ProgramNode(new Context(secLattice, vl.bitWidth), types);
                     NodeVisitor visitor = new NodeVisitor<Object>() {
 
                         @Override
@@ -215,8 +194,12 @@ public class Parser implements Serializable {
                             return new WrapperNode<>(asts.getStartLocation(), SecurityLattice.forName(asts.get(1).getMatchedString()));
                         })
                         .addRule("bit_width", "BIT_WIDTH INTEGER_LITERAL SEMICOLON", asts -> {
-                            statedBitWidth.val = Integer.parseInt(asts.get(1).getMatchedString());
-                            return new WrapperNode<>(asts.getStartLocation(), statedBitWidth.val);
+                            vl.bitWidth = Integer.parseInt(asts.get(1).getMatchedString());
+                            return new WrapperNode<>(asts.getStartLocation(), vl.bitWidth);
+                        })
+                        .addRule("bit_width", "", asts -> {
+                            vl.bitWidth = 32;
+                            return new WrapperNode<>(asts.getStartLocation(), 32);
                         })
                         .addRule("lines", "line_w_semi lines", asts -> {
                             WrapperNode<List<MJNode>> left = (WrapperNode<List<MJNode>>) asts.get(1);
@@ -1562,11 +1545,6 @@ public class Parser implements Serializable {
             predefinedMethods.put("length",
                     program -> new PredefinedMethodNode("length", program.types.INT, -1, null, l -> {
                         throw new NildumuError("");
-                    }));
-            predefinedMethods.put("abs",
-                    program -> new PredefinedMethodNode("abs", program.types.INT, 1, Collections.singletonList(program.types.INT), l -> {
-                        assert l.size() == 1;
-                        return l.get(0).assume(B.ZERO);
                     }));
             predefinedMethods.put("toInt",
                     program -> new PredefinedMethodNode("toInt", program.types.INT, 1,

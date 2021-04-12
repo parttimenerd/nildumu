@@ -1,0 +1,6 @@
+h input int h = 0bu{32};
+int z = 0;
+while (z != h) {
+    z = z + 1;
+}
+l output int o = z;

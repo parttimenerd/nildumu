@@ -1,3 +1,4 @@
+bit_width 4;
 h input int h = 0b0uuu;
 int fib(int a){
 	int r = 1;

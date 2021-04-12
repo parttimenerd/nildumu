@@ -829,16 +829,16 @@ public class BasicUI {
     }
 
     private Path pathForName(String name) {
-        return Paths.get("examples", name + ".java");
+        return Paths.get("examples", name + ".nd");
     }
 
     private String nameForPath(Path path) {
-        return path.getName(path.getNameCount() - 1).toString().split(".java")[0];
+        return path.getName(path.getNameCount() - 1).toString().split("\\.nd")[0];
     }
 
     private List<String> getExampleNames() {
         try {
-            return Files.list(Paths.get("examples")).filter(p -> p.toString().endsWith(".java")).map(this::nameForPath).collect(Collectors.toList());
+            return Files.list(Paths.get("examples")).filter(p -> p.toString().endsWith(".nd")).map(this::nameForPath).collect(Collectors.toList());
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -35,7 +35,7 @@ public class EvaluationTests {
 
     @Test
     public void testBinarySearch() {
-        check("h input int I = 0b0u{32};\n" +
+        check("bit_width 33; h input int I = 0b0u{32};\n" +
                 "\n" +
                 "int BITS = 16;\n" +
                 "\n" +
@@ -75,7 +75,7 @@ public class EvaluationTests {
     public void testIllustrativeExample2() {
         check("/* Z. Meng and G. Smith, Calculating Bounds on Information Leakage Using Two-bit Patterns, in Proceedings of the ACM SIGPLAN 6th Workshop on Programming Languages and Analysis for Security, 2011, p. 1:1--1:12. */\n" +
                 "/* Should leak log 17 = 4.087 bits */\n" +
-                "int O;\n" +
+                "bit_width 33; int O;\n" +
                 "h input int h = 0b0u{32};\n" +
                 "int z = h & 0b001110111011101110111011101110111; /* 0x77777777 */\n" +
                 "if (z <= 64) {\n" +
@@ -247,6 +247,7 @@ public class EvaluationTests {
     @Test
     public void testGuessPresenceAll() {
         check("/* N is the total number of houses */\n" +
+                "bit_width 32;" +
                 "int N;\n" +
                 "\n" +
                 "/* We consider different sizes of houses. S, M and L indicate the number of houses of each size. */\n" +

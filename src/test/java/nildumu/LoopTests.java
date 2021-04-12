@@ -81,7 +81,7 @@ public class LoopTests {
 
     @Test
     public void testBasicLoop3() {
-        String program = "h input int h = 0bu;\n" +
+        String program = "bit_width 1; h input int h = 0bu;\n" +
                 "while (h){\n" +
                 "\th = h;\n" +
                 "}\n" +
@@ -312,7 +312,7 @@ public class LoopTests {
     @Test
     @Timeout(3)
     public void testBinarySearch_condensedWithoutLoop() {
-        String program = "h input int I = 0b0u{32};\n" +
+        String program = "bit_width 33; h input int I = 0b0u{32};\n" +
                 "int O = 0;\n" +
                 "\n" +
                 "int m = 0;\n" +
@@ -329,7 +329,7 @@ public class LoopTests {
 
     @Test
     public void testBinarySearch_condensedWithoutLoop2() {
-        String program = "h input int I = 0b0u{32};\n" +
+        String program = "bit_width 33; h input int I = 0b0u{32};\n" +
                 "int m_ = 1 << 31;";
         parse(program).val("m_", 2147483648l).run();
     }

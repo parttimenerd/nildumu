@@ -162,17 +162,25 @@ public class DotRegistry {
 
     public LinkedHashMap<String, DotFile> getFilesPerTopic(String topic){
         loadGraphRegistry();
+        return getFilesPerTopic_(topic);
+    }
+
+    private LinkedHashMap<String, DotFile> getFilesPerTopic_(String topic){
         return filesPerTopic.getOrDefault(topic == null ? "" : topic, new LinkedHashMap<>());
     }
 
     public boolean has(String topic, String name){
         loadGraphRegistry();
-        return getFilesPerTopic(topic).containsKey(name);
+        return _has(topic, name);
+    }
+
+    private boolean _has(String topic, String name){
+        return getFilesPerTopic_(topic).containsKey(name);
     }
 
     public Optional<DotFile> get(String topic, String name){
         loadGraphRegistry();
-        return Optional.ofNullable(getFilesPerTopic(topic).getOrDefault(name, null));
+        return Optional.ofNullable(getFilesPerTopic_(topic).getOrDefault(name, null));
     }
 
     public static class Anchor {
@@ -304,13 +312,13 @@ public class DotRegistry {
 
     public void loadGraphRegistry() {
         for (Utils.Triple<String, String, CallGraph> cgTriple : GraphRegistry.get().getCallGraphsPerTopic()) {
-            if (!has(cgTriple.first, cgTriple.second)) {
+            if (!_has(cgTriple.first, cgTriple.second)) {
                 store(cgTriple.first, cgTriple.second, () -> () -> createDotGraph(cgTriple.third.mainNode,
                         (CallGraph.CallNode n) -> Records.of(cgTriple.third.loopDepths.get(n) + "", n.method.name)));
             }
         }
         for (Utils.Quadruple<Pair<String, String>, BitGraph, String, Boolean> quadruple : GraphRegistry.get().getBitGraphsPerTopic()) {
-            if (!has(quadruple.first.first, quadruple.first.second)) {
+            if (!_has(quadruple.first.first, quadruple.first.second)) {
                 store(quadruple.first.first, quadruple.first.second, () -> () -> createDotGraph(quadruple.second, quadruple.third, quadruple.fourth));
             }
         }
