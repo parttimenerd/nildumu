@@ -6,7 +6,6 @@ import nildumu.util.DefaultMap;
 import nildumu.util.Util;
 import swp.util.Pair;
 
-import javax.annotation.Nullable;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -794,7 +793,7 @@ public class Context {
 
     /* -------------------------- extended mode specific -------------------------------*/
 
-    public Bit replace(Bit bit, @Nullable Branch branch){
+    public Bit replace(Bit bit, Branch branch){
         if (inExtendedMode()) {
             Bit ret = null;
             for (Mods additionalMod : additionalMods) {
@@ -817,7 +816,7 @@ public class Context {
         return bit;
     }
 
-    public Interval replace(Interval inter, @Nullable Branch branch){
+    public Interval replace(Interval inter, Branch branch){
         if (inExtendedMode()) {
             Interval ret = null;
             for (Mods additionalMod : additionalMods) {
@@ -850,7 +849,7 @@ public class Context {
         return replace(value, frame.nodeValueState.branchStack.peek());
     }
 
-    public Value replace(Value value, @Nullable Branch branch) {
+    public Value replace(Value value, Branch branch) {
         Util.Box<Boolean> replacedABit = new Util.Box<>(false);
         Value newValue = value.stream().map(b -> {
             Bit r = replace(b, branch);
