@@ -1,18 +1,27 @@
 package nildumu;
 
-import nildumu.parser.LangBaseListener;
 import nildumu.parser.LangBaseVisitor;
 import nildumu.parser.LangLexer;
 import nildumu.parser.LangParser;
+import nildumu.typing.Type;
+import nildumu.typing.Types;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.tree.*;
+import swp.lexer.Location;
+import swp.parser.lr.CustomAST;
 import swp.parser.lr.ListAST;
+import swp.util.Utils;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static nildumu.Lattices.vl;
+import static nildumu.util.Util.p;
 
 /**
  * @author Alexander Weigl
@@ -100,78 +109,130 @@ class Translator extends LangBaseVisitor<Object> {
 
     @Override
     public Object visitUse_sec(LangParser.Use_secContext ctx) {
-        return new Parser.WrapperNode<>(asts.getStartLocation(), Lattices.SecurityLattice.forName(asts.get(1).getMatchedString()));
+        return new Parser.WrapperNode<>(location(ctx),
+                Lattices.SecurityLattice.forName(ctx.getText()));
+    }
+
+    private Location location(ParserRuleContext ctx) {
+        return null;
     }
 
     @Override
-    public Integer visitBit_width(LangParser.Bit_widthContext ctx) {
-        vl.bitWidth = Integer.parseInt(asts.get(1).getMatchedString());
-        return new Parser.WrapperNode<>(asts.getStartLocation(), vl.bitWidth);
+    public Object visitBit_width(LangParser.Bit_widthContext ctx) {
+        vl.bitWidth = Integer.parseInt(ctx.INTEGER_LITERAL().getText());
+        return new Parser.WrapperNode<>(location(ctx), vl.bitWidth);
     }
 
     @Override
     public Object visitBlock_statement(LangParser.Block_statementContext ctx) {
-        return super.visitBlock_statement(ctx);
+        return new Parser.BlockNode(location(ctx),
+                accept(ctx.block()));
+        //asts.get(1).<Parser.WrapperNode<List<Parser.StatementNode>>>as().wrapped));
     }
+
+    final Types types = new Types();
 
     @Override
     public Object visitVardecl(LangParser.VardeclContext ctx) {
-        return super.visitVardecl(ctx);
-    }
-
-    @Override
-    public Object visitZIGNORE(LangParser.ZIGNOREContext ctx) {
-        return super.visitZIGNORE(ctx);
+        Type type = accept(ctx.type());
+        return new Parser.VariableDeclarationNode(
+                ctx.IDENT().get(0).getText(),
+                type == types.AINT ? types.INT : type,
+                (Parser.ExpressionNode) accept(ctx.expression()),
+                type == types.AINT);
     }
 
     @Override
     public Object visitWhile_statement(LangParser.While_statementContext ctx) {
-        return super.visitWhile_statement(ctx);
+        List<Parser.VariableAssignmentNode> pres;
+        if (ctx.assignments() == null)
+            pres = new ArrayList<>();
+        else
+            pres = (ListAST) accept(ctx.assignments());
+        return new Parser.WhileStatementNode(
+                location(ctx),
+                pres,
+                accept(ctx.expression()),
+                accept(ctx.statement()));
     }
 
     @Override
     public Object visitIf_statement(LangParser.If_statementContext ctx) {
-        return super.visitIf_statement(ctx);
+        return new Parser.IfStatementNode(location(ctx),
+                accept(ctx.expression()),
+                accept(ctx.statements(0)),
+                accept(ctx.statements(1)));
     }
 
     @Override
     public Object visitExpression_statement(LangParser.Expression_statementContext ctx) {
-        return super.visitExpression_statement(ctx);
+        return new Parser.ExpressionStatementNode(accept(ctx.expression()));
     }
 
     @Override
     public Object visitArray_assignment_statement(LangParser.Array_assignment_statementContext ctx) {
-        return super.visitArray_assignment_statement(ctx);
+        return new Parser.ArrayAssignmentNode(location(ctx),
+                ctx.ident().getText(),
+                accept(ctx.expression(0)),
+                accept(ctx.expression(1)));
     }
 
     @Override
     public Object visitReturn_statement(LangParser.Return_statementContext ctx) {
-        return super.visitReturn_statement(ctx);
+        return new Parser.ReturnStatementNode(location(ctx),
+                (Parser.ExpressionNode) accept(ctx));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T accept(ParserRuleContext ctx) {
+        if (ctx == null) return null;
+        return (T) ctx.accept(this);
     }
 
     @Override
     public Object visitStatements(LangParser.StatementsContext ctx) {
-        return super.visitStatements(ctx);
+        Parser.WrapperNode<List<Parser.StatementNode>> left = (Parser.WrapperNode<List<Parser.StatementNode>>) asts.get(1);
+        Parser.StatementNode right = (Parser.StatementNode) asts.getAs(0);
+        left.wrapped.add(0, right);
+        return left;
     }
 
     @Override
     public Object visitMethod(LangParser.MethodContext ctx) {
-        return super.visitMethod(ctx);
+        return new Parser.MethodNode(
+                location(ctx),
+                ctx.ident().getText(),
+                accept(ctx.type()),
+                accept(ctx.parameters()),
+                accept(ctx.block()),
+                accept(ctx.globals()));
     }
+
+}
 
     @Override
     public Object visitParameters(LangParser.ParametersContext ctx) {
-        return super.visitParameters(ctx);
+        Parser.ParametersNode node = new Parser.ParametersNode(location(ctx),
+                listOf(ctx.parameter()));
+        return node;
+    }
+
+    private <T> List<T> listOf(List<? extends ParserRuleContext> ctxs) {
+        return ctxs.stream().map(it -> (T) accept(it)).collect(Collectors.toList());
     }
 
     @Override
     public Object visitParameter(LangParser.ParameterContext ctx) {
-        return super.visitParameter(ctx);
+        return new Parser.ParameterNode(location(ctx),
+                accept(ctx.type()), ctx.ident().getText());
     }
 
     @Override
     public Object visitAssignment(LangParser.AssignmentContext ctx) {
-        return super.visitAssignment(ctx);
+        return new Parser.VariableAssignmentNode(
+                location(ctx),
+                ctx.ident(0).getText(),
+                accept(ctx.expression()));
     }
 
     @Override
@@ -181,7 +242,9 @@ class Translator extends LangBaseVisitor<Object> {
 
     @Override
     public Object visitIdents(LangParser.IdentsContext ctx) {
-        return super.visitIdents(ctx);
+        return new CustomAST<List<String>>
+                (Stream.concat(Stream.of(asts.get(0).getMatchedString()),
+                ((CustomAST<List<String>>) asts.get(2)).value.stream()).collect(Collectors.toList()));
     }
 
     @Override
@@ -246,41 +309,59 @@ class Translator extends LangBaseVisitor<Object> {
 
     @Override
     public Object visitLiteral(LangParser.LiteralContext ctx) {
-        return super.visitLiteral(ctx);
+        Lattices.Value val = Lattices.ValueLattice.get().parse(asts.getMatchedString());
+        statedBitWidth.val = Math.max(statedBitWidth.val, val.size());
+        return new Parser.IntegerLiteralNode(asts.getStartLocation(), val);
     }
 
     @Override
     public Object visitGlobals(LangParser.GlobalsContext ctx) {
-        return super.visitGlobals(ctx);
+        Utils.Triple<String, String, String> glob = asts.get(0).<Parser.WrapperNode<Utils.Triple<String, String, String>>>as().wrapped;
+        Parser.GlobalVariablesNode globalNode = ((Parser.GlobalVariablesNode) asts.get(2));
+        globalNode.globalVarSSAVars.put(glob.first, p(glob.second, glob.third));
+        return new Parser.GlobalVariablesNode(((Parser.WrapperNode<?>) asts.get(0)).location, globalNode.globalVarSSAVars);
     }
 
     @Override
     public Object visitGlobals_(LangParser.Globals_Context ctx) {
-        return super.visitGlobals_(ctx);
+        new Parser.GlobalVariablesNode(new Location(0, 0), new HashMap<>())
+
     }
 
     @Override
     public Object visitGlobal(LangParser.GlobalContext ctx) {
-        return super.visitGlobal(ctx);
+        return new Parser.WrapperNode<>(asts.getStartLocation(),
+                new Utils.Triple<>(asts.get(0).getMatchedString(), asts.get(2).getMatchedString(), asts.get(4).getMatchedString()));
     }
 
     @Override
     public Object visitIdent(LangParser.IdentContext ctx) {
-        return super.visitIdent(ctx);
+        return ctx.getText();
     }
 
     @Override
     public Object visitBaseTypeInt(LangParser.BaseTypeIntContext ctx) {
         return super.visitBaseTypeInt(ctx);
+        if (!types.containsKey(type)) {
+            throw new NildumuError(String.format("No such type %s", type));
+        }
+        return new Parser.TypeNode(asts.getStartLocation(), types.get(type));
+        new Parser.TypeNode(asts.getStartLocation(),
+                types.INT)
     }
 
     @Override
     public Object visitArray_type(LangParser.Array_typeContext ctx) {
-        return super.visitArray_type(ctx);
+        Type subType = asts.get(0).<Parser.TypeNode>as().type;
+        int length = (int)vl.parse(asts.get(2).getMatchedString()).asLong();
+        return new Parser.TypeNode(asts.get(0).<Parser.MJNode>as().location,
+                types.getOrCreateFixedArrayType(subType, Collections.singletonList(length)));
     }
 
     @Override
     public Object visitTuple_type(LangParser.Tuple_typeContext ctx) {
-        return super.visitTuple_type(ctx);
+        List<Type> elementTypes = (List<Type>) asts.getAll("type").stream().map(a -> ((Parser.TypeNode) a).type).collect(Collectors.toList());
+        return new Parser.TypeNode(asts.getStartLocation(), types.getOrCreateTupleType(elementTypes));
+
     }
 }
