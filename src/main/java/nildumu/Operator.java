@@ -16,6 +16,8 @@ import java.util.stream.Stream;
 import static nildumu.Context.v;
 import static nildumu.Lattices.*;
 import static nildumu.Lattices.B.*;
+import static nildumu.Parser.LexerTerminal.INVERT;
+import static nildumu.Parser.LexerTerminal.PLUS;
 import static nildumu.util.Util.*;
 
 public interface Operator {
@@ -1231,9 +1233,6 @@ public interface Operator {
                 if (shift < 0){
                     return RIGHT_SHIFT.compute(c, first, vl.parse(-shift));
                 }
-                if (!first.isPositive()) {
-                    return createUnknownValue(first, second);
-                }
                 Value ret = Stream.concat(IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
                     if (i - shift < 1) {
                         return bl.create(ZERO);
@@ -1254,9 +1253,6 @@ public interface Operator {
                 int shift = (int)second.asLong();
                 if (shift < 0){
                     return LEFT_SHIFT.compute(c, first, vl.parse(-shift));
-                }
-                if (!first.isPositive()) {
-                    return createUnknownValue(first, second);
                 }
                 return Stream.concat(IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
                     if (i + shift > c.maxBitWidth){
@@ -1292,14 +1288,14 @@ public interface Operator {
     BinaryOperator MULTIPLY = new BinaryOperator("*") {
         @Override
         Value compute(Context c, Value first, Value second) {
+            if (first.isConstant() && second.isConstant()) {
+                return vl.parse(first.asLong() * second.asLong());
+            }
             if (second.isPowerOfTwo()) {
-                return setMultSign(first, second, LEFT_SHIFT.compute(c, first, vl.parse(Math.abs((int) log2(second.asLong())))));
+                return LEFT_SHIFT.compute(c, first, vl.parse((int) log2(second.asLong())));
             }
             if (first.isPowerOfTwo()) {
                 return MULTIPLY.compute(c, second, first);
-            }
-            if (first.isConstant() && second.isConstant()) {
-                return vl.parse(first.asLong() * second.asLong());
             }
             return createUnknownValue(first, second);
         }
@@ -1318,14 +1314,16 @@ public interface Operator {
     BinaryOperator DIVIDE = new BinaryOperator("/") {
         @Override
         Value compute(Context c, Value first, Value second) {
-            if (second.isPowerOfTwo()){
-                return setMultSign(first, second, RIGHT_SHIFT.compute(c, first, vl.parse((int)log2(second.asLong()))));
-            }
-            if (first.isPowerOfTwo()){
-                return DIVIDE.compute(c, second, first);
-            }
             if (first.isConstant() && second.isConstant()){
                 return vl.parse(first.asLong() * second.asLong());
+            }
+            if (second.isPowerOfTwoOrNegPowerOfTwo() && first.isPositive()){
+                int k = (int)log2(Math.abs(second.asLong()));  // (x + (2^k-1)) >> k  // hackers's delight
+                Value val = RIGHT_SHIFT.compute(c, ADD.compute(c, first, vl.parse((long)Math.pow(2, k - 1))), vl.parse(k));
+                if (!second.isPowerOfTwo()){ // -2^k: negate
+                    return ADD.compute(c, vl.parse(1), NOT.compute(c, val));
+                }
+                return val;
             }
             return createUnknownValue(first, second);
         }
@@ -1334,6 +1332,9 @@ public interface Operator {
     BinaryOperator MODULO = new BinaryOperator("+") {
         @Override
         Value compute(Context c, Value first, Value second) {
+            if (first.isConstant() && second.isConstant()) {
+                return vl.parse(first.asLong() % second.asLong());
+            }
             if (second.isPowerOfTwo() && !second.isNegative()) {
                 return IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
                     if (i > log2(second.asLong())) {
@@ -1341,9 +1342,6 @@ public interface Operator {
                     }
                     return first.get(i);
                 }).collect(Value.collector());
-            }
-            if (first.isConstant() && second.isConstant()) {
-                return vl.parse(first.asLong() % second.asLong());
             }
             return createUnknownValue(first, second);
         }

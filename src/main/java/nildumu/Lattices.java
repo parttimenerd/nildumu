@@ -1503,7 +1503,15 @@ public class Lattices {
         }
 
         public boolean isPowerOfTwo(){
-            if (!isConstant()){
+            if (!isConstant() || asLong() <= 0){
+                return false;
+            }
+            double twoLog = log2(asLong());
+            return ((int)twoLog) == twoLog;
+        }
+
+        public boolean isPowerOfTwoOrNegPowerOfTwo(){
+            if (!isConstant() || asLong() <= 0){
                 return false;
             }
             double twoLog = log2(asLong());

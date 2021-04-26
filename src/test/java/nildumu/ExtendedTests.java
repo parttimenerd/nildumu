@@ -39,7 +39,7 @@ public class ExtendedTests {
      */
     @Test
     public void testBasicIfWithMods() {
-        parse("h input int h = 0b0u;\n" +
+        parse("bit_width 2; h input int h = 0b0u;\n" +
                 "int x = 1;\n" +
                 "if (h){\n" +
                 "    x = h;\n" +
@@ -48,11 +48,11 @@ public class ExtendedTests {
 
     @Test
     public void testImplicitFlowWithVariableEquals() {
-        parse("h input int h = 0bu{5};\n" +
+        parse("bit_width 5; h input int h = 0bu{5};\n" +
                 "int x = h * 2;\n" +
                 "if (h == x){\n" +
                 "    x = h;\n" +
-                "} else {x = 0; } l output int o = x").leaks(5).run();
+                "} else {x = 0; } l output int o = x").leaks(3).run();
     }
 
     /**
