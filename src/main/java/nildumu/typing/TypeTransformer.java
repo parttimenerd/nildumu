@@ -447,7 +447,7 @@ public class TypeTransformer implements Parser.NodeVisitor<TypeTransformer.VisRe
         newMethods.forEach(program::addMethod);
         resolution.getCreatedMethods().forEach(program::addMethod);
         if (resolution.getCreatedMethods().size() > 0) {
-            program = (ProgramNode) generator.parse(program.toPrettyString());
+            program = parse(program.toPrettyString());
             new NameResolution(program).resolve();
             return process(program);
         }

@@ -645,7 +645,7 @@ public class BasicUI {
     private void setMiscInfo(String program, Parser.ProgramNode programNode) {
         ssaArea.setText(programNode.toPrettyString());
         try {
-            Parser.ProgramNode p = (Parser.ProgramNode) Parser.generator.parse(program);
+            Parser.ProgramNode p = Parser.parse(program);
             LoopTransformer.process(p);
             withoutLoopsArea.setText(p.toPrettyString());
         } catch (Exception ex) {

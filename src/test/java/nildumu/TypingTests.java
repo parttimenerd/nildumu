@@ -22,7 +22,7 @@ public class TypingTests {
             "'var value = {1, 1}; var val = {1, *value, 1, 2}', 'use_sec basic;\nbit_width 3;\nvar value = {1, 1};\nvar val = {1, *value, 1, 2};'"
     })
     public void testParseExpressions(String program, String expectedParsingResult) {
-        assertEquals(expectedParsingResult, Parser.generator.parse("bit_width 3; " + program).toPrettyString());
+        assertEquals(expectedParsingResult, Parser.parse("bit_width 3; " + program).toPrettyString());
     }
 
     @ParameterizedTest

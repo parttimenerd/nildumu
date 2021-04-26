@@ -9,7 +9,6 @@ import java.util.logging.Level;
 
 import static nildumu.Checks.checkAndThrow;
 import static nildumu.FunctionTests.parse;
-import static nildumu.Parser.generator;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -185,7 +184,7 @@ public class SSA2Tests {
 
     @Test
     public void testBasicNestedCalls(){
-        toSSA("print(input())").globalBlock.children().stream()
+        toSSA("print(input());").globalBlock.children().stream()
                 .filter(b -> b.toPrettyString().startsWith("print[")).forEach(b -> {
             Parser.MethodInvocationNode print = (Parser.MethodInvocationNode)b.children().get(0);
             Parser.MethodInvocationNode input = (Parser.MethodInvocationNode)print.arguments.get(0);
@@ -228,7 +227,7 @@ public class SSA2Tests {
         Context.LOG.setLevel(Level.FINE);
         Parser.MJNode.resetIdCounter();
         Lattices.Bit.resetNumberOfCreatedBits();
-        Parser.ProgramNode programNode = (Parser.ProgramNode) generator.parse(program);
+        Parser.ProgramNode programNode = Parser.parse(program);
         if (log) {
             if (log) {
                 System.out.println(programNode.toPrettyString());
@@ -245,12 +244,12 @@ public class SSA2Tests {
         }
         Parser.MJNode.resetIdCounter();
         Lattices.Bit.resetNumberOfCreatedBits();
-        programNode = (Parser.ProgramNode) generator.parse(program);
+        programNode = Parser.parse(program);
         SSAResolution2.process(programNode);
         if (log) {
             System.out.println(programNode.toPrettyString());
         }
-        Parser.ProgramNode resolvedProgram = (Parser.ProgramNode) Parser.generator.parse(programNode.toPrettyString());
+        Parser.ProgramNode resolvedProgram = Parser.parse(programNode.toPrettyString());
         new NameResolution(resolvedProgram).resolve();
         //checkAndThrow(resolvedProgram);
         Parser.ProgramNode transformedProgram = new MetaOperatorTransformator(resolvedProgram.context.maxBitWidth, false).process(resolvedProgram);

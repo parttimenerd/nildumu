@@ -38,7 +38,7 @@ public class Evaluation {
         assert path.toString().endsWith(".nd");
         try {
             TestProgram program = new TestProgram(path, path.toFile().getName(),
-                    (Parser.ProgramNode) Parser.generator.parse(String.join("\n",
+                    Parser.parse(String.join("\n",
                     Files.readAllLines(path))), integerType);
             String[] split = path.getFileName().toString().split("\\.");
             String baseName = Arrays.stream(split, 0, split.length - 1).collect(Collectors.joining("."));
@@ -259,7 +259,7 @@ public class Evaluation {
         IF_WHILE_STATEMENTS(Generator::createProgramOfIfStmtsWithEqsSurroundedByCountingLoop),
         REPEATED_FIBONACCIS(Generator::repeatedFibonaccis),
         REPEATED_MANY_FIBONACCIS(Generator::repeatedManyFibonaccis),
-        WHILE_UNWINDING(alpha -> (Parser.ProgramNode)Parser.generator.parse(String.format("h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu; int z = 0; while (0 < h && h < %s){z = z + 1; h = h + 1} l output int o = z;", alpha))) {
+        WHILE_UNWINDING(alpha -> Parser.parse(String.format("h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu; int z = 0; while (0 < h && h < %s){z = z + 1; h = h + 1} l output int o = z;", alpha))) {
             @Override
             void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, int dryruns, Function<Integer, List<AbstractTool>> toolsForUnwind) {
                 evalPackets(IntStream.rangeClosed(start, endIncl)

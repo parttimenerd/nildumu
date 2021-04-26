@@ -18,7 +18,7 @@ public class OperatorTests {
             "5, *, 1, 5"
     })
     public void test(String arg1, String op, String arg2, String result){
-        parse(String.format("bit_width 10; l input int a = %s; l input int b = %s; int x = a %s b", arg1, arg2, op)).val("x", result).run();
+        parse(String.format("bit_width 10; int a = %s; int b = %s; int x = a %s b", arg1, arg2, op)).val("x", result).run();
     }
 
     @ParameterizedTest
@@ -28,7 +28,7 @@ public class OperatorTests {
             "0bu, |, 0, 1"
     })
     public void testLeakage(String arg1, String op, String arg2, int leakage){
-        String program = String.format("bit_width 10; h input int a = %s; h input int b = %s; l output int x = a %s b", arg1, arg2, op);
+        String program = String.format("bit_width 10; h input int a = %s; int b = %s; l output int x = a %s b", arg1, arg2, op);
         System.out.println(toSSA(program));
         parse(program).leaks(leakage).run();
     }

@@ -100,7 +100,12 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
                 if (unOp.operator == MINUS) {
                     return new BinaryOperatorNode(new IntegerLiteralNode(unOp.location, Lattices.ValueLattice.get().parse(1)), new UnaryOperatorNode(unOp.expression, INVERT), PLUS);
                 }
-                return unOp;
+                if (unOp instanceof UnpackOperatorNode) {
+                    return new UnpackOperatorNode(repl(unOp.expression));
+                }
+                if (unOp instanceof BitPlaceOperatorNode) {
+                    return new BitPlaceOperatorNode(repl(unOp.expression), ((BitPlaceOperatorNode) unOp).index);
+                }
             }
             return node;
         });
@@ -206,7 +211,7 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
                         new MethodInvocationNode(methodInvocation.location, methodInvocation.method,
                                 new Parser.ArgumentsNode(methodInvocation.arguments.location,
                                         methodInvocation.arguments.arguments.stream()
-                                                .map(this::replace).collect(Collectors.toList())),
+                                                .map(a -> replace(a)).collect(Collectors.toList())),
                                 methodInvocation.globals);
                 node.globalDefs = methodInvocation.globalDefs;
                 node.definition = methodInvocation.definition;
@@ -234,6 +239,11 @@ public class MetaOperatorTransformator implements NodeVisitor<MJNode> {
             @Override
             public ExpressionNode visit(TupleLiteralNode primaryExpression) {
                 return new TupleLiteralNode(primaryExpression.location, primaryExpression.elements.stream().map(e -> e.accept(this)).collect(Collectors.toList()));
+            }
+
+            @Override
+            public ExpressionNode visit(UnpackOperatorNode unpackOperator) {
+                return new UnpackOperatorNode(unpackOperator.expression.accept(this));
             }
         });
         replacedMap.put(node, replExpr);

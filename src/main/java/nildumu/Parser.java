@@ -1,5 +1,6 @@
 package nildumu;
 
+import jdk.nashorn.internal.ir.visitor.NodeVisitor;
 import nildumu.typing.Type;
 import nildumu.typing.Types;
 import nildumu.util.Util;
@@ -38,6 +39,12 @@ import static nildumu.util.Util.p;
  * </ul>
  */
 public class Parser implements Serializable {
+
+    /**
+     * change this to switch between the ANTLR based parser ({@link ParserFacade})
+     * and the custom LR parser
+     */
+    public static final boolean use_antlr = true;
 
     /**
      * The terminals with the matching regular expression
@@ -141,464 +148,475 @@ public class Parser implements Serializable {
      * Change the id, when changing the parser oder replace the id by {@code null} to build the parser and lexer
      * every time (takes long)
      */
-    public static final Generator generator = Generator.getCachedIfPossible("./parser/3", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
-            (builder) -> {
-                Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
-                Types types = new Types();
-                builder.addRule("program", "use_sec? bit_width lines", asts -> {
-                    SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>) asts.get(0)).get(0).wrapped;
-                    int declaredBitWidth = vl.bitWidth;
-                    /*
-                     * Calc bit width
-                     */
-                    List<MJNode> topLevelNodes = asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped;
-                    ProgramNode node = new ProgramNode(new Context(secLattice, vl.bitWidth), types);
-                    NodeVisitor visitor = new NodeVisitor<Object>() {
+    public static Generator generator;
+    static {
+        if (!use_antlr)
+            generator = Generator.getCachedIfPossible("./parser/3", LexerTerminal.class, new String[]{"WS", "COMMENT", "LBRK"},
+                    (builder) -> {
+                        Util.Box<Integer> statedBitWidth = new Util.Box<>(2);
+                        Types types = new Types();
+                        builder.addRule("program", "use_sec? bit_width lines", asts -> {
+                            SecurityLattice<?> secLattice = asts.get(0).children().isEmpty() ? BasicSecLattice.get() : ((ListAST<WrapperNode<SecurityLattice<?>>>) asts.get(0)).get(0).wrapped;
+                            int declaredBitWidth = vl.bitWidth;
+                            /*
+                             * Calc bit width
+                             */
+                            List<MJNode> topLevelNodes = asts.get(2).<WrapperNode<List<MJNode>>>as().wrapped;
+                            ProgramNode node = new ProgramNode(new Context(secLattice, vl.bitWidth), types);
+                            NodeVisitor visitor = new NodeVisitor<Object>() {
 
-                        @Override
-                        public Object visit(MJNode node) {
-                            return null;
-                        }
+                                @Override
+                                public Object visit(MJNode node) {
+                                    return null;
+                                }
 
-                        @Override
-                        public Object visit(MethodNode method) {
-                            node.addMethod(method);
-                            return null;
-                        }
+                                @Override
+                                public Object visit(MethodNode method) {
+                                    node.addMethod(method);
+                                    return null;
+                                }
 
-                        @Override
-                        public Object visit(StatementNode statement) {
-                            node.addGlobalStatement(statement);
-                            return null;
-                        }
+                                @Override
+                                public Object visit(StatementNode statement) {
+                                    node.addGlobalStatement(statement);
+                                    return null;
+                                }
 
-                        @Override
-                        public Object visit(InputVariableDeclarationNode inputDecl) {
-                            node.context.addInputValue(secLattice.parse(inputDecl.secLevel), ((IntegerLiteralNode) inputDecl.expression).value);
-                            visit((StatementNode) inputDecl);
-                            return null;
-                        }
+                                @Override
+                                public Object visit(InputVariableDeclarationNode inputDecl) {
+                                    node.context.addInputValue(secLattice.parse(inputDecl.secLevel), ((IntegerLiteralNode) inputDecl.expression).value);
+                                    visit((StatementNode) inputDecl);
+                                    return null;
+                                }
 
-                        @Override
-                        public Object visit(AppendOnlyVariableDeclarationNode appendDecl) {
-                            node.context.addAppendOnlyVariable(secLattice.parse(appendDecl.secLevel), appendDecl.variable);
-                            visit((StatementNode) appendDecl);
-                            return null;
-                        }
-                    };
-                    topLevelNodes.forEach(n -> n.accept(visitor));
-                    node.handleInputAndPrint();
-                    return node;
-                })
-                        .addRule("use_sec", "USE_SEC IDENT SEMICOLON", asts -> {
-                            return new WrapperNode<>(asts.getStartLocation(), SecurityLattice.forName(asts.get(1).getMatchedString()));
-                        })
-                        .addRule("bit_width", "BIT_WIDTH INTEGER_LITERAL SEMICOLON", asts -> {
-                            vl.bitWidth = Integer.parseInt(asts.get(1).getMatchedString());
-                            return new WrapperNode<>(asts.getStartLocation(), vl.bitWidth);
-                        })
-                        .addRule("bit_width", "", asts -> {
-                            vl.bitWidth = 32;
-                            return new WrapperNode<>(asts.getStartLocation(), 32);
-                        })
-                        .addRule("lines", "line_w_semi lines", asts -> {
-                            WrapperNode<List<MJNode>> left = (WrapperNode<List<MJNode>>) asts.get(1);
-                            MJNode right = (MJNode) asts.getAs(0);
-                            left.wrapped.add(0, right);
-                            return left;
-                        })
-                        .addRule("lines", "line", asts -> {
-                            return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
-                        })
-                        .addRule("lines", "", asts -> {
-                            return new WrapperNode<>(new Location(0, 0), new ArrayList<>());
-                        })
-                        .addRule("line_w_semi", "method")
-                        .addRule("line_w_semi", "block_statement_w_semi")
-                        .addRule("line_w_semi", "output_decl_statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("line_w_semi", "input_decl_statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("line_w_semi", "append_decl_statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("line", "method")
-                        .addRule("line", "block_statement")
-                        .addRule("line", "output_decl_statement")
-                        .addRule("line", "input_decl_statement")
-                        .addRule("line", "append_decl_statement")
-                        .addRule("output_decl_statement", "IDENT OUTPUT type IDENT (EQUAL_SIGN expression)?", asts -> {
-                            return new OutputVariableDeclarationNode(
-                                    asts.get(0).getMatchedTokens().get(0).location,
-                                    asts.get(3).getMatchedString(),
-                                    ((TypeNode) asts.get(2)).type,
-                                    (ExpressionNode)((ListAST) asts.get(4)).getAll(ExpressionNode.class).stream().findAny().orElse(null),
-                                    asts.get(0).getMatchedString());
-                        })
-                        .addRule("input_decl_statement", "IDENT INPUT type IDENT EQUAL_SIGN input_literal", asts -> {
-                            return new InputVariableDeclarationNode(
-                                    asts.getStartLocation(),
-                                    asts.get(3).getMatchedString(),
-                                    ((TypeNode) asts.get(2)).type,
-                                    (IntegerLiteralNode) asts.get(5),
-                                    asts.get(0).getMatchedString());
-                        })
-                        .addRule("tmp_input_decl_statement", "IDENT TMP_INPUT INT IDENT EQUAL_SIGN input_literal", asts -> {
-                            return new TmpInputVariableDeclarationNode(
-                                    asts.getStartLocation(),
-                                    asts.get(3).getMatchedString(),
-                                    types.INT,
-                                    (IntegerLiteralNode) asts.get(5),
-                                    asts.get(0).getMatchedString());
-                        })
-                        .addRule("append_decl_statement", "IDENT APPEND_ONLY INT ident", asts -> {
-                            return new AppendOnlyVariableDeclarationNode(
-                                    asts.getStartLocation(),
-                                    asts.get(3).getMatchedString(),
-                                    types.INT,
-                                    asts.get(0).getMatchedString());
-                        })
-                        .addRule("append_decl_statement", "IDENT APPEND_ONLY INPUT INT ident", asts -> {
-                            return new AppendOnlyVariableDeclarationNode(
-                                    asts.getStartLocation(),
-                                    asts.get(4).getMatchedString(),
-                                    types.INT,
-                                    asts.get(0).getMatchedString(),
-                                    true);
-                        })
-                        .addRule("method", "type ident LPAREN parameters RPAREN method_body", asts -> {
-                            return new MethodNode(asts.get(0).<MJNode>as().location,
-                                    asts.get(1).getMatchedString(),
-                                    ((TypeNode) asts.get(0)).type,
-                                    (ParametersNode) asts.get(3), (BlockNode) asts.get(5),
-                                    new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
-                        })
-                        .addRule("method", "type ident globals LPAREN parameters RPAREN method_body", asts -> {
-                            return new MethodNode(asts.get(0).<MJNode>as().location,
-                                    asts.get(1).getMatchedString(),
-                                    ((TypeNode) asts.get(0)).type,
-                                    (ParametersNode) asts.get(4), (BlockNode) asts.get(6),
-                                    (GlobalVariablesNode) asts.get(2));
-                        })
-                        .addRule("parameters", "", asts -> new ParametersNode(new Location(0, 0), new ArrayList<>()))
-                        .addRule("parameters", "parameter COMMA parameters", asts -> {
-                            ParameterNode param = (ParameterNode) asts.get(0);
-                            ParametersNode node = new ParametersNode(param.location, Utils.makeArrayList(param));
-                            node.parameterNodes.addAll(((ParametersNode) asts.get(2)).parameterNodes);
+                                @Override
+                                public Object visit(AppendOnlyVariableDeclarationNode appendDecl) {
+                                    node.context.addAppendOnlyVariable(secLattice.parse(appendDecl.secLevel), appendDecl.variable);
+                                    visit((StatementNode) appendDecl);
+                                    return null;
+                                }
+                            };
+                            topLevelNodes.forEach(n -> n.accept(visitor));
+                            node.handleInputAndPrint();
                             return node;
                         })
-                        .addRule("parameters", "parameter", asts -> {
-                            ParameterNode param = (ParameterNode) asts.get(0);
-                            return new ParametersNode(param.location, Utils.makeArrayList(param));
-                        })
-                        .addRule("parameter", "type ident", asts -> {
-                            return new ParameterNode(asts.get(0).<MJNode>as().location, ((TypeNode) asts.get(0)).type,
-                                    asts.get(1).getMatchedString());
-                        })
-                        .addEitherRule("statement", "block")
-                        .addRule("expression_statement", "expression", asts -> {
-                            return new ExpressionStatementNode((ExpressionNode) asts.get(0));
-                        })
-                        .addRule("block", "LCURLY block_statements RCURLY", asts -> new BlockNode(asts.get(0).getMatchedTokens().get(0).location, asts.get(1).<WrapperNode<List<StatementNode>>>as().wrapped))
-                        .addRule("method_body", "LCURLY method_block_statements RCURLY", asts -> new BlockNode(asts.get(0).getMatchedTokens().get(0).location, asts.get(1).<WrapperNode<List<StatementNode>>>as().wrapped))
-                        .addRule("block_statements", "block_statement_w_semi block_statements", asts -> {
-                            WrapperNode<List<StatementNode>> left = (WrapperNode<List<StatementNode>>) asts.get(1);
-                            StatementNode right = (StatementNode) asts.getAs(0);
-                            left.wrapped.add(0, right);
-                            return left;
-                        })
-                        .addRule("block_statements", "block_statement", asts -> {
-                            return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
-                        })
-                        .addRule("block_statements", "", asts -> {
-                            return new WrapperNode<>(new Location(0, 0), new ArrayList<>());
-                        })
-                        .addRule("method_block_statements", "block_statement_w_semi method_block_statements", asts -> {
-                            WrapperNode<List<StatementNode>> left = (WrapperNode<List<StatementNode>>) asts.get(1);
-                            StatementNode right = (StatementNode) asts.getAs(0);
-                            left.wrapped.add(0, right);
-                            return left;
-                        })
-                        .addRule("method_block_statements", "block_statement", asts -> {
-                            return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
-                        })
-                        .addRule("method_block_statements", "return_statement SEMICOLON?", asts -> {
-                            return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
-                        })
-                        .addRule("method_block_statements", "", asts -> {
-                            return new WrapperNode<>(new Location(0, 0), new ArrayList<>());
-                        })
-                        .addRule("block_statement_w_semi", "statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("block_statement_w_semi", "var_decl SEMICOLON", asts -> asts.get(0))
-                        .addRule("block_statement_w_semi", "local_variable_assignment_statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("block_statement_w_semi", "while_statement")
-                        .addRule("block_statement_w_semi", "if_statement")
-                        .addRule("block_statement_w_semi", "expression_statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("block_statement_w_semi", "print_statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("block_statement_w_semi", "input_statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("block_statement_w_semi", "tmp_input_decl_statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("block_statement_w_semi", "array_assignment_statement SEMICOLON", asts -> asts.get(0))
-                        //.addRule("block_statement_w_semi", "assert_statement SEMICOLON", asts -> asts.get(0))
-                        .addRule("block_statement_w_semi", "block")
-                        .addRule("block_statement", "statement", asts -> asts.get(0))
-                        .addRule("block_statement", "var_decl", asts -> asts.get(0))
-                        .addRule("block_statement", "local_variable_assignment_statement", asts -> asts.get(0))
-                        .addRule("block_statement", "while_statement")
-                        .addRule("block_statement", "if_statement")
-                        .addRule("block_statement", "expression_statement")
-                        .addRule("block_statement", "print_statement", asts -> asts.get(0))
-                        .addRule("block_statement", "input_statement")
-                        .addRule("block_statement", "tmp_input_decl_statement")
-                        .addRule("block_statement", "array_assignment_statement")
-                        //.addRule("block_statement", "assert_statement")
-                        .addRule("block_statement", "block")
-                        .addRule("var_decl", "type ident", asts -> {
-                            Type type = ((TypeNode) asts.get(0)).type;
-                            return new VariableDeclarationNode(
-                                    asts.get(0).<MJNode>as().location,
-                                    asts.get(1).getMatchedString(),
-                                    type == types.AINT ? types.INT : type,
-                                    null,
-                                    type == types.AINT);
-                        })
-                        .addRule("var_decl", "type ident EQUAL_SIGN (phi|expression)", asts -> {
-                            Type type = ((TypeNode) asts.get(0)).type;
-                            return new VariableDeclarationNode(
-                                    asts.get(0).<MJNode>as().location,
-                                    asts.get(1).getMatchedString(),
-                                    type == types.AINT ? types.INT : type,
-                                    (ExpressionNode) asts.get(3),
-                                    type == types.AINT);
-                        })
-                        .addRule("local_variable_assignment_statement", "ident EQUAL_SIGN (phi|expression)", asts -> {
-                            return new VariableAssignmentNode(
-                                    asts.getStartLocation(),
-                                    asts.get(0).getMatchedString(),
-                                    (ExpressionNode) asts.get(2));
-                        })
-                        .addRule("local_variable_assignment_statement", "ident EQUAL_SIGN unpack", asts -> {
-                            return new MultipleVariableAssignmentNode(
-                                    asts.getStartLocation(),
-                                    new String[]{asts.get(0).getMatchedString()},
-                                    (UnpackOperatorNode) asts.get(2));
-                        })
-                        .addRule("local_variable_assignment_statement", "ident COMMA idents EQUAL_SIGN unpack", asts -> {
-                            return new MultipleVariableAssignmentNode(
-                                    asts.getStartLocation(),
-                                    Stream.concat(Stream.of(asts.get(0).getMatchedString()),
-                                            ((CustomAST<List<String>>) asts.get(2)).value.stream())
-                                            .collect(Collectors.toList()).toArray(new String[0]),
-                                    (UnpackOperatorNode) asts.get(4));
-                        })
-                        .addRule("idents", "ident", asts -> {
-                            return new CustomAST<>(Collections.singletonList(asts.get(0).getMatchedString()));
-                        })
-                        .addRule("idents", "ident COMMA idents", asts -> {
-                            return new CustomAST<List<String>>(Stream.concat(Stream.of(asts.get(0).getMatchedString()),
-                                    ((CustomAST<List<String>>) asts.get(2)).value.stream()).collect(Collectors.toList()));
-                        })
-                        .addRule("array_assignment_statement", "ident LBRACKET expression RBRACKET EQUAL_SIGN expression", asts -> {
-                            return new ArrayAssignmentNode(asts.getStartLocation(),
-                                    asts.get(0).getMatchedString(), asts.get(2).<ExpressionNode>as(),
-                                    asts.get(5).<ExpressionNode>as());
-                        })
-                        .addRule("while_statement", "WHILE (LBBRACKET assignments RBBRACKET)? LPAREN expression RPAREN block_statement", asts -> {
-                            ListAST pres = (ListAST) asts.get(1);
-                            return new WhileStatementNode(
-                                    asts.getStartLocation(),
-                                    pres.isEmpty() ? new ArrayList<>() :
-                                            ((WrapperNode<List<VariableAssignmentNode>>) pres.get(1)).wrapped,
-                                    (ExpressionNode) asts.get(3),
-                                    (StatementNode) asts.get(5));
-                        })
-                        .addRule("assignments", "local_variable_assignment_statement SEMICOLON assignments SEMICOLON?", asts -> {
-                            WrapperNode<List<VariableAssignmentNode>> left =
-                                    (WrapperNode<List<VariableAssignmentNode>>) asts.get(2);
-                            VariableAssignmentNode right = (VariableAssignmentNode) asts.getAs(0);
-                            left.wrapped.add(0, right);
-                            return left;
-                        })
-                        .addRule("assignments", "local_variable_assignment_statement", asts -> {
-                            return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
-                        })
-                        .addRule("assignments", "", asts -> {
-                            return new WrapperNode<>(new Location(0, 0), new ArrayList<>());
-                        })
-                        .addRule("if_statement", "IF LPAREN expression RPAREN statement", asts -> {
-                            return new IfStatementNode(
-                                    asts.getStartLocation(),
-                                    (ExpressionNode) asts.get(2),
-                                    (StatementNode) asts.get(4));
-                        })
-                        .addRule("if_statement", "IF LPAREN expression RPAREN statement ELSE statement", asts -> {
-                            return new IfStatementNode(asts.getStartLocation(), (ExpressionNode) asts.get(2),
-                                    (StatementNode) asts.get(4), (StatementNode) asts.get(6));
-                        })
-                        .addRule("return_statement", "RETURN", asts -> {
-                            return new ReturnStatementNode(asts.getStartLocation());
-                        })
-                        .addRule("return_statement", "RETURN expression", asts -> {
-                            return new ReturnStatementNode(asts.getStartLocation(), (ExpressionNode) asts.get(1));
-                        })
-                        /*.addRule("assert_statement", "ASSERT expression", asts -> {
-                            return new Assert
-                        })*/
-                        .addOperators("expression", "postfix_expression", operators -> {
-                            operators.defaultBinaryAction((asts, op) -> {
-                                return new BinaryOperatorNode((ExpressionNode) asts.get(0), (ExpressionNode) asts.get(2), valueOf(op));
-                            })
-                                    .defaultUnaryAction((asts, opStr) -> {
-                                        LexerTerminal op = valueOf(opStr);
-                                        ExpressionNode child = null;
-                                        Token opToken = null;
-                                        boolean exprIsLeft = false;
-                                        if (asts.get(0) instanceof ExpressionNode) {
-                                            child = (ExpressionNode) asts.get(0);
-                                            opToken = asts.get(1).getMatchedTokens().get(0);
-                                            exprIsLeft = true;
-                                        } else {
-                                            child = (ExpressionNode) asts.get(1);
-                                            opToken = asts.get(0).getMatchedTokens().get(0);
-                                        }
-                                        return new UnaryOperatorNode(child, op);
+                                .addRule("use_sec", "USE_SEC IDENT SEMICOLON", asts -> {
+                                    return new WrapperNode<>(asts.getStartLocation(), SecurityLattice.forName(asts.get(1).getMatchedString()));
+                                })
+                                .addRule("bit_width", "BIT_WIDTH INTEGER_LITERAL SEMICOLON", asts -> {
+                                    vl.bitWidth = Integer.parseInt(asts.get(1).getMatchedString());
+                                    return new WrapperNode<>(asts.getStartLocation(), vl.bitWidth);
+                                })
+                                .addRule("bit_width", "", asts -> {
+                                    vl.bitWidth = 32;
+                                    return new WrapperNode<>(asts.getStartLocation(), 32);
+                                })
+                                .addRule("lines", "line_w_semi lines", asts -> {
+                                    WrapperNode<List<MJNode>> left = (WrapperNode<List<MJNode>>) asts.get(1);
+                                    MJNode right = (MJNode) asts.getAs(0);
+                                    left.wrapped.add(0, right);
+                                    return left;
+                                })
+                                .addRule("lines", "line", asts -> {
+                                    return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
+                                })
+                                .addRule("lines", "", asts -> {
+                                    return new WrapperNode<>(new Location(0, 0), new ArrayList<>());
+                                })
+                                .addRule("line_w_semi", "method")
+                                .addRule("line_w_semi", "block_statement_w_semi")
+                                .addRule("line_w_semi", "output_decl_statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("line_w_semi", "input_decl_statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("line_w_semi", "append_decl_statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("line", "method")
+                                .addRule("line", "block_statement")
+                                .addRule("line", "output_decl_statement")
+                                .addRule("line", "input_decl_statement")
+                                .addRule("line", "append_decl_statement")
+                                .addRule("output_decl_statement", "IDENT OUTPUT type IDENT (EQUAL_SIGN expression)?", asts -> {
+                                    return new OutputVariableDeclarationNode(
+                                            asts.get(0).getMatchedTokens().get(0).location,
+                                            asts.get(3).getMatchedString(),
+                                            ((TypeNode) asts.get(2)).type,
+                                            (ExpressionNode) ((ListAST) asts.get(4)).getAll(ExpressionNode.class).stream().findAny().orElse(null),
+                                            asts.get(0).getMatchedString());
+                                })
+                                .addRule("input_decl_statement", "IDENT INPUT type IDENT EQUAL_SIGN input_literal", asts -> {
+                                    return new InputVariableDeclarationNode(
+                                            asts.getStartLocation(),
+                                            asts.get(3).getMatchedString(),
+                                            ((TypeNode) asts.get(2)).type,
+                                            (IntegerLiteralNode) asts.get(5),
+                                            asts.get(0).getMatchedString());
+                                })
+                                .addRule("tmp_input_decl_statement", "IDENT TMP_INPUT INT IDENT EQUAL_SIGN input_literal", asts -> {
+                                    return new TmpInputVariableDeclarationNode(
+                                            asts.getStartLocation(),
+                                            asts.get(3).getMatchedString(),
+                                            types.INT,
+                                            (IntegerLiteralNode) asts.get(5),
+                                            asts.get(0).getMatchedString());
+                                })
+                                .addRule("append_decl_statement", "IDENT APPEND_ONLY INT ident", asts -> {
+                                    return new AppendOnlyVariableDeclarationNode(
+                                            asts.getStartLocation(),
+                                            asts.get(3).getMatchedString(),
+                                            types.INT,
+                                            asts.get(0).getMatchedString());
+                                })
+                                .addRule("append_decl_statement", "IDENT APPEND_ONLY INPUT INT ident", asts -> {
+                                    return new AppendOnlyVariableDeclarationNode(
+                                            asts.getStartLocation(),
+                                            asts.get(4).getMatchedString(),
+                                            types.INT,
+                                            asts.get(0).getMatchedString(),
+                                            true);
+                                })
+                                .addRule("method", "type ident LPAREN parameters RPAREN method_body", asts -> {
+                                    return new MethodNode(asts.get(0).<MJNode>as().location,
+                                            asts.get(1).getMatchedString(),
+                                            ((TypeNode) asts.get(0)).type,
+                                            (ParametersNode) asts.get(3), (BlockNode) asts.get(5),
+                                            new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
+                                })
+                                .addRule("method", "type ident globals LPAREN parameters RPAREN method_body", asts -> {
+                                    return new MethodNode(asts.get(0).<MJNode>as().location,
+                                            asts.get(1).getMatchedString(),
+                                            ((TypeNode) asts.get(0)).type,
+                                            (ParametersNode) asts.get(4), (BlockNode) asts.get(6),
+                                            (GlobalVariablesNode) asts.get(2));
+                                })
+                                .addRule("parameters", "", asts -> new ParametersNode(new Location(0, 0), new ArrayList<>()))
+                                .addRule("parameters", "parameter COMMA parameters", asts -> {
+                                    ParameterNode param = (ParameterNode) asts.get(0);
+                                    ParametersNode node = new ParametersNode(param.location, Utils.makeArrayList(param));
+                                    node.parameterNodes.addAll(((ParametersNode) asts.get(2)).parameterNodes);
+                                    return node;
+                                })
+                                .addRule("parameters", "parameter", asts -> {
+                                    ParameterNode param = (ParameterNode) asts.get(0);
+                                    return new ParametersNode(param.location, Utils.makeArrayList(param));
+                                })
+                                .addRule("parameter", "type ident", asts -> {
+                                    return new ParameterNode(asts.get(0).<MJNode>as().location, ((TypeNode) asts.get(0)).type,
+                                            asts.get(1).getMatchedString());
+                                })
+                                .addEitherRule("statement", "block")
+                                .addRule("expression_statement", "expression", asts -> {
+                                    return new ExpressionStatementNode((ExpressionNode) asts.get(0));
+                                })
+                                .addRule("block", "LCURLY block_statements RCURLY", asts -> new BlockNode(asts.get(0).getMatchedTokens().get(0).location, asts.get(1).<WrapperNode<List<StatementNode>>>as().wrapped))
+                                .addRule("method_body", "LCURLY method_block_statements RCURLY", asts -> new BlockNode(asts.get(0).getMatchedTokens().get(0).location, asts.get(1).<WrapperNode<List<StatementNode>>>as().wrapped))
+                                .addRule("block_statements", "block_statement_w_semi block_statements", asts -> {
+                                    WrapperNode<List<StatementNode>> left = (WrapperNode<List<StatementNode>>) asts.get(1);
+                                    StatementNode right = (StatementNode) asts.getAs(0);
+                                    left.wrapped.add(0, right);
+                                    return left;
+                                })
+                                .addRule("block_statements", "block_statement", asts -> {
+                                    return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
+                                })
+                                .addRule("block_statements", "", asts -> {
+                                    return new WrapperNode<>(new Location(0, 0), new ArrayList<>());
+                                })
+                                .addRule("method_block_statements", "block_statement_w_semi method_block_statements", asts -> {
+                                    WrapperNode<List<StatementNode>> left = (WrapperNode<List<StatementNode>>) asts.get(1);
+                                    StatementNode right = (StatementNode) asts.getAs(0);
+                                    left.wrapped.add(0, right);
+                                    return left;
+                                })
+                                .addRule("method_block_statements", "block_statement", asts -> {
+                                    return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
+                                })
+                                .addRule("method_block_statements", "return_statement SEMICOLON?", asts -> {
+                                    return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
+                                })
+                                .addRule("method_block_statements", "", asts -> {
+                                    return new WrapperNode<>(new Location(0, 0), new ArrayList<>());
+                                })
+                                .addRule("block_statement_w_semi", "statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("block_statement_w_semi", "var_decl SEMICOLON", asts -> asts.get(0))
+                                .addRule("block_statement_w_semi", "local_variable_assignment_statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("block_statement_w_semi", "while_statement")
+                                .addRule("block_statement_w_semi", "if_statement")
+                                .addRule("block_statement_w_semi", "expression_statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("block_statement_w_semi", "print_statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("block_statement_w_semi", "input_statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("block_statement_w_semi", "tmp_input_decl_statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("block_statement_w_semi", "array_assignment_statement SEMICOLON", asts -> asts.get(0))
+                                //.addRule("block_statement_w_semi", "assert_statement SEMICOLON", asts -> asts.get(0))
+                                .addRule("block_statement_w_semi", "block")
+                                .addRule("block_statement", "statement", asts -> asts.get(0))
+                                .addRule("block_statement", "var_decl", asts -> asts.get(0))
+                                .addRule("block_statement", "local_variable_assignment_statement", asts -> asts.get(0))
+                                .addRule("block_statement", "while_statement")
+                                .addRule("block_statement", "if_statement")
+                                .addRule("block_statement", "expression_statement")
+                                .addRule("block_statement", "print_statement", asts -> asts.get(0))
+                                .addRule("block_statement", "input_statement")
+                                .addRule("block_statement", "tmp_input_decl_statement")
+                                .addRule("block_statement", "array_assignment_statement")
+                                //.addRule("block_statement", "assert_statement")
+                                .addRule("block_statement", "block")
+                                .addRule("var_decl", "type ident", asts -> {
+                                    Type type = ((TypeNode) asts.get(0)).type;
+                                    return new VariableDeclarationNode(
+                                            asts.get(0).<MJNode>as().location,
+                                            asts.get(1).getMatchedString(),
+                                            type == types.AINT ? types.INT : type,
+                                            null,
+                                            type == types.AINT);
+                                })
+                                .addRule("var_decl", "type ident EQUAL_SIGN (phi|expression)", asts -> {
+                                    Type type = ((TypeNode) asts.get(0)).type;
+                                    return new VariableDeclarationNode(
+                                            asts.get(0).<MJNode>as().location,
+                                            asts.get(1).getMatchedString(),
+                                            type == types.AINT ? types.INT : type,
+                                            (ExpressionNode) asts.get(3),
+                                            type == types.AINT);
+                                })
+                                .addRule("local_variable_assignment_statement", "ident EQUAL_SIGN (phi|expression)", asts -> {
+                                    return new VariableAssignmentNode(
+                                            asts.getStartLocation(),
+                                            asts.get(0).getMatchedString(),
+                                            (ExpressionNode) asts.get(2));
+                                })
+                                .addRule("local_variable_assignment_statement", "ident EQUAL_SIGN unpack", asts -> {
+                                    return new MultipleVariableAssignmentNode(
+                                            asts.getStartLocation(),
+                                            new String[]{asts.get(0).getMatchedString()},
+                                            (UnpackOperatorNode) asts.get(2));
+                                })
+                                .addRule("local_variable_assignment_statement", "ident COMMA idents EQUAL_SIGN unpack", asts -> {
+                                    return new MultipleVariableAssignmentNode(
+                                            asts.getStartLocation(),
+                                            Stream.concat(Stream.of(asts.get(0).getMatchedString()),
+                                                    ((CustomAST<List<String>>) asts.get(2)).value.stream())
+                                                    .collect(Collectors.toList()).toArray(new String[0]),
+                                            (UnpackOperatorNode) asts.get(4));
+                                })
+                                .addRule("idents", "ident", asts -> {
+                                    return new CustomAST<>(Collections.singletonList(asts.get(0).getMatchedString()));
+                                })
+                                .addRule("idents", "ident COMMA idents", asts -> {
+                                    return new CustomAST<List<String>>(Stream.concat(Stream.of(asts.get(0).getMatchedString()),
+                                            ((CustomAST<List<String>>) asts.get(2)).value.stream()).collect(Collectors.toList()));
+                                })
+                                .addRule("array_assignment_statement", "ident LBRACKET expression RBRACKET EQUAL_SIGN expression", asts -> {
+                                    return new ArrayAssignmentNode(asts.getStartLocation(),
+                                            asts.get(0).getMatchedString(), asts.get(2).<ExpressionNode>as(),
+                                            asts.get(5).<ExpressionNode>as());
+                                })
+                                .addRule("while_statement", "WHILE (LBBRACKET assignments RBBRACKET)? LPAREN expression RPAREN block_statement", asts -> {
+                                    ListAST pres = (ListAST) asts.get(1);
+                                    return new WhileStatementNode(
+                                            asts.getStartLocation(),
+                                            pres.isEmpty() ? new ArrayList<>() :
+                                                    ((WrapperNode<List<VariableAssignmentNode>>) pres.get(1)).wrapped,
+                                            (ExpressionNode) asts.get(3),
+                                            (StatementNode) asts.get(5));
+                                })
+                                .addRule("assignments", "local_variable_assignment_statement SEMICOLON assignments SEMICOLON?", asts -> {
+                                    WrapperNode<List<VariableAssignmentNode>> left =
+                                            (WrapperNode<List<VariableAssignmentNode>>) asts.get(2);
+                                    VariableAssignmentNode right = (VariableAssignmentNode) asts.getAs(0);
+                                    left.wrapped.add(0, right);
+                                    return left;
+                                })
+                                .addRule("assignments", "local_variable_assignment_statement", asts -> {
+                                    return new WrapperNode<>(((MJNode) asts.get(0)).location, new ArrayList<>(Collections.singleton(asts.get(0))));
+                                })
+                                .addRule("assignments", "", asts -> {
+                                    return new WrapperNode<>(new Location(0, 0), new ArrayList<>());
+                                })
+                                .addRule("if_statement", "IF LPAREN expression RPAREN statement", asts -> {
+                                    return new IfStatementNode(
+                                            asts.getStartLocation(),
+                                            (ExpressionNode) asts.get(2),
+                                            (StatementNode) asts.get(4));
+                                })
+                                .addRule("if_statement", "IF LPAREN expression RPAREN statement ELSE statement", asts -> {
+                                    return new IfStatementNode(asts.getStartLocation(), (ExpressionNode) asts.get(2),
+                                            (StatementNode) asts.get(4), (StatementNode) asts.get(6));
+                                })
+                                .addRule("return_statement", "RETURN", asts -> {
+                                    return new ReturnStatementNode(asts.getStartLocation());
+                                })
+                                .addRule("return_statement", "RETURN expression", asts -> {
+                                    return new ReturnStatementNode(asts.getStartLocation(), (ExpressionNode) asts.get(1));
+                                })
+                                /*.addRule("assert_statement", "ASSERT expression", asts -> {
+                                    return new Assert
+                                })*/
+                                .addOperators("expression", "postfix_expression", operators -> {
+                                    operators.defaultBinaryAction((asts, op) -> {
+                                        return new BinaryOperatorNode((ExpressionNode) asts.get(0), (ExpressionNode) asts.get(2), valueOf(op));
                                     })
-                                    .closeLayer()
-                                    .binaryLayer(APPEND)
-                                    .binaryLayer(OR)
-                                    .binaryLayer(AND)
-                                    .binaryLayer(BOR)
-                                    .binaryLayer(BAND)
-                                    .binaryLayer(XOR)
-                                    .binaryLayer(EQUALS, UNEQUALS)
-                                    .binaryLayer(LOWER, LOWER_EQUALS, GREATER, GREATER_EQUALS)
-                                    .binaryLayer(LEFT_SHIFT, RIGHT_SHIFT)
-                                    .binaryLayer(PLUS, MINUS)
-                                    .binaryLayer(MULTIPLY, DIVIDE, MODULO)
-                                    .custom("expression LBRACKET expression RBRACKET", asts -> {
-                                        return new BracketedAccessOperatorNode((ExpressionNode) asts.get(0),
-                                                (ExpressionNode) asts.get(2));
-                                    })
-                                    .unaryLayerLeft(INVERT, MINUS, TILDE)
-                                    .custom("LBRACKET INTEGER_LITERAL RBRACKET expression", asts -> {
-                                        return new BitPlaceOperatorNode((ExpressionNode) asts.get(3),
-                                                vl.parse(asts.get(1).getMatchedString()).asLong());
-                                    });
-                        })
-                        .addRule("postfix_expression", "primary_expression")
-                        .addEitherRule("postfix_expression", "method_invocation")
-                        .addRule("method_invocation", "ident globals LPAREN arguments RPAREN", asts -> {
-                            return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
-                                    (ArgumentsNode) asts.get(3), asts.get(1).as());
-                        })
-                        .addRule("method_invocation", "ident globals LPAREN expression RPAREN", asts -> {
-                            ExpressionNode arg = (ExpressionNode) asts.get(3);
-                            return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
-                                    new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
-                                    asts.get(1).as());
-                        })
-                        .addRule("method_invocation", "ident LPAREN arguments RPAREN", asts -> {
-                            return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
-                                    (ArgumentsNode) asts.get(2),
-                                    new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
-                        })
-                        .addRule("method_invocation", "ident LPAREN tuple_element RPAREN", asts -> {
-                            ExpressionNode arg = (ExpressionNode) asts.get(2);
-                            return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
-                                    new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
-                                    new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
-                        })
-                        .addRule("phi", "PHI LPAREN ident COMMA ident RPAREN", asts -> {
-                            return new PhiNode(asts.getStartLocation(), Arrays.asList(asts.get(2).getMatchedString(),
-                                    asts.get(4).getMatchedString()));
-                        })
-                        .addRule("arguments", "", asts -> new ArgumentsNode(new Location(0, 0), new ArrayList<>()))
-                        .addRule("arguments", "tuple_element", asts -> {
-                            return new ArgumentsNode(((ExpressionNode) asts.get(0)).location, Utils.makeArrayList((ExpressionNode) asts.get(0)));
-                        })
-                        .addRule("arguments", "tuple_element COMMA arguments", asts -> {
-                            List<ExpressionNode> args = Utils.makeArrayList((ExpressionNode) asts.get(0));
-                            ArgumentsNode argsNode = ((ArgumentsNode) asts.get(2));
-                            args.addAll(argsNode.arguments);
-                            return new ArgumentsNode(argsNode.location, args);
-                        })
-                        .addRule("unpack", "MULTIPLY postfix_expression", asts -> new UnpackOperatorNode(asts.get(1).as()))
-                        .addRule("primary_expression", "FALSE", asts -> new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(0)))
-                        .addRule("primary_expression", "TRUE", asts -> new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(1)))
-                        .addRule("primary_expression", "INTEGER_LITERAL", asts -> {
-                            Value val = ValueLattice.get().parse(asts.getMatchedString());
-                            statedBitWidth.val = Math.max(statedBitWidth.val, val.size());
-                            return new IntegerLiteralNode(asts.getStartLocation(), val);
-                        })
-                        .addRule("primary_expression", "var_access")
-                        .addRule("primary_expression", "array_access")
-                        .addRule("primary_expression", "LPAREN expression RPAREN", asts -> {
-                            return asts.get(1);
-                        })
-                        .addRule("primary_expression", "tuple_expression")
-                        .addRule("primary_expression", "array_expression")
-                        .addRule("tuple_expression", "LPAREN tuple_inner RPAREN", asts -> {
-                            return new TupleLiteralNode(asts.getStartLocation(), ((TupleLiteralNode) asts.get(1)).elements);
-                        })
-                        .addRule("tuple_expression", "LPAREN tuple_element RPAREN", asts -> {
-                            return new TupleLiteralNode(asts.getStartLocation(), Collections.singletonList((ExpressionNode) asts.get(1)));
-                        })
-                        .addRule("tuple_inner", Arrays.asList(
-                                "tuple_element COMMA",
-                                "tuple_element (COMMA tuple_element)+"), asts -> {
-                            return new TupleLiteralNode(new Location(0, 0), asts.getAll(ExpressionNode.class));
-                        })
-                        .addRule("array_expression", "LCURLY tuple_inner RCURLY", asts -> {
-                            return new ArrayLiteralNode(asts.getStartLocation(), ((TupleLiteralNode) asts.get(1)).elements);
-                        })
-                        .addRule("tuple_element", "unpack | expression", asts -> (BaseAST) asts.getAll(ExpressionNode.class).get(0))
-                        .addRule("var_access", "ident", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
-                        .addRule("input_literal", "INPUT_LITERAL|INTEGER_LITERAL", asts -> {
+                                            .defaultUnaryAction((asts, opStr) -> {
+                                                LexerTerminal op = valueOf(opStr);
+                                                ExpressionNode child = null;
+                                                Token opToken = null;
+                                                boolean exprIsLeft = false;
+                                                if (asts.get(0) instanceof ExpressionNode) {
+                                                    child = (ExpressionNode) asts.get(0);
+                                                    opToken = asts.get(1).getMatchedTokens().get(0);
+                                                    exprIsLeft = true;
+                                                } else {
+                                                    child = (ExpressionNode) asts.get(1);
+                                                    opToken = asts.get(0).getMatchedTokens().get(0);
+                                                }
+                                                return new UnaryOperatorNode(child, op);
+                                            })
+                                            .closeLayer()
+                                            .binaryLayer(APPEND)
+                                            .binaryLayer(OR)
+                                            .binaryLayer(AND)
+                                            .binaryLayer(BOR)
+                                            .binaryLayer(BAND)
+                                            .binaryLayer(XOR)
+                                            .binaryLayer(EQUALS, UNEQUALS)
+                                            .binaryLayer(LOWER, LOWER_EQUALS, GREATER, GREATER_EQUALS)
+                                            .binaryLayer(LEFT_SHIFT, RIGHT_SHIFT)
+                                            .binaryLayer(PLUS, MINUS)
+                                            .binaryLayer(MULTIPLY, DIVIDE, MODULO)
+                                            .custom("expression LBRACKET expression RBRACKET", asts -> {
+                                                return new BracketedAccessOperatorNode((ExpressionNode) asts.get(0),
+                                                        (ExpressionNode) asts.get(2));
+                                            })
+                                            .unaryLayerLeft(INVERT, MINUS, TILDE)
+                                            .custom("LBRACKET INTEGER_LITERAL RBRACKET expression", asts -> {
+                                                return new BitPlaceOperatorNode((ExpressionNode) asts.get(3),
+                                                        vl.parse(asts.get(1).getMatchedString()).asLong());
+                                            });
+                                })
+                                .addRule("postfix_expression", "primary_expression")
+                                .addEitherRule("postfix_expression", "method_invocation")
+                                .addRule("method_invocation", "ident globals LPAREN arguments RPAREN", asts -> {
+                                    return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
+                                            (ArgumentsNode) asts.get(3), asts.get(1).as());
+                                })
+                                .addRule("method_invocation", "ident globals LPAREN expression RPAREN", asts -> {
+                                    ExpressionNode arg = (ExpressionNode) asts.get(3);
+                                    return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
+                                            new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
+                                            asts.get(1).as());
+                                })
+                                .addRule("method_invocation", "ident LPAREN arguments RPAREN", asts -> {
+                                    return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
+                                            (ArgumentsNode) asts.get(2),
+                                            new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
+                                })
+                                .addRule("method_invocation", "ident LPAREN tuple_element RPAREN", asts -> {
+                                    ExpressionNode arg = (ExpressionNode) asts.get(2);
+                                    return new MethodInvocationNode(asts.getStartLocation(), asts.get(0).getMatchedString(),
+                                            new ArgumentsNode(arg.location, Utils.makeArrayList(arg)),
+                                            new GlobalVariablesNode(new Location(0, 0), new HashMap<>()));
+                                })
+                                .addRule("phi", "PHI LPAREN ident COMMA ident RPAREN", asts -> {
+                                    return new PhiNode(asts.getStartLocation(), Arrays.asList(asts.get(2).getMatchedString(),
+                                            asts.get(4).getMatchedString()));
+                                })
+                                .addRule("arguments", "", asts -> new ArgumentsNode(new Location(0, 0), new ArrayList<>()))
+                                .addRule("arguments", "tuple_element", asts -> {
+                                    return new ArgumentsNode(((ExpressionNode) asts.get(0)).location, Utils.makeArrayList((ExpressionNode) asts.get(0)));
+                                })
+                                .addRule("arguments", "tuple_element COMMA arguments", asts -> {
+                                    List<ExpressionNode> args = Utils.makeArrayList((ExpressionNode) asts.get(0));
+                                    ArgumentsNode argsNode = ((ArgumentsNode) asts.get(2));
+                                    args.addAll(argsNode.arguments);
+                                    return new ArgumentsNode(argsNode.location, args);
+                                })
+                                .addRule("unpack", "MULTIPLY postfix_expression", asts -> new UnpackOperatorNode(asts.get(1).as()))
+                                .addRule("primary_expression", "FALSE", asts -> new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(0)))
+                                .addRule("primary_expression", "TRUE", asts -> new IntegerLiteralNode(asts.getStartLocation(), ValueLattice.get().parse(1)))
+                                .addRule("primary_expression", "INTEGER_LITERAL", asts -> {
+                                    Value val = ValueLattice.get().parse(asts.getMatchedString());
+                                    statedBitWidth.val = Math.max(statedBitWidth.val, val.size());
+                                    return new IntegerLiteralNode(asts.getStartLocation(), val);
+                                })
+                                .addRule("primary_expression", "var_access")
+                                .addRule("primary_expression", "array_access")
+                                .addRule("primary_expression", "LPAREN expression RPAREN", asts -> {
+                                    return asts.get(1);
+                                })
+                                .addRule("primary_expression", "tuple_expression")
+                                .addRule("primary_expression", "array_expression")
+                                .addRule("tuple_expression", "LPAREN tuple_inner RPAREN", asts -> {
+                                    return new TupleLiteralNode(asts.getStartLocation(), ((TupleLiteralNode) asts.get(1)).elements);
+                                })
+                                .addRule("tuple_expression", "LPAREN tuple_element RPAREN", asts -> {
+                                    return new TupleLiteralNode(asts.getStartLocation(), Collections.singletonList((ExpressionNode) asts.get(1)));
+                                })
+                                .addRule("tuple_inner", Arrays.asList(
+                                        "tuple_element COMMA",
+                                        "tuple_element (COMMA tuple_element)+"), asts -> {
+                                    return new TupleLiteralNode(new Location(0, 0), asts.getAll(ExpressionNode.class));
+                                })
+                                .addRule("array_expression", "LCURLY tuple_inner RCURLY", asts -> {
+                                    return new ArrayLiteralNode(asts.getStartLocation(), ((TupleLiteralNode) asts.get(1)).elements);
+                                })
+                                .addRule("tuple_element", "unpack | expression", asts -> (BaseAST) asts.getAll(ExpressionNode.class).get(0))
+                                .addRule("var_access", "ident", asts -> new VariableAccessNode(asts.getStartLocation(), asts.getMatchedString()))
+                                .addRule("input_literal", "INPUT_LITERAL|INTEGER_LITERAL", asts -> {
                             /*List<Bit> rev = asts.get(0).<ListAST<?>>as().stream().map(s -> new Bit(B.U.parse(s.getMatchedString().substring(1)))).collect(Collectors.toList());
                             Collections.reverse(rev);
                             return new IntegerLiteralNode(new Value(rev));*/
-                            Value val = ValueLattice.get().parse(asts.getMatchedString());
-                            statedBitWidth.val = Math.max(statedBitWidth.val, val.size());
-                            return new IntegerLiteralNode(asts.getStartLocation(), val);
-                        })
-                        .addRule("globals", "", asts -> new GlobalVariablesNode(new Location(0, 0), new HashMap<>()))
-                        .addRule("globals", "LBBRACKET globals_ RBBRACKET", asts -> asts.get(1))
-                        .addRule("globals_", "", asts -> new GlobalVariablesNode(new Location(0, 0), new HashMap<>()))
-                        .addRule("globals_", "global", asts -> {
-                            Map<String, Pair<String, String>> globs = new HashMap<>();
-                            Utils.Triple<String, String, String> glob = asts.get(0).<WrapperNode<Utils.Triple<String, String, String>>>as().wrapped;
-                            globs.put(glob.first, p(glob.second, glob.third));
-                            return new GlobalVariablesNode(new Location(0, 0), globs);
-                        })
-                        .addRule("globals_", "global COMMA globals_", asts -> {
-                            Utils.Triple<String, String, String> glob = asts.get(0).<WrapperNode<Utils.Triple<String, String, String>>>as().wrapped;
-                            GlobalVariablesNode globalNode = ((GlobalVariablesNode) asts.get(2));
-                            globalNode.globalVarSSAVars.put(glob.first, p(glob.second, glob.third));
-                            return new GlobalVariablesNode(((WrapperNode<?>) asts.get(0)).location, globalNode.globalVarSSAVars);
-                        })
-                        // globals only usable after the type transformation
-                        .addRule("global", "ident ARROW ident ARROW ident", asts -> {
-                            return new WrapperNode<>(asts.getStartLocation(),
-                                    new Utils.Triple<>(asts.get(0).getMatchedString(), asts.get(2).getMatchedString(), asts.get(4).getMatchedString()));
-                        })
-                        .addRule("ident", "IDENT|INPUT")
-                        .addRule("type", "INT", asts -> new TypeNode(asts.getStartLocation(),
-                                types.INT))
-                        .addRule("type", "array_type")
-                        .addRule("type", "tuple_type")
-                        .addRule("type", "VAR", asts -> {
-                            String type = asts.getMatchedString();
-                            if (!types.containsKey(type)) {
-                                throw new NildumuError(String.format("No such type %s", type));
-                            }
-                            return new TypeNode(asts.getStartLocation(), types.get(type));
-                        })
-                        .addRule("array_type", "type LBRACKET INTEGER_LITERAL RBRACKET", asts -> {
-                            Type subType = asts.get(0).<TypeNode>as().type;
-                            int length = (int)vl.parse(asts.get(2).getMatchedString()).asLong();
-                            return new TypeNode(asts.get(0).<MJNode>as().location,
-                                    types.getOrCreateFixedArrayType(subType, Collections.singletonList(length)));
-                        })
-                        .addRule("tuple_type", "LPAREN type (COMMA type)* RPAREN", asts -> {
-                            List<Type> elementTypes = (List<Type>) asts.getAll("type").stream().map(a -> ((TypeNode) a).type).collect(Collectors.toList());
-                            return new TypeNode(asts.getStartLocation(), types.getOrCreateTupleType(elementTypes));
-                        });
-            }, "program");
+                                    Value val = ValueLattice.get().parse(asts.getMatchedString());
+                                    statedBitWidth.val = Math.max(statedBitWidth.val, val.size());
+                                    return new IntegerLiteralNode(asts.getStartLocation(), val);
+                                })
+                                .addRule("globals", "", asts -> new GlobalVariablesNode(new Location(0, 0), new HashMap<>()))
+                                .addRule("globals", "LBBRACKET globals_ RBBRACKET", asts -> asts.get(1))
+                                .addRule("globals_", "", asts -> new GlobalVariablesNode(new Location(0, 0), new HashMap<>()))
+                                .addRule("globals_", "global", asts -> {
+                                    Map<String, Pair<String, String>> globs = new HashMap<>();
+                                    Utils.Triple<String, String, String> glob = asts.get(0).<WrapperNode<Utils.Triple<String, String, String>>>as().wrapped;
+                                    globs.put(glob.first, p(glob.second, glob.third));
+                                    return new GlobalVariablesNode(new Location(0, 0), globs);
+                                })
+                                .addRule("globals_", "global COMMA globals_", asts -> {
+                                    Utils.Triple<String, String, String> glob = asts.get(0).<WrapperNode<Utils.Triple<String, String, String>>>as().wrapped;
+                                    GlobalVariablesNode globalNode = ((GlobalVariablesNode) asts.get(2));
+                                    globalNode.globalVarSSAVars.put(glob.first, p(glob.second, glob.third));
+                                    return new GlobalVariablesNode(((WrapperNode<?>) asts.get(0)).location, globalNode.globalVarSSAVars);
+                                })
+                                // globals only usable after the type transformation
+                                .addRule("global", "ident ARROW ident ARROW ident", asts -> {
+                                    return new WrapperNode<>(asts.getStartLocation(),
+                                            new Utils.Triple<>(asts.get(0).getMatchedString(), asts.get(2).getMatchedString(), asts.get(4).getMatchedString()));
+                                })
+                                .addRule("ident", "IDENT|INPUT")
+                                .addRule("type", "INT", asts -> new TypeNode(asts.getStartLocation(),
+                                        types.INT))
+                                .addRule("type", "array_type")
+                                .addRule("type", "tuple_type")
+                                .addRule("type", "VAR", asts -> {
+                                    String type = asts.getMatchedString();
+                                    if (!types.containsKey(type)) {
+                                        throw new NildumuError(String.format("No such type %s", type));
+                                    }
+                                    return new TypeNode(asts.getStartLocation(), types.get(type));
+                                })
+                                .addRule("array_type", "type LBRACKET INTEGER_LITERAL RBRACKET", asts -> {
+                                    Type subType = asts.get(0).<TypeNode>as().type;
+                                    int length = (int) vl.parse(asts.get(2).getMatchedString()).asLong();
+                                    return new TypeNode(asts.get(0).<MJNode>as().location,
+                                            types.getOrCreateFixedArrayType(subType, Collections.singletonList(length)));
+                                })
+                                .addRule("tuple_type", "LPAREN type (COMMA type)* RPAREN", asts -> {
+                                    List<Type> elementTypes = (List<Type>) asts.getAll("type").stream().map(a -> ((TypeNode) a).type).collect(Collectors.toList());
+                                    return new TypeNode(asts.getStartLocation(), types.getOrCreateTupleType(elementTypes));
+                                });
+                    }, "program");
+    }
+
+    public static ProgramNode parse(String input) {
+        if (!use_antlr) {
+            return (ProgramNode) generator.parse(input);
+        }
+        return ParserFacade.parse(input);
+    }
 
     /**
      * Start a simple repl
@@ -619,7 +637,7 @@ public class Parser implements Serializable {
                 } catch (SWPException ex) {
                     System.out.print("Caught error: " + ex.getMessage());
                 }
-                System.out.println(Parser.generator.parse(s).toPrettyString());
+                System.out.println(Parser.parse(s).toPrettyString());
                 return null;
             });
         }

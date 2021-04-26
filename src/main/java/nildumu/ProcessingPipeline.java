@@ -5,6 +5,7 @@ import nildumu.typing.TypeTransformer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import static nildumu.ProcessingPipeline.Stage.wrap;
 
@@ -19,7 +20,7 @@ public class ProcessingPipeline {
         Parser.ProgramNode process(Parser.ProgramNode program);
 
         default String process(String program) {
-            return process((Parser.ProgramNode) Parser.generator.parse(program)).toPrettyString();
+            return process(Parser.parse(program)).toPrettyString();
         }
 
         static Stage wrap(Consumer<Parser.ProgramNode> func) {
@@ -74,6 +75,7 @@ public class ProcessingPipeline {
                 Parser.MJNode.resetIdCounter();
                 Lattices.Bit.resetNumberOfCreatedBits();
             }
+            Lattices.ValueLattice.get().bitWidth = 32;
             try {
                 program = stage.process(program);
             } catch (NildumuError err) {
@@ -83,7 +85,7 @@ public class ProcessingPipeline {
                 throw new NildumuError(err);
             }
         }
-        Parser.ProgramNode programNode = (Parser.ProgramNode) Parser.generator.parse(program);
+        Parser.ProgramNode programNode = Parser.parse(program);
         new NameResolution(programNode).resolve();
         return programNode;
     }

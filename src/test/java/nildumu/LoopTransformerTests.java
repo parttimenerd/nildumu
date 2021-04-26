@@ -7,7 +7,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.util.logging.Level;
 
 import static nildumu.Checks.checkAndThrow;
-import static nildumu.Parser.generator;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class LoopTransformerTests {
@@ -45,7 +44,7 @@ public class LoopTransformerTests {
         Context.LOG.setLevel(Level.FINE);
         Parser.MJNode.resetIdCounter();
         Lattices.Bit.resetNumberOfCreatedBits();
-        Parser.ProgramNode programNode = (Parser.ProgramNode) generator.parse(program);
+        Parser.ProgramNode programNode = Parser.parse(program);
         if (log) {
             System.out.println(programNode.toPrettyString());
         }
@@ -55,10 +54,11 @@ public class LoopTransformerTests {
                 System.out.println("-- to --");
                 System.out.println(programNode.toPrettyString());
             }
-            programNode = (Parser.ProgramNode) generator.parse(programNode.toPrettyString());
+            programNode = Parser.parse(programNode.toPrettyString());
             SSAResolution2.process(programNode);
         }
-        Parser.ProgramNode resolvedProgram = (Parser.ProgramNode) Parser.generator.parse(programNode.toPrettyString());
+        System.out.println("----------\n" + programNode.toPrettyString());
+        Parser.ProgramNode resolvedProgram = Parser.parse(programNode.toPrettyString());
         new NameResolution(resolvedProgram).resolve();
         //checkAndThrow(resolvedProgram);
         Parser.ProgramNode transformedProgram = new MetaOperatorTransformator(resolvedProgram.context.maxBitWidth, false).process(resolvedProgram);

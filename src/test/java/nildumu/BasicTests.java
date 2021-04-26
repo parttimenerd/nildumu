@@ -181,14 +181,14 @@ public class BasicTests {
     @Test
     public void testParsePhi(){
         Assert.assertEquals(Parser.PhiNode.class,
-                ((Parser.VariableAssignmentNode)((Parser.ProgramNode)Parser.generator.parse("int a = phi(z, l)"))
+                ((Parser.VariableAssignmentNode) Parser.parse("int a = phi(z, l)")
                 .globalBlock.statementNodes.get(0)).expression.getClass());
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"while (a == h){}", "while [[]] (a == h) {}", "while [[a = phi(a, b)]] (a == h) {}"})
     public void testWhileParsing(String program){
-        Parser.generator.parse(program);
+        Parser.parse(program);
     }
 
     @ParameterizedTest
@@ -197,7 +197,7 @@ public class BasicTests {
             "int a; while (1) {int a; a = a + 1;}"
     })
     public void testNameResolution(String program){
-        Parser.generator.parse(program);
+        Parser.parse(program);
     }
 
     @Test

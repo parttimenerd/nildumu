@@ -347,7 +347,7 @@ l output int o = fib(h);
         );
     }
 
-    public static void main(String[] args){
+    /*public static void main(String[] args){
         Context.LOG.setLevel(Level.INFO);
         String program = "     h input int h = 0b0uuuuuu;\n" +
                 "     l input int l = 0b0u;\n" +
@@ -367,7 +367,7 @@ l output int o = fib(h);
                 "     l output int o = fib(h); ";
         System.err.println(Parser.process(program, false).toPrettyString());
        parse(program, MethodInvocationHandler.parse("handler=inlining;maxrec=1;bot=summary"));
-    }
+    }*/
 
     @Test
     public void bla(){

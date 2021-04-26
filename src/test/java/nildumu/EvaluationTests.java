@@ -1,6 +1,7 @@
 package nildumu;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static nildumu.LoopTests.parse;
@@ -164,8 +165,7 @@ public class EvaluationTests {
         check("/* Typical password checker adaption, that compares with \"1\", as not all tools support */\n" +
                 "/* low inputs */\n" +
                 "h input int h = 0bu{32};\n" +
-                "l input int l = 0;\n" +
-                "if (h == l){\n" +
+                "int l = 1; if (h == 1){\n" +
                 "    l = 1;\n" +
                 "} else {\n" +
                 "    l = 0;\n" +
@@ -245,6 +245,7 @@ public class EvaluationTests {
     }
 
     @Test
+    @Disabled("takes really long")
     public void testGuessPresenceAll() {
         check("/* N is the total number of houses */\n" +
                 "bit_width 32;" +
@@ -326,6 +327,7 @@ public class EvaluationTests {
     }
 
     @Test
+    @Disabled("takes really long")
     public void testGuessPresenceSingleHouse() {
         check("/* N is the total number of houses */\n" +
                 "int N;\n" +

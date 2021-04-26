@@ -61,7 +61,6 @@ public class DotPanel extends JPanel {
         });
         fileSelector.addActionListener(e -> {
             if (!insideUpdate) {
-                System.out.println("H");
                 update();
                 controlPanel.invalidate();
             }

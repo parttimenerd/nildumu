@@ -156,7 +156,7 @@ public class Generator {
     public static ProgramNode repeatedFibonaccis(int comparisons,
                                                  Function<Integer, ExpressionNode> fibArgumentCreator){
         ProgramNode program = new ProgramNode(new Context(BasicSecLattice.get(), 32));
-        program.addMethod(((ProgramNode) generator.parse("int fib(int n) { int r = 1; if (n > 2) { r = fib(n - 1) + fib(n - 2);} return r;}"))
+        program.addMethod(parse("int fib(int n) { int r = 1; if (n > 2) { r = fib(n - 1) + fib(n - 2);} return r;}")
                 .getMethod("fib"));
         program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h", program.INT,
                 new IntegerLiteralNode(loc(), vl.parse("0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")),
@@ -189,9 +189,9 @@ public class Generator {
         ProgramNode program = new ProgramNode(new Context(BasicSecLattice.get(), 32));
         for (int i = 0; i < comparisons; i++) {
             int other = i + 1 == comparisons ? 1: i + 2 % comparisons;
-            program.addMethod(((ProgramNode) generator.parse(String.format("int fib%d(int n) { int r = 1; if (n > 2) { r = fib%d(n - 1) + fib%d(n - 2);} return r;}",
+            program.addMethod(parse(String.format("int fib%d(int n) { int r = 1; if (n > 2) { r = fib%d(n - 1) + fib%d(n - 2);} return r;}",
                     i + 1, other, other
-                    )))
+                    ))
                     .getMethod(String.format("fib%d", i + 1)));
         }
         program.addGlobalStatement(new InputVariableDeclarationNode(loc(), "h", program.INT,
