@@ -1,6 +1,5 @@
 package nildumu;
 
-import jdk.nashorn.internal.ir.LiteralNode;
 import nildumu.parser.LangBaseVisitor;
 import nildumu.parser.LangLexer;
 import nildumu.parser.LangParser;
