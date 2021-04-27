@@ -17,24 +17,13 @@ cd "$PROJECT_DIR"
 echo "check for solvers"
 ./download_solvers > /dev/null
 
-echo "check for graalvm"
-./download_graal > /dev/null
-
 echo "build evaluation jar"
 mvn compile > /dev/null
 mvn package > /dev/null
-
-echo "build evaluated native image"
-./build_native_image 
 
 echo "build evaluated jar"
 mvn package -f pom2.xml > /dev/null
 cp target/nildumu-minimal-jar-with-dependencies.jar eval-programs/nildumu.jar
 
-#echo "use graalvm to build native image"
-#./download_graal
-
-#PATH="$PROJECT_DIR/dist/graalvm/bin:$PATH" JAVA_HOME="$PROJECT_DIR/dist/graalvm" native-image --no-fallback -jar eval-programs/nildumu.jar -H:Name=eval-programs/nildumu
-
-git submodule update --recursive --remote
-(cd eval-programs/approxflow; git checkout master; git pull)
+#git submodule update --recursive --remote
+#(cd eval-programs/approxflow; git checkout master; git pull)

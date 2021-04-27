@@ -6,7 +6,7 @@ public class NildumuError extends RuntimeException {
         super(message);
     }
 
-    public NildumuError(NildumuError error) {
+    public NildumuError(RuntimeException error) {
         super(error);
     }
 }

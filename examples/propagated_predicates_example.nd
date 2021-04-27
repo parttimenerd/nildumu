@@ -1,0 +1,8 @@
+/* Example for propagated predicates, should leak zero information */
+input int x;
+int z = 0;
+int y = 1;
+if (x = y) {
+    z := x;
+}
+output int o = z;

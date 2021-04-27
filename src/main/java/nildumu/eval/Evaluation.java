@@ -210,9 +210,9 @@ public class Evaluation {
                 });
                 PacketList packets = getPacketsForToolsOrDie(tools, specimen, Paths.get("eval"), false);
                 if (!cmd.dontSplitTemciFiles){
-                    packets.writeTemciConfigOrDiePerProgram(Paths.get("eval"), "run.yaml", duration);
+                    //packets.writeTemciConfigOrDiePerProgram(Paths.get("eval"), "run.yaml", duration);
                 } else {
-                    packets.writeTemciConfigOrDie("run.yaml", duration);
+                    //packets.writeTemciConfigOrDie("run.yaml", duration);
                 }
                 AggregatedAnalysisResults results =
                         new PacketExecutor(duration).analysePackets(packets, cmd.parallelism, cmd.runs, cmd.dryruns, cmd.verbose).aggregate();

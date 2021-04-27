@@ -32,7 +32,7 @@ public class TypingTests {
             "'var value = (1, 1)', '(int, int)'",
             "'var value = (1, (1, 1))', '(int, (int, int))'",
             "'var val = (1, 1); var value = (1, *val)', '(int, int, int)'",
-            "'(int) method() { return (1,); } int var_; var_ = *method(); var value = var_', 'int'",
+            "'(int) method() { return (1,); } int var_; (var_) = *method(); var value = var_', 'int'",
             "'(int, int) method() { return (1, 1); } int var_; int var_2; var_, var_2 = *method(); var value = var_', 'int'"
     })
     public void testTypes(String code, String expectedType) {

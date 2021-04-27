@@ -1,0 +1,13 @@
+/* Example for the generation of summary graphs,
+use the gui to get a visualization of the graph */
+bit_width 3;
+
+int f(int x){
+    int r := 0;
+    if(x * 3 = 1){
+        r := 0b111
+    }
+    return r
+}
+input h;
+output o = f(h);

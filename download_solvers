@@ -15,9 +15,9 @@ PROJECT_DIR=$(dirname "$SCRIPT_PATH")
 cd dist/solvers
 
 for f in UWrMaxSat-1.1w; do
-    stat $f > /dev/null || (wget https://maxsat-evaluations.github.io/2020/mse20-solver-src/complete/$f.zip && unzip $f.zip)
+    stat $f > /dev/null || (wget https://maxsat-evaluations.github.io/2020/mse20-solver-src/complete/$f.zip && unzip $f.zip > /dev/null)
 done
 
 for f in Open-WBO; do
-    stat $f > /dev/null || (wget https://maxsat-evaluations.github.io/2019/mse19-solver-src/complete/$f.zip && unzip $f.zip)
+    stat $f > /dev/null || (wget https://maxsat-evaluations.github.io/2019/mse19-solver-src/complete/$f.zip && unzip $f.zip > /dev/null)
 done

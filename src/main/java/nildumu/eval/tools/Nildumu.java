@@ -12,31 +12,28 @@ import nildumu.eval.*;
 public class Nildumu extends AbstractTool {
 
     private static final Path JAR_PATH = Paths.get("eval-programs/nildumu.jar");
-    private static final Path GRAAL_PATH = Paths.get("eval-programs/nildumu");
 
     private final String mih;
 
     private final MinCut.Algo algo;
-    private final boolean useGraal;
 
-    public Nildumu(int unwind, MinCut.Algo algo, boolean useGraal) {
-        this(unwind, 0, algo, useGraal);
+    public Nildumu(int unwind, MinCut.Algo algo) {
+        this(unwind, 0, algo);
     }
 
-    public Nildumu(int unwind, boolean summaryUnwind, MinCut.Algo algo, boolean useGraal) {
-        this(unwind, summaryUnwind ? unwind : 0, algo, useGraal);
+    public Nildumu(int unwind, boolean summaryUnwind, MinCut.Algo algo) {
+        this(unwind, summaryUnwind ? unwind : 0, algo);
     }
 
     /**
      *  @param csrec maximum recursion depth for the call string handler
      * @param scsrec maximum recusion depth for the call string handler used by the summary handler
      */
-    public Nildumu(int csrec, int scsrec, MinCut.Algo algo, boolean useGraal){
-        super(String.format("nildumu%s%02d_%02d_%s", useGraal ? "_g" : "", csrec, scsrec, algo.shortName), csrec, "nd");
+    public Nildumu(int csrec, int scsrec, MinCut.Algo algo){
+        super(String.format("nildumu%02d_%02d_%s", csrec, scsrec, algo.shortName), csrec, "nd");
         this.mih = String.format("handler=inlining;maxrec=%d;bot={handler=summary;csmaxrec=%d;bot=basic}",
                 csrec, scsrec);
         this.algo = algo;
-        this.useGraal = useGraal;
     }
 
     @Override
@@ -54,8 +51,10 @@ public class Nildumu extends AbstractTool {
         return new AnalysisPacket(this, program) {
             @Override
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
-                return String.format("%s %s --handler \"%s\" --algo \"%s\"",
-                        useGraal ? formatter.format(GRAAL_PATH) : String.format("java -jar %s", formatter.format(JAR_PATH)) ,
+                int freeMB = (int) (Runtime.getRuntime().maxMemory() / 1024L / 1024L * 0.9);
+                String javaConf = String.format("-Xmx%dm -Xms%dm", (int)(freeMB * 0.8), (int)(freeMB * 0.2));
+                return String.format("taskset -c 0 %s %s --handler \"%s\" --algo \"%s\"",
+                        String.format("java %s -jar %s", javaConf, formatter.format(JAR_PATH)),
                         formatter.format(testFile), mih, algo.name());
             }
 

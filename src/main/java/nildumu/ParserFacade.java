@@ -8,10 +8,7 @@ import nildumu.typing.Types;
 import org.antlr.v4.runtime.*;
 import swp.lexer.Location;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -197,20 +194,24 @@ class Translator extends LangBaseVisitor<Object> {
         Parser.TypeNode typeNode = accept(ctx.type());
         Type type = typeNode.type;
         String secLevel = ctx.IDENT() == null ? "h" : ctx.IDENT().getText();
+        Lattices.Value value = ctx.INPUT_LITERAL() != null ? vl.parse(ctx.INPUT_LITERAL().getText()) :
+                vl.parse("0b" + java.util.stream.IntStream.range(0, vl.bitWidth).mapToObj(i -> "u")
+                .collect(Collectors.joining()));
+        Parser.IntegerLiteralNode integerLiteralNode = new Parser.IntegerLiteralNode(location(ctx), value);
         if (ctx.mod.getType() == LangParser.TMP_INPUT) {
             return new Parser.TmpInputVariableDeclarationNode(
                     location(ctx),
                     ctx.ident().getText(),
                     type,
-                    new Parser.IntegerLiteralNode(location(ctx), vl.parse(ctx.INPUT_LITERAL().getText())),
-                    ctx.IDENT().getText());
+                    integerLiteralNode,
+                    secLevel);
         }
         return new Parser.InputVariableDeclarationNode(
                 location(ctx),
                 ctx.ident().getText(),
                 type,
-                new Parser.IntegerLiteralNode(location(ctx), vl.parse(ctx.INPUT_LITERAL().getText())),
-                ctx.IDENT().getText());
+                integerLiteralNode,
+                secLevel);
     }
 
     @Override
@@ -252,10 +253,14 @@ class Translator extends LangBaseVisitor<Object> {
 
     @Override
     public Parser.ReturnStatementNode visitReturn_statement(LangParser.Return_statementContext ctx) {
-        if (ctx.expression() == null) {
+        if (ctx.expression() == null || ctx.expression().size() == 0) {
             return new Parser.ReturnStatementNode(location(ctx));
         }
-        return new Parser.ReturnStatementNode(location(ctx), (Parser.ExpressionNode)accept(ctx.expression()));
+        if (ctx.expression().size() == 1) {
+            return new Parser.ReturnStatementNode(location(ctx), (Parser.ExpressionNode)accept(ctx.expression(0)));
+        }
+        return new Parser.ReturnStatementNode(location(ctx), new Parser.TupleLiteralNode(Location.ZERO,
+                ctx.expression().stream().map(e -> (Parser.ExpressionNode)accept(e)).collect(Collectors.toList())));
     }
 
     @SuppressWarnings("unchecked")
@@ -285,10 +290,17 @@ class Translator extends LangBaseVisitor<Object> {
 
     @Override
     public Parser.MethodNode visitMethod(LangParser.MethodContext ctx) {
+        Type type;
+        if (ctx.type().size() == 1) {
+            type = ((Parser.TypeNode)accept(ctx.type(0))).type;
+        } else {
+            type = types.getOrCreateTupleType(ctx.type().stream()
+                    .map(t -> ((Parser.TypeNode)accept(t)).type).collect(Collectors.toList()));
+        }
         return new Parser.MethodNode(
                 location(ctx),
                 ctx.ident().getText(),
-                ((Parser.TypeNode)accept(ctx.type())).type,
+                type,
                 ctx.parameters() != null ? accept(ctx.parameters()) : new Parser.ParametersNode(Location.ZERO, new ArrayList<>()),
                 accept(ctx.block()),
                 ctx.globals() != null ? accept(ctx.globals()) : new Parser.GlobalVariablesNode(Location.ZERO, new HashMap<>()));
@@ -311,15 +323,24 @@ class Translator extends LangBaseVisitor<Object> {
     }
 
     @Override
-    public Parser.StatementNode visitAssignment(LangParser.AssignmentContext ctx) {
-        if (ctx.unpack() != null) {
-            return new Parser.MultipleVariableAssignmentNode(location(ctx), ctx.ident().stream().map(i -> i.getText()).toArray(String[]::new),
-                    accept(ctx.unpack()));
+    public Object visitMultiple_assignment(LangParser.Multiple_assignmentContext ctx) {
+        return new Parser.MultipleVariableAssignmentNode(location(ctx), ctx.ident().stream()
+                .map(RuleContext::getText).toArray(String[]::new),
+                ctx.unpack() != null ? accept(ctx.unpack()) : new Parser.UnpackOperatorNode(accept(ctx.method_invocation())));
+    }
+
+    @Override
+    public Parser.StatementNode visitSingle_assignment(LangParser.Single_assignmentContext ctx) {
+        if (ctx.unpack() == null) {
+            return new Parser.VariableAssignmentNode(
+                    location(ctx),
+                    ctx.ident().getText(),
+                    accept(ctx.expression(), ctx.phi()));
         }
-        return new Parser.VariableAssignmentNode(
+        return new Parser.MultipleVariableAssignmentNode(
                 location(ctx),
-                ctx.ident(0).getText(),
-                accept(ctx.expression(), ctx.phi()));
+                new String[]{ctx.ident().getText()},
+                accept(ctx.unpack()));
     }
 
     @Override

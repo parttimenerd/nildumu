@@ -1,0 +1,7 @@
+/* Laundering Attack which leaks the secret input over all iterations of the loop.*/
+input int h;
+int z := 0;
+while (z != h) {
+    z := z + 1;
+}
+output int o := z

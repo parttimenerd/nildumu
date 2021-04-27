@@ -179,7 +179,7 @@ l output int o = fib(h);
     @ParameterizedTest
     @MethodSource("handlers")
     public void testWeirdFibonacciTermination(String handler){
-        assertTimeoutPreemptively(ofSeconds(1), () -> parse(
+        assertTimeoutPreemptively(ofSeconds(10), () -> parse(
                 "     h input int h = 0b0u;\n" +
                         "     l input int l = 0b0u;\n" +
                         "     int res = 0;\n" +

@@ -12,6 +12,24 @@ esac
 
 PROJECT_DIR=$(dirname "$SCRIPT_PATH")
 
+
+totalMemKB=$(free --kilo |awk '/^Mem:/{print $4}')
+
+# Percentage of free memory to use for Java
+usageFactor=80
+
+# Percentage to use for the heap
+heapFactor=80
+
+# heap size in KB
+avKB=$(($totalMemKB*$usageFactor/100))
+
+# heap size in MB
+heapMB=$(($avKB*$heapFactor/1024/100))
+
+stackMB=$((($avKB / 1024 - $heapMB)))
+
+
 cd "$PROJECT_DIR"
-./update_eval > /dev/null
-mvn exec:java -Deval -Dexec.args="$*"
+./update_eval
+MAVEN_OPTS="-Xmx$((avKB))k" mvn exec:java -Deval -Dexec.args="$*"

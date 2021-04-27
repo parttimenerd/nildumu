@@ -1,0 +1,3 @@
+/* Program that leaks only one bit of information, from the secret input h to the public output o. */
+input int h;
+output int o := h = 1

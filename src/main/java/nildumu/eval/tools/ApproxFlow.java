@@ -96,7 +96,7 @@ public class ApproxFlow extends AbstractTool {
                         e.printStackTrace();
                     }
                 }
-                return String.format("cd %s; %s UNWIND=%d EPSILON=%f DELTA=%f PARTIAL_LOOPS=true python ApproxFlow.py %s %s; rm %s* || true",
+                return String.format("cd %s; %s UNWIND=%d EPSILON=%f DELTA=%f PARTIAL_LOOPS=true taskset -c 0 python ApproxFlow.py %s %s; rm %s* || true",
                         formatter.format(approxFlowFolder),
                         envString,
                         unwind, epsilon, delta,

@@ -3,19 +3,19 @@ grammar Lang;
 @header{
 }
 
-file: SEMI* use_sec? bit_width? (statement_w_semi|(method SEMI?))* statement_wo_semi? EOF;
+file: SEMI* use_sec? bit_width? ((method SEMI?)|statement_w_semi)* statement_wo_semi? EOF;
 
 use_sec: USE_SEC IDENT SEMI;
 
 bit_width: BIT_WIDTH INTEGER_LITERAL SEMI;
 
 normal_statement:
-           (IDENT? OUTPUT)? type ident (EQUAL_SIGN (phi|expression))?
+         IDENT? mod=(INPUT|TMP_INPUT) type ident ((EQUAL_SIGN|COLON_EQUAL) INPUT_LITERAL)? #inputdecl
+        |  (IDENT? OUTPUT)? type ident ((EQUAL_SIGN|COLON_EQUAL) (phi|expression))?
           #vardecl
-        | IDENT? mod=(INPUT|TMP_INPUT) type ident EQUAL_SIGN INPUT_LITERAL #inputdecl
         | IDENT? INPUT? APPEND_ONLY INT ident #appenddecl
         | assignment #IGNORE
-        | RETURN expression? #return_statement
+        | RETURN (expression (COMMA expression)*)? #return_statement
         | ident LBRACKET expression RBRACKET EQUAL_SIGN expression
           #array_assignment_statement
         | expression            #expression_statement;
@@ -31,22 +31,22 @@ control_statement:
         ;
 
 statement_w_semi:
-      normal_statement SEMI
-    | control_statement SEMI?;
+      control_statement SEMI?
+    | normal_statement SEMI;
 
 statement_wo_semi:
-      normal_statement
-    | control_statement;
+      control_statement
+    | normal_statement;
 
 statements: statement_w_semi+ statement_wo_semi | statement_wo_semi SEMI?;
 
-method:   type ident globals? LPAREN parameters? RPAREN block;
+method:   type+ ident globals? LPAREN parameters? RPAREN block;
 parameters: parameter (COMMA parameter)*;
 parameter: type ident;
 
 assignment:
-    ident (EQUAL_SIGN|COLON_EQUAL) (phi|expression|unpack)
-  | (ident (COMMA ident)+ | LPAREN ident (COMMA ident)* RPAREN) (EQUAL_SIGN|COLON_EQUAL) unpack;
+    ident (EQUAL_SIGN|COLON_EQUAL) (phi|expression|unpack) #single_assignment
+  | (ident (COMMA ident)+ | LPAREN ident (COMMA ident)* RPAREN) (EQUAL_SIGN|COLON_EQUAL) (unpack|method_invocation) #multiple_assignment;
 
 block: LCURLY SEMI* statements? SEMI* RCURLY;
 //idents: ident (COMMA ident)*;
@@ -65,7 +65,7 @@ expression:
   | l=expression op=(LEFT_SHIFT|RIGHT_SHIFT) r=expression
   | l=expression op=APPEND r=expression
   | l=expression op=(GREATER|GREATER_EQUALS|LOWER_EQUALS|LOWER) r=expression
-  | l=expression op=(UNEQUALS|EQUALS) r=expression
+  | l=expression op=(UNEQUALS|EQUALS|EQUAL_SIGN) r=expression
   | l=expression op=BAND r=expression
   | l=expression op=XOR r=expression
   | l=expression op=BOR r=expression

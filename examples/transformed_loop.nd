@@ -1,0 +1,11 @@
+/* Transformed while loop */
+input int h;
+int z = 1;
+int f(int z, int h){
+    if (z != h) {
+        z := z + 1;
+        z := f(z, h)
+    } return z
+}
+z = f(z, h);
+output int o = z

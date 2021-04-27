@@ -77,8 +77,10 @@ public class ProcessingPipeline {
             }
             Lattices.ValueLattice.get().bitWidth = 32;
             try {
+                System.out.println(program);
                 program = stage.process(program);
-            } catch (NildumuError err) {
+                System.out.println(program);
+            } catch (NildumuError | ClassCastException err) {
                 System.err.println("---- prior to state ---");
                 System.err.println(program);
                 System.err.println("----");

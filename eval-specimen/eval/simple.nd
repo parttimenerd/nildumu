@@ -1,3 +1,0 @@
-bit_width 8;
-h input int h = 0bu{8};
-l output int o = h;
