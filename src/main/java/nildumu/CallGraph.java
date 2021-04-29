@@ -311,6 +311,7 @@ public class CallGraph {
      * @param next next nodes for current node
      * @param priority priority of each node, usable for an inner loop optimization of the iteration
      *     order
+     * @param changed should return true iff something changed
      * @param <T> type of the data calculated for each node
      * @return the calculated values
      */

@@ -767,7 +767,7 @@ public class Lattices {
         }
 
         /**
-         * Returns the bit of the passed set, that are reachable from the bit
+         * Returns the bits of the passed set, that are reachable from the bit
          */
         public static Set<Bit> calcReachableBits(Bit bit, Set<Bit> bits){
             Set<Bit> reachableBits = new HashSet<>();
@@ -776,6 +776,19 @@ public class Lattices {
                     reachableBits.add(b);
                 }
             }, b -> false);
+            return reachableBits;
+        }
+
+        /**
+         * Returns the bits of the passed set, that are reachable from the bit, without crossing the passed bits
+         */
+        public static Set<Bit> calcReachableBitsWithoutCrossingThem(Bit bit, Set<Bit> bits){
+            Set<Bit> reachableBits = new HashSet<>();
+            bl.walkBits(bit, b -> {
+                if (bits.contains(b)){
+                    reachableBits.add(b);
+                }
+            }, b -> bits.contains(b) && bit != b);
             return reachableBits;
         }
 

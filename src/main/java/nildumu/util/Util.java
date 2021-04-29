@@ -9,6 +9,8 @@ import java.io.Serializable;
 import java.time.temporal.ValueRange;
 import java.util.*;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -126,6 +128,16 @@ public class Util {
             ret.add(consumer.apply(a.get(i), b.get(i)));
         }
         return Collections.unmodifiableList(ret);
+    }
+
+    public static <S, T> boolean zipAnyMatch(List<S> a, List<T> b, BiPredicate<S, T> predicate) {
+        assert a.size() == b.size();
+        for (int i = 0; i < a.size(); i++) {
+            if (predicate.test(a.get(i), b.get(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static <S, R> List<R> enumerate(List<S> a, BiFunction<Integer, S, R> consumer) {

@@ -16,6 +16,8 @@ import static nildumu.Context.log;
 import static nildumu.Lattices.B.U;
 import static nildumu.Lattices.bl;
 import static nildumu.Lattices.ds;
+import static nildumu.util.Util.zip;
+import static nildumu.util.Util.zipAnyMatch;
 
 /**
  * A summary-edge based handler. It creates for each function beforehand summary edges:
@@ -123,10 +125,38 @@ public class SummaryHandler extends MethodInvocationHandler {
                     }
                     , node -> node.getCallers().stream().filter(n -> !n.isMainNode).collect(Collectors.toSet()),
                     state, (f, s) -> {
-                        return !s.addedAStarBit && !f.value.equals(s.value);
+                        return !areSummaryGraphsEqual(f.value, s.value); // print history is ignored here
                     }).entrySet().stream().collect(Collectors.toMap(e -> e.getKey().method, e -> e.getValue().value));
         });
         Context.log(() -> "Finish setup");
+    }
+
+    /**
+     * Compares two graphs and checks whether the new is (from an information flow point of view)
+     * equal to the old.
+     * TODO: improve
+     */
+    public static boolean areSummaryGraphsEqual(BitGraph oldGraph, BitGraph newGraph) {
+        if (!oldGraph.paramBitsPerReturnValue.equals(newGraph.paramBitsPerReturnValue)) {
+            return false;
+        }
+        if (oldGraph.methodReturnValue.globals.size() != newGraph.methodReturnValue.globals.size()) {
+            return false;
+        }
+        if (zipAnyMatch(oldGraph.getMethodReturnValue().getCombinedReturnValue().bits,
+                newGraph.getMethodReturnValue().getCombinedReturnValue().bits,
+                (b1, b2) -> b1.deps().size() != b2.deps().size())){
+            return false;
+        }
+        if (zipAnyMatch(oldGraph.getMethodReturnValue().getCombinedReturnValue().bits,
+                newGraph.getMethodReturnValue().getCombinedReturnValue().bits,
+                (b1, b2) -> !b1.deps().stream().map(d -> d.deps().size()).collect(Collectors.toSet())
+                        .equals(b2.deps().stream().map(d -> d.deps().size()).collect(Collectors.toSet())))){
+            return false;
+        }
+        return oldGraph.methodReturnValue.globals.keySet().stream()
+                .allMatch(k -> oldGraph.methodReturnValue.globals.get(k).sizeWithoutEs() ==
+                        newGraph.methodReturnValue.globals.get(k).sizeWithoutEs());
     }
 
     /**
@@ -223,7 +253,7 @@ public class SummaryHandler extends MethodInvocationHandler {
         });
         bitGraph.parameterBits.forEach(b -> newBits.put(b, b));
         MethodReturnValue newRetValue = bitGraph.methodReturnValue.map(newBits::get);
-        Util.zip(newRetValue.values, bitGraph.returnValues, (v1, v2) -> v1.node(v2.node()));
+        zip(newRetValue.values, bitGraph.returnValues, (v1, v2) -> v1.node(v2.node()));
         return new BitGraph(context, bitGraph.parameters, newRetValue, bitGraph.methodNode, bitGraph.inputBits.map(newBits::get));
     }
 
@@ -236,8 +266,8 @@ public class SummaryHandler extends MethodInvocationHandler {
         anchorBits.addAll(minCutBits);
         Map<Lattices.Bit, Lattices.Bit> newBits = new HashMap<>();
         // create the new bits
-        Stream.concat(Stream.concat(bitGraph.inputBits.getBits().stream(), bitGraph.methodReturnValue.getCombinedValue().stream()), minCutBits.stream()).forEach(b -> {
-            Set<Lattices.Bit> reachable = Lattices.BitLattice.calcReachableBits(b, anchorBits);
+        Stream.concat(Stream.concat(inputBits.stream(), bitGraph.methodReturnValue.getCombinedValue().stream()), minCutBits.stream()).forEach(b -> {
+            Set<Lattices.Bit> reachable = Lattices.BitLattice.calcReachableBitsWithoutCrossingThem(b, anchorBits);
             if (!b.deps().contains(b)) {
                 reachable.remove(b);
             }
@@ -251,7 +281,7 @@ public class SummaryHandler extends MethodInvocationHandler {
             b.alterDependencies(newBits::get);
         });
         MethodReturnValue ret = bitGraph.methodReturnValue.map(newBits::get);
-        Util.zip(ret.values, bitGraph.returnValues, (v1, v2) -> v1.node(v2.node()));
+        zip(ret.values, bitGraph.returnValues, (v1, v2) -> v1.node(v2.node()));
         BitGraph newGraph = new BitGraph(context, bitGraph.parameters, ret, bitGraph.methodNode, bitGraph.inputBits.map(newBits::get));
         //assert !isReachable || newGraph.calcReachableBits(newGraph.returnValue.get(1), newGraph.parameters.get(0).bitSet()).size() > 0;
         return newGraph;

@@ -248,9 +248,8 @@ public class TypeTransformerTests {
     }
 
     @Test
-    @Disabled
     public void testMid() {
-        parse("int mid((int, int) pos) { return (pos[0] + pos[1]) / 2}").run();
+        parse("int mid((int, int) pos) { return (pos[0] + pos[1]) / 2}").leaks(0).run();
     }
 
     @Test

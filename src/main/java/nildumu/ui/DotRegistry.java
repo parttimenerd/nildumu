@@ -232,14 +232,18 @@ public class DotRegistry {
             return node;
         });
         Set<Value> values = new HashSet<>();
+        Map<Bit, Set<Bit>> outgoingEdges = new DefaultMap<>((map, n) -> new HashSet<>());
         for (Bit bit : botAnchor.value) {
             bl.walkBits(bit, b -> {
-                nodes.get(b).addLink((String[])b.deps().stream().sorted(Comparator.comparingLong(d -> d.bitNo)).map(d -> d.bitNo + "").toArray(String[]::new));
+                b.deps().stream().forEach(b_ -> outgoingEdges.get(b_).add(b));
                 if (b.value() != null){
                     values.add(b.value());
                 }
                 }, b -> false, alreadyVisited, b -> b.deps().stream().sorted(Comparator.comparingLong(d -> d.bitNo)).collect(Collectors.toList()));
         }
+        outgoingEdges.forEach((b, b_) -> {
+            nodes.get(b).addLink((String[])outgoingEdges.get(b).stream().sorted(Comparator.comparingLong(d -> d.bitNo)).map(d -> d.bitNo + "").toArray(String[]::new));
+        });
         if (context.inIntervalMode()) {
             Map<Value, MutableNode> intervalToNodes =
                     new DefaultMap<>((map, value) -> {
@@ -272,13 +276,13 @@ public class DotRegistry {
             MutableNode paramNode = mutNode(nodeId);
             paramNode.add(Color.GREEN, Color.GREEN.font());
             nodeList.add(paramNode);
-            val.stream().map(nodes::get).forEach(n -> n.addLink(paramNode));
+            val.stream().map(nodes::get).forEach(n -> paramNode.addLink(n));
         });
         MutableNode ret = mutNode(botAnchor.name);
         ret.add(Color.BLUE, Color.BLUE.font());
         nodeList.add(ret);
-        ret.addLink((MutableNode[])botAnchor.value.stream().map(nodes::get).toArray(MutableNode[]::new));
-        return graph(name).directed().nodeAttr().with(Font.name("Helvetica")).graphAttr().with(RankDir.BOTTOM_TO_TOP).graphAttr().with(Font.name("Helvetica")).with((MutableNode[])nodeList.toArray(new MutableNode[0]));
+        botAnchor.value.stream().map(nodes::get).forEach(n -> n.addLink(ret));
+        return graph(name).directed().nodeAttr().with(Font.name("Helvetica")).graphAttr().with(RankDir.TOP_TO_BOTTOM).graphAttr().with(Font.name("Helvetica")).with((MutableNode[])nodeList.toArray(new MutableNode[0]));
     }
 
     public static Graph createDotGraph(BitGraph bg, String name, boolean withMinCut) {

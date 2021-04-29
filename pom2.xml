@@ -131,7 +131,7 @@
                         <argument>-package</argument>
                         <argument>nildumu.parser</argument>
                     </arguments>
-                    <outputDirectory>${project.build.directory}/generated-sources/antlr4/nildumu/parser</outputDirectory>
+                    <outputDirectory>${project.basedir}/src/main/java/nildumu/parser</outputDirectory>
                 </configuration>
                 <executions>
                     <execution>

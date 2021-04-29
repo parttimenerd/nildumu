@@ -152,20 +152,7 @@ public class BitGraph {
      */
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof BitGraph) {
-            //assert ((BitGraph)obj).parameterBits == this.parameterBits;
-            BitGraph other = (BitGraph) obj;
-            if (!paramBitsPerReturnValue.equals(((BitGraph) obj).paramBitsPerReturnValue)) {
-                return false;
-            }
-            if (methodReturnValue.globals.size() != other.methodReturnValue.globals.size()) {
-                return false;
-            }
-            return methodReturnValue.globals.keySet().stream()
-                    .allMatch(k -> methodReturnValue.globals.get(k).sizeWithoutEs() ==
-                            other.methodReturnValue.globals.get(k).sizeWithoutEs());
-        }
-        return false;
+        throw new RuntimeException();
     }
 
     public Context getContext() {

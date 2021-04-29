@@ -9,5 +9,5 @@ int f(int x){
     }
     return r
 }
-input h;
-output o = f(h);
+input int h;
+output int o = f(h);

@@ -436,6 +436,36 @@ l output int o = fib(h);
                 "}").run();
     }
 
+    @Test
+    public void testSimpleSummaryGraph() {
+        parse("bit_width 2;\n" +
+                "int f(int x){\n" +
+                "    int r := 0;\n" +
+                "    if(x = 1){\n" +
+                "        r := 0b11\n" +
+                "    }\n" +
+                "    return r\n" +
+                "}\n" +
+                "input int h;\n" +
+                "output int o = f(h);", "handler=summary").leaks(1).run();
+    }
+
+    @Test
+    public void testTransformedLoop() {
+        parse("bit_width 4; input int h; int z = 1; int f(int z, int h){ if (z != h) { z := f(z * 3, h)} return z } z = f(z, h); output int o = z", "handler=summary;csmaxrec=0").leaks(4).run();
+    }
+
+    @Test
+    public void testReallySimple() {
+        parse("use_sec basic;\n" +
+                "bit_width 4;\n" +
+                "int f(int z){\n" +
+                "  return z;\n" +
+                "}\n" +
+                "h input int h = 0buuuu;\n" +
+                "l output int o = f(h);", "handler=summary;csmaxrec=0").leaks(4).run();
+    }
+
     static ContextMatcher parse(String program){
         return parse(program, MethodInvocationHandler.createDefault());
     }

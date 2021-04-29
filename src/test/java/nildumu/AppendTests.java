@@ -14,6 +14,7 @@ import static nildumu.FunctionTests.parse;
 import static nildumu.SSA2Tests.toSSA;
 import static org.junit.jupiter.api.Assertions.*;
 
+@Disabled("not important for paper, misc work")
 public class AppendTests {
 
     @ParameterizedTest
