@@ -22,11 +22,11 @@ public class Evaluation {
     public final IntegerType integerType;
 
     public Evaluation(){
-        this(IntegerType.INT, "");
+        this(IntegerType.INT);
     }
 
-    public Evaluation(IntegerType integerType, String type){
-        this(DEFAULT_SPECIMEN_DIR.resolve(type), integerType);
+    public Evaluation(IntegerType integerType){
+        this(DEFAULT_SPECIMEN_DIR, integerType);
     }
 
     public Evaluation(Path specimenDirectory, IntegerType integerType) {
@@ -108,35 +108,23 @@ public class Evaluation {
         NORMAL
     }
 
-    @Command(description="Evaluation tool")
+    @Command(description="Evaluation tool", showDefaultValues = true, mixinStandardHelpOptions = true)
     static class Cmd {
-
-        @Parameters(description="scal or normal or list", defaultValue = "normal")
-        private String mode = "normal";
-
-        @Option(description="scalability benchmark", names = "--scal")
-        private List<String> scalBench = Collections.singletonList(ScalBench.ALL.name().toLowerCase());
-
-        @Option(names={"--maxScalAlpha", "--alpha"})
-        private int maxScalAlpha = 5;
-
-        @Option(names={"--minScalAlpha", "--start"})
-        private int minScalAlpha = 0;
 
         @Option(names="--duration")
         private String maxDuration = "PT2H";
 
-        @Option(names="--normal")
+        @Option(names="--programs", description = "example programs to evaluate: all (all from paper), small (… except E-Voting)")
         private List<String> normalBench = Collections.singletonList("all");
 
-        @Option(names="--normal_ex")
+        @Option(names="--excluded_programs")
         private List<String> normalEx = Collections.emptyList();
 
         @Option(names="--dont_split_temci")
         private boolean dontSplitTemciFiles = false;
 
         @Option(names="--tools", description = "all (paper), full (+ other MAXSAT and GraphTT), exact (unwind 100, eps=0.1, delta=0.05, short (all tools in one config)")
-        private List<String> tools = Collections.singletonList("all");
+        private List<String> tools = Collections.singletonList("small");
 
         //@Option(names="--parallelism", description = "cores to use")
         //private int parallelism = 1;//(int)Math.ceil(Runtime.getRuntime().availableProcessors() / 4f);
@@ -161,7 +149,7 @@ public class Evaluation {
         Cmd cmd = new Cmd();
         CommandLine commandLine = new CommandLine(cmd);
         commandLine.parseArgs(args);
-        Evaluation evaluation = new Evaluation(IntegerType.INT, "eval");
+        Evaluation evaluation = new Evaluation(IntegerType.INT);
         try {
 
             List<AbstractTool> tools_ = AbstractTool.getDefaultTools(cmd.summaryUnwind, cmd.unwinds.isEmpty() ?
@@ -179,46 +167,33 @@ public class Evaluation {
             List<AbstractTool> tools = tools_;
             System.out.println(cmd.maxDuration);
             Duration duration = Duration.parse(cmd.maxDuration);
-            if (cmd.mode.equals("list")){
-                System.out.println("== Normal ==");
-                evaluation.getAllSpecimen().stream().forEach(s -> System.out.println(s.name.substring(0, s.name.length() - 3)));
-                System.out.println("== Bench ==");
-                for (ScalBench bench : ScalBench.values()) {
-                    System.out.println(bench.name().toLowerCase());
-                }
-            } else if (!cmd.mode.equals("normal")){
-                cmd.scalBench.forEach(s -> ScalBench.valueOf(s.toUpperCase()).benchmark(cmd.minScalAlpha, cmd.maxScalAlpha, duration, 1, cmd.runs, cmd.dryruns, unwind -> {
-                    List<AbstractTool> ts = AbstractTool.getDefaultTools(cmd.summaryUnwind, unwind);
-                    if (!cmd.tools.get(0).equals("all")){
-                        ts = ts.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
+            List<TestProgram> specimen = new ArrayList<>();
+            cmd.normalBench.forEach(s -> {
+                try {
+                    if (s.equals("all")) {
+                        specimen.addAll(evaluation.getAllSpecimen().stream()
+                                .filter(ss -> !cmd.normalEx.contains(ss.name)).collect(Collectors.toList()));
+                    } else if (s.equals("small")) {
+                        specimen.addAll(evaluation.getAllSpecimen().stream()
+                                .filter(ss -> !cmd.normalEx.contains(ss.name) && !ss.name.contains("preference"))
+                                .collect(Collectors.toList()));
+                    } else {
+                        specimen.add(evaluation.loadSpecimen(evaluation.specimenDirectory.resolve(s + ".nd")));
                     }
-                    return ts;
-                }));
+                } catch (IOException ex){
+                    ex.printStackTrace();
+                }
+            });
+            PacketList packets = getPacketsForToolsOrDie(tools, specimen, Paths.get("."), false);
+            if (!cmd.dontSplitTemciFiles){
+                //packets.writeTemciConfigOrDiePerProgram(Paths.get("eval"), "run.yaml", duration);
             } else {
-                List<TestProgram> specimen = new ArrayList<>();
-                cmd.normalBench.forEach(s -> {
-                    try {
-                        if (s.equals("all")){
-                            specimen.addAll(evaluation.getAllSpecimen().stream()
-                                    .filter(ss -> !cmd.normalEx.contains(ss.name)).collect(Collectors.toList()));
-                        } else {
-                            specimen.add(evaluation.loadSpecimen(evaluation.specimenDirectory.resolve(s + ".nd")));
-                        }
-                    } catch (IOException ex){
-                        ex.printStackTrace();
-                    }
-                });
-                PacketList packets = getPacketsForToolsOrDie(tools, specimen, Paths.get("eval"), false);
-                if (!cmd.dontSplitTemciFiles){
-                    //packets.writeTemciConfigOrDiePerProgram(Paths.get("eval"), "run.yaml", duration);
-                } else {
-                    //packets.writeTemciConfigOrDie("run.yaml", duration);
-                }
-                AggregatedAnalysisResults results =
-                        new PacketExecutor(duration).analysePackets(packets, 1, cmd.runs, cmd.dryruns, cmd.verbose).aggregate();
-                storeAndPrintAnalysisResults(results, String.format("eval/results%d.csv", System.currentTimeMillis()));
+                //packets.writeTemciConfigOrDie("run.yaml", duration);
             }
-          } catch (ParameterException | IOException e) {
+            AggregatedAnalysisResults results =
+                    new PacketExecutor(duration).analysePackets(packets, 1, cmd.runs, cmd.dryruns, cmd.verbose).aggregate();
+            storeAndPrintAnalysisResults(results, String.format("eval/results%d.csv", System.currentTimeMillis()));
+          } catch (ParameterException e) {
             System.out.println(e.getMessage());
             commandLine.usage(System.out);
         }
@@ -240,42 +215,6 @@ public class Evaluation {
             Files.write(Paths.get(csvFile), Arrays.asList(csv.split("\n")));
         } catch (IOException e) {
             e.printStackTrace();
-        }
-    }
-
-    public enum ScalBench {
-        ALL(i -> null){
-            @Override
-            void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, int dryruns, Function<Integer, List<AbstractTool>> toolsForUnwind) {
-                for (ScalBench bench : ScalBench.values()) {
-                    if (bench != ALL){
-                        bench.benchmark(start, endIncl, duration, parallelism, runs, dryruns, toolsForUnwind);
-                    }
-                }
-            }
-        },
-        IF_STATEMENTS(Generator::createProgramOfIfStmtsWithEqsAndBasicAssign),
-        IF_STATEMENTS2(Generator::createProgramOfIfStmtsWithEqsAndBasicAssign2),
-        IF_WHILE_STATEMENTS(Generator::createProgramOfIfStmtsWithEqsSurroundedByCountingLoop),
-        REPEATED_FIBONACCIS(Generator::repeatedFibonaccis),
-        REPEATED_MANY_FIBONACCIS(Generator::repeatedManyFibonaccis),
-        WHILE_UNWINDING(alpha -> Parser.parse(String.format("h input int h = 0buuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu; int z = 0; while (0 < h && h < %s){z = z + 1; h = h + 1} l output int o = z;", alpha))) {
-            @Override
-            void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, int dryruns, Function<Integer, List<AbstractTool>> toolsForUnwind) {
-                evalPackets(IntStream.rangeClosed(start, endIncl)
-                        .mapToObj(alpha -> getPacketsForToolsOrDie(toolsForUnwind.apply(1 << alpha), new TestProgram(null, "while_unwinding_" + alpha, programGenerator.apply(1 << alpha), IntegerType.INT), Paths.get("bench").resolve("while_unwinding_" + alpha), true))
-                        .flatMap(PacketList::stream)
-                        .collect(PacketList.collector()),"bench/temci_run.yaml",
-                        "bench/results.csv", duration, parallelism, runs, dryruns, true);       }
-        };
-        final Function<Integer, Parser.ProgramNode> programGenerator;
-
-        ScalBench(Function<Integer, Parser.ProgramNode> programGenerator) {
-            this.programGenerator = programGenerator;
-        }
-
-        void benchmark(int start, int endIncl, Duration duration, int parallelism, int runs, int dryruns, Function<Integer, List<AbstractTool>> toolsForUnwind){
-            evalBenchmark(this.name().toLowerCase(), start, endIncl, "bench/" + name().toLowerCase(), programGenerator, duration, parallelism, runs, dryruns, toolsForUnwind.apply(AbstractTool.DEFAULT_UNWIND));
         }
     }
 

@@ -1,5 +1,7 @@
 package nildumu.solver;
 
+import nildumu.util.InputStreamWithActionOnClose;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -49,7 +51,6 @@ public class PMSATSolverImpl<V> extends PMSATSolver<V> {
         }
         String message = "Unable to run solver, be sure to run the download_solvers script";
         try {
-            ProcessBuilder builder = new ProcessBuilder();
             List<String> params = new ArrayList<>();
             params.add(binary.toString());
             if (options.length() > 0) {
@@ -57,7 +58,7 @@ public class PMSATSolverImpl<V> extends PMSATSolver<V> {
             }
             params.add(file.getAbsolutePath());
             Process proc = new ProcessBuilder().command(params.toArray(new String[0])).start();
-            return new InputStreamReader(proc.getInputStream());
+            return new InputStreamReader(new InputStreamWithActionOnClose(proc.getInputStream(), file::delete));
         } catch (IOException ex){
             System.err.println(ex.getMessage());
             System.err.println(message);
