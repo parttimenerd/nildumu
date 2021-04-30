@@ -3,35 +3,61 @@
 Nildumu
 =======
 
-An experimental quantitative information flow analysis on a PDG like
-structure for a while-language with functions, one data type (`int`)
-and a C like syntax. Example programs can be found in the `examples`
-directory.
+An experimental quantitative information flow analysis 
+for a while-language with functions, arrays and a C like syntax. 
+Example programs can be found in the `examples` and 
+the `eval-specimen` (file ending `.nd`, from the evaluation) directory.
 
-It is based, and developed alongside, my [master's thesis](https://pp.info.uni-karlsruhe.de/publication.php?id=bechberger18masterarbeit) and as draft version of the analysis, finally implemented on top of (and as part of) [JOANA](https://pp.ipd.kit.edu/projects/joana/).
-It uses the *swp* parser and lexer generator for parsing the demo
-language. The generator was originally written some years ago, but it
-changed slightly during the implementation of this project, as this
-project is the first real use of the generator.
+TL;DR: To reproduce the results of the paper create a docker container using the Dockerfile in this folder
+and run `./evaluation` inside the container 
+(pass `--programs all` to also run the E-Voting benchmarks as this takes longer). 
 
-Run a basic UI via the `gui` script in the main directory. This allows
-to run the analysis and see the computed leakage and the bit dependency
-graph.
-
-Setup
+Usage
 -----
-```shell script
-./download_solvers   # download MaxSAT solvers from the MaxSAT Evaluation webpage
-./gui                # build and run the gui
-./evaluate           # build and run the evaluation
+
+Nildumu can be used either via its command line application `./run`, 
+via an editor `./gui` or via the evaluation script `./evaluation`.
+
+### Command Line Application
+A command line that can be used to run programs 
+(passed either via standard in or via a passed file name).
+```
+Usage: ./run [-hV] [--algo=<algo>] [--handler=<handler>]
+             [-ra=<recordAlternatives>] [-tl=<transformLoops>]
+             [-tp=<transformPlus>] <programPath>
+Run nildumu on the command line. Example programs are given in the folders
+'eval-specimen' and 'examples'. The syntax of the paper is accepted too.
+      <programPath>         program file to analyze, or '-' to read from
+                              standard in. Nildumu files usually end with '.nd'.
+                              Default: -
+      --algo=<algo>         Used leakage computation algorithm, default is
+                              OpenWBO PMSAT based
+                              Default: Open-WBO GL PMSAT
+  -h, --help                Show this help message and exit.
+      --handler=<handler>   Method invocation handler configuration, for paper:
+                              'handler=inlining;maxrec=null;bot=summary'
+                              Default: handler=inlining;maxrec=32;bot=summary
+      -ra, --recordAlternatives=<recordAlternatives>
+
+      -tl, --transformLoops=<transformLoops>
+
+      -tp, --transformPlus=<transformPlus>
+
+  -V, --version             Print version information and exit.
 ```
 
-Requirements for the evaluation
--------------------------------
-- python2 with pycparser package
-- CBMC
-- libc6-dev package
-- openjdk-8
+### Evaluation
+Run `./evaluation` inside the docker container.
+TODO: small and run times and docker commands
+
+### Nildumu Editor
+![editor](./img/editor.png)
+An editor front-end for nildumu which gives additional information.
+Run it via `./gui`.
+
+
+TODO: specify language
+TODO: write subset as Artifact README
 
 Language
 --------

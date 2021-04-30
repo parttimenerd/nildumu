@@ -429,6 +429,25 @@
 
     <profiles>
         <profile>
+            <id>cmd</id>
+            <activation>
+                <property>
+                    <name>cmd</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <configuration>
+                            <mainClass>nildumu.Main</mainClass>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <id>gui</id>
             <activation>
                 <property>
