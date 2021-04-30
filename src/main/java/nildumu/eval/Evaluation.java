@@ -138,8 +138,8 @@ public class Evaluation {
         @Option(names="--tools", description = "all (paper), full (+ other MAXSAT and GraphTT), exact (unwind 100, eps=0.1, delta=0.05, short (all tools in one config)")
         private List<String> tools = Collections.singletonList("all");
 
-        @Option(names="--parallelism", description = "cores to use")
-        private int parallelism = 1;//(int)Math.ceil(Runtime.getRuntime().availableProcessors() / 4f);
+        //@Option(names="--parallelism", description = "cores to use")
+        //private int parallelism = 1;//(int)Math.ceil(Runtime.getRuntime().availableProcessors() / 4f);
 
         @Option(names = {"--unwind", "-u"}, description = "unwinds used")
         private List<Integer> unwinds = Arrays.asList(2, 8, 32);
@@ -187,7 +187,7 @@ public class Evaluation {
                     System.out.println(bench.name().toLowerCase());
                 }
             } else if (!cmd.mode.equals("normal")){
-                cmd.scalBench.forEach(s -> ScalBench.valueOf(s.toUpperCase()).benchmark(cmd.minScalAlpha, cmd.maxScalAlpha, duration, cmd.parallelism, cmd.runs, cmd.dryruns, unwind -> {
+                cmd.scalBench.forEach(s -> ScalBench.valueOf(s.toUpperCase()).benchmark(cmd.minScalAlpha, cmd.maxScalAlpha, duration, 1, cmd.runs, cmd.dryruns, unwind -> {
                     List<AbstractTool> ts = AbstractTool.getDefaultTools(cmd.summaryUnwind, unwind);
                     if (!cmd.tools.get(0).equals("all")){
                         ts = ts.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
@@ -215,7 +215,7 @@ public class Evaluation {
                     //packets.writeTemciConfigOrDie("run.yaml", duration);
                 }
                 AggregatedAnalysisResults results =
-                        new PacketExecutor(duration).analysePackets(packets, cmd.parallelism, cmd.runs, cmd.dryruns, cmd.verbose).aggregate();
+                        new PacketExecutor(duration).analysePackets(packets, 1, cmd.runs, cmd.dryruns, cmd.verbose).aggregate();
                 storeAndPrintAnalysisResults(results, String.format("eval/results%d.csv", System.currentTimeMillis()));
             }
           } catch (ParameterException | IOException e) {

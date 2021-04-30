@@ -52,8 +52,8 @@ public class Nildumu extends AbstractTool {
             @Override
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
                 int freeMB = (int) (Runtime.getRuntime().maxMemory() / 1024L / 1024L * 0.9);
-                String javaConf = String.format("-Xmx%dm -Xms%dm", (int)(freeMB * 0.8), (int)(freeMB * 0.2));
-                return String.format("taskset -c 0 %s %s --handler \"%s\" --algo \"%s\"",
+                String javaConf = String.format("-Xmx%dm", freeMB);
+                return String.format("taskset -c 0,1 %s %s --handler \"%s\" --algo \"%s\"",
                         String.format("java %s -jar %s", javaConf, formatter.format(JAR_PATH)),
                         formatter.format(testFile), mih, algo.name());
             }
