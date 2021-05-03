@@ -15,6 +15,6 @@ PROJECT_DIR=$(dirname "$SCRIPT_PATH")
 
 cd "$PROJECT_DIR"
 ./download_solvers
-mvn compile > /dev/null
+mvn compile -DskipTests=true > /dev/null
 mvn exec:java -Dcmd -q -Dexec.args="$*"
 

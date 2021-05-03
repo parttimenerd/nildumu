@@ -26,7 +26,6 @@ RUN apt-get update && \
 
 # Setup JAVA_HOME -- useful for docker commandline
 ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64/
-ENV JAVA_TOOL_OPTIONS -Dfile.encoding=UTF8
 RUN export JAVA_HOME
 
 # build CryptoMiniSat for ApproxFlow
@@ -65,3 +64,4 @@ RUN cp /approxmc/build/approxmc /nildumu/eval-programs/approxflow/util/scalmc
 #RUN git checkout f47a18e925afd890538d0d0438fc8cbf41759496
 
 RUN ./download_solvers
+RUN mvn compile -DskipTests=true > /dev/null

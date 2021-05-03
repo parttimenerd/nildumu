@@ -46,39 +46,41 @@ Run nildumu on the command line. Example programs are given in the folders
   -V, --version             Print version information and exit.
 ```
 You can also run this command inside the docker image 
-(build it via `sudo docker build -t nildumu .`, run it via `sudo docker run -it nildumu`).
+(build it via `sudo docker build -t nildumu .`, run it via `sudo docker run -it nildumu`)
+or use it directly, for example:
+```
+    # directly (or in docker image)
+    ./run examples/laundering_attack.nd
+    # via docker image from dockerhub
+    sudo docker run -it parttimenerd/nildumu ./run examples/laundering_attack.nd
+```
 
 An example execution is:
-```
-./run examples/laundering_attack.nd   
+``` 
 ```
 
 ### Evaluation
-Create the docker image (via `sudo docker build -t nildumu .`) witch
-takes around 4 minutes on an Intel(R) Core(TM) i5-8500 with 32GiB of RAM),
-then run the evaluation inside the docker container:
+Create the docker image (via `sudo docker build -t nildumu .`) which
+takes around 4 minutes on an Intel(R) Core(TM) i5-8500 with 32GiB of RAM) and
+then run the evaluation inside the docker container, or use the docker image
+from dockerhub:
 ```
 # run one single iteration, this takes 10 minutes and max. 7GiB RAM on an Intel(R) Core(TM) i5-8500
 # and excludes the longer running E-Voting examples
-sudo docker run -it nildumu /evaluation --runs 1 --programs small
+sudo docker run -it parttimenerd/nildumu /evaluation --runs 1 --programs small
 
 # to run all benchmarks, pass `--programs all` (takes n minutes)
-sudo docker run -it nildumu ./evaluation --runs 1 --programs all
+sudo docker run -it parttimenerd/nildumu ./evaluation --runs 1 --programs all
 
 # to obtain the "exact" leakages for the E-Voting and Smart Grid programs, run
-sudo docker run -it nildumu ./evaluation --runs 1 --programs all --tools exact
+sudo docker run -it parttimenerd/nildumu ./evaluation --runs 1 --programs all --tools exact
 ```
 The evaluation commands print the evaluation results.
 
-TODO: small and run times and docker commands
-
-### Nildumu Editor
+### Nildumu Editor UI
 ![editor](./img/gui.png)
 An editor front-end for nildumu which gives additional information.
-Run it via `./gui`.
-
-
-TODO: write subset as Artifact README
+Run it via `./gui`, requires Java >= 8
 
 Language
 --------
