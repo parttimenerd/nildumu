@@ -65,4 +65,3 @@ RUN cp /approxmc/build/approxmc /nildumu/eval-programs/approxflow/util/scalmc
 #RUN git checkout f47a18e925afd890538d0d0438fc8cbf41759496
 
 RUN ./download_solvers
-RUN ./update_eval

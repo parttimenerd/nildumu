@@ -47,7 +47,18 @@ Run nildumu on the command line. Example programs are given in the folders
 ```
 
 ### Evaluation
-Run `./evaluation` inside the docker container.
+Create the docker image (via `sudo docker build -t nildumu .`) witch
+takes around 4 minutes on an Intel(R) Core(TM) i5-8500 with 32GiB of RAM),
+then run the evaluation inside the docker container:
+```
+# run one single iteration, this takes minutes on an Intel(R) Core(TM) i5-8500
+# and excludes the longer running E-Voting examples
+sudo docker run -d nildumu -- ./evaluation --runs 1   
+
+# to run all benchmarks, pass `--programs all` (takes n minutes)
+sudo docker run -d nildumu -- ./evaluation --runs 1
+```
+
 TODO: small and run times and docker commands
 
 ### Nildumu Editor

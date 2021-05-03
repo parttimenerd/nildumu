@@ -120,11 +120,11 @@ public class Evaluation {
         @Option(names="--excluded_programs")
         private List<String> normalEx = Collections.emptyList();
 
-        @Option(names="--dont_split_temci")
+        //@Option(names="--dont_split_temci")
         private boolean dontSplitTemciFiles = false;
 
-        @Option(names="--tools", description = "all (paper), full (+ other MAXSAT and GraphTT), exact (unwind 100, eps=0.1, delta=0.05, short (all tools in one config)")
-        private List<String> tools = Collections.singletonList("small");
+        @Option(names="--tools", description = "all (paper), full (+ other MAXSAT and GraphTT), exact (unwind 5, 10, 64, eps=0.1, delta=0.05), short (all tools in one config)")
+        private List<String> tools = Collections.singletonList("all");
 
         //@Option(names="--parallelism", description = "cores to use")
         //private int parallelism = 1;//(int)Math.ceil(Runtime.getRuntime().availableProcessors() / 4f);
@@ -138,8 +138,8 @@ public class Evaluation {
         @Option(names="--runs")
         private int runs = 5;
 
-        @Option(names="--dryruns")
-        private int dryruns = 1;
+        //@Option(names="--dryruns")
+        private int dryruns = 0;
 
         @Option(names="--verbose", description = "log all tool output")
         private boolean verbose = false;
@@ -159,7 +159,7 @@ public class Evaluation {
                     tools_ = AbstractTool.getAllTools(cmd.summaryUnwind, cmd.unwinds.isEmpty() ?
                             new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray());
                 } else if (cmd.tools.get(0).equals("exact")) {
-                    tools_ = Arrays.asList(new ApproxFlow(64, 0.5, 0.05));
+                    tools_ = Arrays.asList(new ApproxFlow(5, 0.1, 0.05), new ApproxFlow(10, 0.1, 0.05), new ApproxFlow(64, 0.1, 0.05));
                 } else {
                     tools_ = tools_.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
                 }

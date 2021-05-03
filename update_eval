@@ -18,11 +18,11 @@ echo "check for solvers"
 ./download_solvers > /dev/null
 
 echo "build evaluation jar"
-mvn compile > /dev/null
-mvn package > /dev/null
+mvn compile -DskipTests=true > /dev/null
+mvn package -DskipTests=true > /dev/null
 
 echo "build evaluated jar"
-mvn package -f pom2.xml > /dev/null
+mvn package -f pom2.xml -DskipTests=true > /dev/null
 cp target/nildumu-minimal-jar-with-dependencies.jar eval-programs/nildumu.jar
 
 #git submodule update --recursive --remote
