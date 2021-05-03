@@ -9,8 +9,8 @@ Example programs can be found in the `examples` and
 the `eval-specimen` (file ending `.nd`, from the evaluation) directory.
 
 TL;DR: To reproduce the results of the paper create a docker container using the Dockerfile in this folder
-and run `./evaluation` inside the container 
-(pass `--programs all` to also run the E-Voting benchmarks as this takes longer). 
+and run `./evaluation` inside the container (it takes around 3 days) and optionally 
+pass `--programs small --runs 1` (it now takes around 10 Minutes on an i5-8500).
 
 Usage
 -----
