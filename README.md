@@ -56,68 +56,11 @@ An editor front-end for nildumu which gives additional information.
 Run it via `./gui`.
 
 
-TODO: specify language
 TODO: write subset as Artifact README
 
 Language
 --------
-- the language has a C like syntax
-- it supports `if` and `while` statements that only consider the first
-bit of the result of their conditional expression
-- it supports different widths for the data type `int`, the default
-width is gathered by taking the maximum bitwidth of all literals in the
-program
-    - define the width by using `bit_width N` as the first statement
-    in the program, `N` being the desired maximum bit width
-- it supports different security lattices, use `use_sec [lattice|basic]`
-  to set the used lattice
-    - basic lattice: just consists of `h` (high) and `l` (low)
-    - diamond lattice: extends the basic lattice by two uncomparable
-      middle values `m` and `n`
-    - this statement has to come before all other statements (even
-      the `bit_width` statement)
-- input variables of level `X` can be defined in the global scope by
-  using the syntax `X input int VAR_NAME = INPUT_LITERAL`
-    - `INPUT_LITERAL` can be a signed integer literal or a binary literal
-      (`0b…`) where bits can also be specified as `u` (statically unknown)
-        - `ɑ{n}` repeats a bit ɑ n times
-    - this the only case where variability can be introduced
-    - typically unknown bits of high input variables are considered the
-      secret
-- output variables of level `X` can be defined in the global scope by
-  using the syntax `X output int VAR_NAME = EXPRESSION`
-- functions have `int` as a return value, even if they don't return
-  anything and can have arbitrary parameters
-  - only the last statement of a function can be a return-statement
-  - global variables cannot be accessed within a function
-  - the order of function definition is not important
-- it currently supports the following operators in expressions
-  - `&` (`&&` is not implemented, because it typically involves
-    short-cutting)
-  - `|` (same here)
-  - `^` (bit wise xor)
-  - `=`, `!=`
-  - `<`, `<=`, `=>`, `>`
-  - `+`, `-`, `<<`, `>>`, `*`
-  - unary operators: `~`, `-`, `!`
-  - `·[n]`: a bit select operator, that selects the `n`th bit, `n` being
-    a literal >= 1
-  - `[n]·`: a bit place operator, that returns a value that has the
-    first bit of the child expression as its `n`th bit and is otherwise
-    zero
-  - `/`, `%`
-    - only sound if no exception occurs
-- the features are trimmed down, to make the implementation as simple
-  as feasable
-- the analysis assumes that all program evaluations terminate
-- it supports `print(X)` statements, where `X` is an arbitrary expression
-  whichs value is leaked to low,
-  and `input()` invocations where a high user input is returned
-  - requires the interprocedural analysis
-  - the methods for other security levels are named `SEC_print` and `SEC_input`respectively
-  - the method definitions are inserted automatically
-  - variable names starting with `input` or containing the string `_input` are not recommended when using
-    `input()` (and its variants)  
+The language is loosely C based. See the beforementioned examples and the documented grammar at `src/main/antlr4/Lang.g4`.
 
 UI
 ---
@@ -149,15 +92,8 @@ All configurations and inputs are stored continously in the
     - run the analysis, changes to `…` during the run of the analysis
 - the button labeled ⏹
     - abort the current run of the analysis
-- the *Mode* combobox
-    - *basic*: use the basic version of the analysis that only supports
-      if-statement and doesn't take into account that conditions fixate
-      specific bits in the then- and the else-branch of if-statements
-   - `extended`: takes the last point into account
-   - `loop`: full support of the whole language, contains still bugs, it is advised
-     to enable the transformation of loops to recursion
 - the big combobox below
-   - it allows to select and configure the method handler the handles
+   - it allows the selection and configuration of the method handler that handles
      the method invocations
    - some example configurations are already included
    - it uses as syntax the standard Java property syntax, using `;`
@@ -166,7 +102,7 @@ All configurations and inputs are stored continously in the
         - if this misses and the configuration string just consists of
           a single identifier, then this identifier is considered as
           the chosen handler
-   - the `basic` handler
+   - the `basic` handler (`all` handler in the paper)
         - this is the default handler, that just connects returns
           a return value for every function call in which every bit
           depends on every parameter bit
@@ -220,8 +156,8 @@ All configurations and inputs are stored continously in the
         - properties
             - `maxiter`: maximum number of iterations for the
               coinduction, as every intermediate state is also valid
-            - `bot`: default is `basic`
-            - `mode`: `ind` or `coind`, default is `coind`
+            - `bot`: default is `basic` only used for `coind`
+            - `mode`: `ind` or `coind`, default is `ind`
             - `reduction`: reduction policy, either `basic` or `mincut`,
               default is `mincut`
             - `dot`: folder to output dot files for the bit graphs of
