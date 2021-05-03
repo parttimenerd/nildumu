@@ -35,7 +35,7 @@ Run nildumu on the command line. Example programs are given in the folders
                               Default: Open-WBO GL PMSAT
   -h, --help                Show this help message and exit.
       --handler=<handler>   Method invocation handler configuration, for paper:
-                              'handler=inlining;maxrec=null;bot=summary'
+                              'handler=inlining;maxrec=INLINING;bot=summary'
                               Default: handler=inlining;maxrec=32;bot=summary
       -ra, --recordAlternatives=<recordAlternatives>
 
@@ -44,6 +44,13 @@ Run nildumu on the command line. Example programs are given in the folders
       -tp, --transformPlus=<transformPlus>
 
   -V, --version             Print version information and exit.
+```
+You can also run this command inside the docker image 
+(build it via `sudo docker build -t nildumu .`, run it via `sudo docker run -it nildumu`).
+
+An example execution is:
+```
+./run examples/laundering_attack.nd   
 ```
 
 ### Evaluation
@@ -61,6 +68,7 @@ sudo docker run -it nildumu ./evaluation --runs 1 --programs all
 # to obtain the "exact" leakages for the E-Voting and Smart Grid programs, run
 sudo docker run -it nildumu ./evaluation --runs 1 --programs all --tools exact
 ```
+The evaluation commands print the evaluation results.
 
 TODO: small and run times and docker commands
 

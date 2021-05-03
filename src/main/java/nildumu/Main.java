@@ -25,7 +25,7 @@ public class Main implements Runnable {
     private String programPath = "-";
 
     @Option(names = "--handler", description = "Method invocation handler configuration, " +
-            "for paper: 'handler=inlining;maxrec=${INLINING};bot=summary'")
+            "for paper: 'handler=inlining;maxrec=INLINING;bot=summary'")
     private String handler = "handler=inlining;maxrec=32;bot=summary";
 
     @Option(names = "--algo", description = "Used leakage computation algorithm, default is OpenWBO PMSAT based")
