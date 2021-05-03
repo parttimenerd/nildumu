@@ -28,6 +28,14 @@ RUN apt-get update && \
 ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64/
 RUN export JAVA_HOME
 
+# build M4RI for ApproxFlow
+WORKDIR /
+RUN wget https://bitbucket.org/malb/m4ri/downloads/m4ri-20200125.tar.gz
+RUN tar -xvf m4ri-20200125.tar.gz
+WORKDIR m4ri-20200125
+RUN ./configure
+RUN make && make install
+
 # build CryptoMiniSat for ApproxFlow
 WORKDIR /
 RUN wget https://github.com/msoos/cryptominisat/archive/5.8.0.tar.gz
@@ -61,7 +69,6 @@ RUN git clone https://github.com/parttimenerd/nildumu  /nildumu --recursive
 WORKDIR /nildumu
 RUN git submodule update --recursive --remote
 RUN cp /approxmc/build/approxmc /nildumu/eval-programs/approxflow/util/scalmc
-#RUN git checkout f47a18e925afd890538d0d0438fc8cbf41759496
 
 RUN ./download_solvers
 RUN mvn compile -DskipTests=true > /dev/null

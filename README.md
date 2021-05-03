@@ -8,9 +8,18 @@ for a while-language with functions, arrays and a C like syntax.
 Example programs can be found in the `examples` and 
 the `eval-specimen` (file ending `.nd`, from the evaluation) directory.
 
-TL;DR: To reproduce the results of the paper create a docker container using the Dockerfile in this folder
+TL;DR: To reproduce the results of the paper or to run the analysis,
+create a docker container using the Dockerfile in this folder
 and run `./evaluation` inside the container (it takes around 3 days) and optionally 
-pass `--programs small --runs 1` (it now takes around 10 Minutes on an i5-8500).
+pass `--programs small --runs 1` (it now takes around 10 Minutes on an Intel i5-8500),
+or use the `run` script to run specific programs:
+```
+sudo docker run -i parttimenerd/nildumu ./evaluation --programs small --runs 1
+# analyze a program (with inlining level 32) from standard in
+sudo docker run -i parttimenerd/nildumu ./run << EOF
+input int h; output int o := h | 1
+EOF
+```
 
 Usage
 -----
@@ -52,7 +61,7 @@ or use it directly, for example:
     # directly (or in docker image)
     ./run examples/laundering_attack.nd
     # via docker image from dockerhub
-    sudo docker run -it parttimenerd/nildumu ./run examples/laundering_attack.nd
+    sudo docker run -i parttimenerd/nildumu ./run examples/laundering_attack.nd
 ```
 
 An example execution is:
@@ -67,13 +76,13 @@ from dockerhub:
 ```
 # run one single iteration, this takes 10 minutes and max. 7GiB RAM on an Intel(R) Core(TM) i5-8500
 # and excludes the longer running E-Voting examples
-sudo docker run -it parttimenerd/nildumu /evaluation --runs 1 --programs small
+sudo docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs small
 
 # to run all benchmarks, pass `--programs all` (takes n minutes)
-sudo docker run -it parttimenerd/nildumu ./evaluation --runs 1 --programs all
+sudo docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs all
 
 # to obtain the "exact" leakages for the E-Voting and Smart Grid programs, run
-sudo docker run -it parttimenerd/nildumu ./evaluation --runs 1 --programs all --tools exact
+sudo docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs all --tools exact
 ```
 The evaluation commands print the evaluation results.
 

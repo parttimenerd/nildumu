@@ -190,6 +190,7 @@
                         <compilerArgs>
                             <arg>-Aproject=${project.groupId}/${project.artifactId}</arg>
                         </compilerArgs>
+                        <encoding>UTF-8</encoding>
                     </configuration>
                 </plugin>
             </plugins>
@@ -247,6 +248,7 @@
                         <configuration>
                             <source>1.8</source>
                             <target>1.8</target>
+                            <encoding>UTF-8</encoding>
                         </configuration>
                     </execution>
                     <execution>
@@ -258,12 +260,14 @@
                         <configuration>
                             <source>1.8</source>
                             <target>1.8</target>
+                            <encoding>UTF-8</encoding>
                         </configuration>
                     </execution>
                 </executions>
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
+                    <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
             <plugin>
