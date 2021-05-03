@@ -1,8 +1,5 @@
 grammar Lang;
 
-@header{
-}
-
 /*
 Be aware:
 - C-like comments are supported

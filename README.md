@@ -51,18 +51,21 @@ Create the docker image (via `sudo docker build -t nildumu .`) witch
 takes around 4 minutes on an Intel(R) Core(TM) i5-8500 with 32GiB of RAM),
 then run the evaluation inside the docker container:
 ```
-# run one single iteration, this takes minutes on an Intel(R) Core(TM) i5-8500
+# run one single iteration, this takes 10 minutes and max. 7GiB RAM on an Intel(R) Core(TM) i5-8500
 # and excludes the longer running E-Voting examples
-sudo docker run -d nildumu -- ./evaluation --runs 1   
+sudo docker run -it nildumu /evaluation --runs 1 --programs small
 
 # to run all benchmarks, pass `--programs all` (takes n minutes)
-sudo docker run -d nildumu -- ./evaluation --runs 1
+sudo docker run -it nildumu ./evaluation --runs 1 --programs all
+
+# to obtain the "exact" leakages for the E-Voting and Smart Grid programs, run
+sudo docker run -it nildumu ./evaluation --runs 1 --programs all --tools exact
 ```
 
 TODO: small and run times and docker commands
 
 ### Nildumu Editor
-![editor](./img/editor.png)
+![editor](./img/gui.png)
 An editor front-end for nildumu which gives additional information.
 Run it via `./gui`.
 
@@ -81,11 +84,11 @@ All configurations and inputs are stored continously in the
 
 - the top combobox allows to access different examples from the
   `examples` folder and to store the current program there in,
-  using the 🖪 button
+  using the "Save" button
 - the text input allows to input the program, it supports basic
   auto completions, syntax highlighting, code folding and syntax error
   highlighting
-- the checkbox labeled ⮔
+- the checkbox labeled "Auto Run"
     - if checked, the input program is analysed continously
     - only use this for small programs with short analysis times
 - the checkbox labeled `+ → &!|^`
@@ -99,9 +102,9 @@ All configurations and inputs are stored continously in the
     - `WONR`: also update the *Variable values* table
     - `ALL`: also update the *Node values* table and output debug
       information on the console
-- the button labeled 🢒
+- the button labeled "Run"
     - run the analysis, changes to `…` during the run of the analysis
-- the button labeled ⏹
+- the button labeled "Stop"
     - abort the current run of the analysis
 - the big combobox below
    - it allows the selection and configuration of the method handler that handles
@@ -181,12 +184,12 @@ All configurations and inputs are stored continously in the
               the size of the summary edges.
 - the combobox labeled *Min-Cut* allows to choose between several
   minimum-cut algorithms for the analysis
-    - the GraphT version is correct and optimal and currently the only supported
 - the tabs below
     - *Leakage*: contains the leakage of information from higher or
       non-comparable security levels into each security level
     - *Preprocessed*: contains the SSA resolved version of the program
       with some operators replaced
+    - *Without loops*: contains the program with all loops replaced by recursion
     - *Output*: Just some statistics
     - *Node values*: the values of the AST/PDG-nodes at the end of the
       analysis

@@ -214,7 +214,7 @@ public class Evaluation {
         try {
             Files.write(Paths.get(csvFile), Arrays.asList(csv.split("\n")));
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
     }
 
