@@ -9,7 +9,7 @@ TL;DR: To reproduce the results of the paper use the docker image
 [parttimenerd/nildumu](https://hub.docker.com/layers/parttimenerd/nildumu/latest/images/sha256-053b5f6b09adbda070dc65726e444960b51f39e386a9eda32590f5c68014d25d?context=repo):
 ```
 # run the small version of the evaluation, prints the evaluation result table
-# takes 4 minutes on an Intel i5-8500 using 8GiB RAM and two cores
+# takes 12 minutes on an Intel i5-8500 using 9GiB RAM and two cores
 # `--programs small` excludes the longer running E-Voting benchmarks
 docker run -i parttimenerd/nildumu ./evaluation --programs small --runs 1
 # analyze a program (with inlining level 32) from standard in
@@ -65,9 +65,9 @@ or use it directly, for example:
 Use the docker image from docker hub, as stated before:
 The evaluation in the paper used an Intel Xeon Gold 6230 CPU with 40 cores (80 logical cores) and 512 GiB of RAM.
 But the benchmarks can also be run on machines with a CPU like the Intel i5-8500 (6 cores, only two are actually used) 
-using 8GiB RAM for the evaluation itself:
+using 9GiB RAM for the evaluation and the docker container:
 ```shell script
-# run one single iteration, this takes 10 minutes
+# run one single iteration, this takes 12 minutes
 # and excludes the longer running E-Voting examples
 docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs small
 
@@ -85,7 +85,7 @@ The evaluation of nildumu alone runs without installing additional software, onl
 
 
 ### Nildumu Editor UI
-![editor](https://github.com/parttimenerd/nildumu/raw/master/img/logo.png)
+![editor](https://github.com/parttimenerd/nildumu/raw/master/img/gui.png)
 An editor front-end for nildumu which gives additional information.
 Run it via `./gui`, requires Java >= 8
 

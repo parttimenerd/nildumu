@@ -8,6 +8,12 @@
     <artifactId>nildumu-project</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <properties>
+        <picocli.version>4.6.1</picocli.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>de.vandermeer</groupId>
@@ -93,7 +99,7 @@
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
-            <version>4.6.1</version>
+            <version>${picocli.version}</version>
         </dependency>
         <dependency>
             <groupId>com.google.truth</groupId>
