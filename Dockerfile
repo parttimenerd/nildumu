@@ -68,6 +68,7 @@ RUN pip install pycparser
 RUN git clone https://github.com/parttimenerd/nildumu  /nildumu --recursive
 WORKDIR /nildumu
 RUN git submodule update --recursive --remote
+RUN git pull
 RUN cp /approxmc/build/approxmc /nildumu/eval-programs/approxflow/util/scalmc
 
 RUN ./download_solvers

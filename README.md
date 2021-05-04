@@ -6,7 +6,7 @@ Example programs can be found in the `examples` and
 the `eval-specimen` (file ending `.nd`, from the evaluation) directory.
 
 TL;DR: To reproduce the results of the paper use the docker image 
-[parttimenerd/nildumu](https://hub.docker.com/layers/parttimenerd/nildumu/latest/images/sha256-053b5f6b09adbda070dc65726e444960b51f39e386a9eda32590f5c68014d25d?context=repo):
+[parttimenerd/nildumu](https://hub.docker.com/r/parttimenerd/nildumu):
 ```
 # run the small version of the evaluation, prints the evaluation result table
 # takes 12 minutes on an Intel i5-8500 using 9GiB RAM and two cores
@@ -14,11 +14,11 @@ TL;DR: To reproduce the results of the paper use the docker image
 docker run -i parttimenerd/nildumu ./evaluation --programs small --runs 1
 # analyze a program (with inlining level 32) from standard in
 docker run -i parttimenerd/nildumu ./run << EOF
-input int h; output int o := h | 1
+    input int h; output int o := h | 1
 EOF
-# analyze a program with a different inlining level
+# analyze a program with a different INLINING level
 docker run -i parttimenerd/nildumu ./run --handler 'handler=inlining;maxrec=INLINING;bot=summary' << EOF
-input int h; output int o := h | 1
+    input int h; output int o := h | 1
 EOF
 ```
 
@@ -55,11 +55,12 @@ You can also run this command inside the docker image
 (build it via `docker build -t nildumu .`, run it via `docker run -it nildumu`)
 or use it directly, for example:
 ```shell script
-    # directly (or in docker image)    # does only require a JDK >= 8, maven, curl and unzip
-    ./run examples/laundering_attack.nd
-    # via docker image from dockerhub
-    docker run -i parttimenerd/nildumu ./run examples/laundering_attack.nd
+# directly (or in docker image)    # does only require a JDK >= 8, maven, curl and unzip
+./run examples/laundering_attack.nd
+# via docker image from dockerhub
+docker run -i parttimenerd/nildumu ./run examples/laundering_attack.nd
 ```
+For convenience, vim, emacs and nano are installed by default.
 
 ### Evaluation
 Use the docker image from docker hub, as stated before:
