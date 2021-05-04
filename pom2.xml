@@ -154,12 +154,14 @@
                         <configuration>
                             <source>1.8</source>
                             <target>1.8</target>
+                            <encoding>UTF-8</encoding>
                         </configuration>
                     </execution>
                 </executions>
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
+                    <encoding>UTF-8</encoding>
                     <excludes>
                         <exclude>**/nildumu/eval/**/*</exclude>
                         <exclude>**/nildumu/ui/**/*</exclude>

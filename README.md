@@ -1,22 +1,23 @@
-![logo](./img/logo.png)
-
-Nildumu
-=======
+![logo](https://github.com/parttimenerd/nildumu/raw/master/img/logo.png)
 
 An experimental quantitative information flow analysis 
 for a while-language with functions, arrays and a C like syntax. 
 Example programs can be found in the `examples` and 
 the `eval-specimen` (file ending `.nd`, from the evaluation) directory.
 
-TL;DR: To reproduce the results of the paper or to run the analysis,
-create a docker container using the Dockerfile in this folder
-and run `./evaluation` inside the container (it takes around 3 days) and optionally 
-pass `--programs small --runs 1` (it now takes around 10 Minutes on an Intel i5-8500),
-or use the `run` script to run specific programs:
+TL;DR: To reproduce the results of the paper use the docker image 
+[parttimenerd/nildumu](https://hub.docker.com/layers/parttimenerd/nildumu/latest/images/sha256-053b5f6b09adbda070dc65726e444960b51f39e386a9eda32590f5c68014d25d?context=repo):
 ```
-sudo docker run -i parttimenerd/nildumu ./evaluation --programs small --runs 1
+# run the small version of the evaluation, prints the evaluation result table
+# takes 4 minutes on an Intel i5-8500 using 8GiB RAM and two cores
+# `--programs small` excludes the longer running E-Voting benchmarks
+docker run -i parttimenerd/nildumu ./evaluation --programs small --runs 1
 # analyze a program (with inlining level 32) from standard in
-sudo docker run -i parttimenerd/nildumu ./run << EOF
+docker run -i parttimenerd/nildumu ./run << EOF
+input int h; output int o := h | 1
+EOF
+# analyze a program with a different inlining level
+docker run -i parttimenerd/nildumu ./run --handler 'handler=inlining;maxrec=INLINING;bot=summary' << EOF
 input int h; output int o := h | 1
 EOF
 ```
@@ -29,92 +30,88 @@ via an editor `./gui` or via the evaluation script `./evaluation`.
 
 ### Command Line Application
 A command line that can be used to run programs 
-(passed either via standard in or via a passed file name).
-```
-Usage: ./run [-hV] [--algo=<algo>] [--handler=<handler>]
-             [-ra=<recordAlternatives>] [-tl=<transformLoops>]
-             [-tp=<transformPlus>] <programPath>
+(passed either via standard in or via a passed filename).
+```shell script
+Usage: ./run [-hV] [-tp] [--algo=<algo>] [--handler=<handler>] <programPath>
 Run nildumu on the command line. Example programs are given in the folders
 'eval-specimen' and 'examples'. The syntax of the paper is accepted too.
-      <programPath>         program file to analyze, or '-' to read from
-                              standard in. Nildumu files usually end with '.nd'.
-                              Default: -
-      --algo=<algo>         Used leakage computation algorithm, default is
-                              OpenWBO PMSAT based
-                              Default: Open-WBO GL PMSAT
-  -h, --help                Show this help message and exit.
-      --handler=<handler>   Method invocation handler configuration, for paper:
-                              'handler=inlining;maxrec=INLINING;bot=summary'
-                              Default: handler=inlining;maxrec=32;bot=summary
-      -ra, --recordAlternatives=<recordAlternatives>
-
-      -tl, --transformLoops=<transformLoops>
-
-      -tp, --transformPlus=<transformPlus>
-
-  -V, --version             Print version information and exit.
+      <programPath>          program file to analyze, or '-' to read from
+                               standard in. Nildumu files usually end with '.
+                               nd'.
+                               Default: -
+      --algo=<algo>          Used leakage computation algorithm, default is
+                               OpenWBO PMSAT based
+                               Default: Open-WBO GL PMSAT
+  -h, --help                 Show this help message and exit.
+      --handler=<handler>    Method invocation handler configuration, for
+                               paper: 'handler=inlining;maxrec=INLINING;
+                               bot=summary'
+                               Default: handler=inlining;maxrec=32;bot=summary
+      -tp, --transformPlus   Transform plus into bit wise operators in the
+                               preprocessing step
+  -V, --version              Print version information and exit.
 ```
 You can also run this command inside the docker image 
-(build it via `sudo docker build -t nildumu .`, run it via `sudo docker run -it nildumu`)
+(build it via `docker build -t nildumu .`, run it via `docker run -it nildumu`)
 or use it directly, for example:
-```
-    # directly (or in docker image)
+```shell script
+    # directly (or in docker image)    # does only require a JDK >= 8, maven, curl and unzip
     ./run examples/laundering_attack.nd
     # via docker image from dockerhub
-    sudo docker run -i parttimenerd/nildumu ./run examples/laundering_attack.nd
-```
-
-An example execution is:
-``` 
+    docker run -i parttimenerd/nildumu ./run examples/laundering_attack.nd
 ```
 
 ### Evaluation
-Create the docker image (via `sudo docker build -t nildumu .`) which
-takes around 4 minutes on an Intel(R) Core(TM) i5-8500 with 32GiB of RAM) and
-then run the evaluation inside the docker container, or use the docker image
-from dockerhub:
-```
-# run one single iteration, this takes 10 minutes and max. 7GiB RAM on an Intel(R) Core(TM) i5-8500
+Use the docker image from docker hub, as stated before:
+The evaluation in the paper used an Intel Xeon Gold 6230 CPU with 40 cores (80 logical cores) and 512 GiB of RAM.
+But the benchmarks can also be run on machines with a CPU like the Intel i5-8500 (6 cores, only two are actually used) 
+using 8GiB RAM for the evaluation itself:
+```shell script
+# run one single iteration, this takes 10 minutes
 # and excludes the longer running E-Voting examples
-sudo docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs small
+docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs small
 
-# to run all benchmarks, pass `--programs all` (takes n minutes)
-sudo docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs all
+# to run all benchmarks, pass `--programs all` (takes around 3 days)
+docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs all
 
 # to obtain the "exact" leakages for the E-Voting and Smart Grid programs, run
-sudo docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs all --tools exact
+docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs all --tools exact
 ```
 The evaluation commands print the evaluation results.
 
+Running the evaluation without docker is also possible, refer to the Dockerfile for required packages.
+The evaluation of nildumu alone runs without installing additional software, only the usage of ApproxFlow 
+(with which we compare nildumu) requires additional software.
+
+
 ### Nildumu Editor UI
-![editor](./img/gui.png)
+![editor](https://github.com/parttimenerd/nildumu/raw/master/img/logo.png)
 An editor front-end for nildumu which gives additional information.
 Run it via `./gui`, requires Java >= 8
 
 Language
 --------
-The language is loosely C based. See the beforementioned examples and the documented grammar at `src/main/antlr4/Lang.g4`.
+The language is loosely C-based. See the beforementioned examples and the documented grammar at `src/main/antlr4/Lang.g4`.
 
 UI
 ---
 The following describes the UI (launch it via `./gui`).
-All configurations and inputs are stored continously in the
+All configurations and inputs are stored continuously in the
 `gui.config` file, they are brought back after a restart of a program
 
-- the top combobox allows to access different examples from the
-  `examples` folder and to store the current program there in,
+- the top combobox allows accessing different examples from the
+  `examples` folder and to store the current program therein,
   using the "Save" button
 - the text input allows to input the program, it supports basic
-  auto completions, syntax highlighting, code folding and syntax error
+  auto completion, syntax highlighting, code folding, and syntax error
   highlighting
 - the checkbox labeled "Auto Run"
-    - if checked, the input program is analysed continously
+    - if checked, the input program is analyzed continuously
     - only use this for small programs with short analysis times
 - the checkbox labeled `+ → &!|^`
-    - if checked, all `+` and `-` operators will replaced by their
+    - if checked, all `+` and `-` operators will be replaced by their
       respective bit operation networks
-    - this yields to a far worse perfomance, but has theorectial
-      advantages
+    - this yields to a far worse performance
     - there is no difference in the leakage computation
 - the combobox labeled *Output*
     - `MIN`: only update the *Leakage* table
@@ -155,37 +152,35 @@ All configurations and inputs are stored continously in the
                   the `summary` handler here
                 - default is `basic`
    - the `summary` handler
-        - A summary-edge based handler.
+        - A summary-edge-based handler.
         - It creates for each function beforehand summary edges:
             - these edges connect the parameter bits and the return bits
         - The analysis assumes that all parameter bits might have a
           statically unknown value.
         - The summary-edge analysis builds the summary edges using a
-          fix point iteration over the call graph.
+          fixed point iteration over the call graph.
         - Each analysis of a method runs the normal analysis of the
           method body and uses the prior summary edges if a method is
           called in the body.
         - The resulting bit graph is then reduced.
         - It supports coinduction (`mode=coind`)
-          and induction (`mode=ind`), but the default is to choose
-          induction for non-recursive programs and else coinduction
-          (`mode=auto`)
+          and induction (`mode=ind`, the default)
         - Induction starts with no edges between parameter bits and
           return bits and iterates till no new connection between a
           return bit and a parameter bit is added.
             - It only works for programs without recursion.
-        - Coinduction starts with the an over approximation produced by
+        - Coinduction starts with an over approximation produced by
           another handler (`bot` property) and iterates at most a
           configurable number of times (`maxiter` property), by default
           this number is 2147483647 (the maximum number of signed 32 bit
           integer)
-        - The default reduction policy is to connect all return bits
+        - The basic reduction policy is to connect all return bits
           with all parameter bits that they depend upon
           ("reduction=basic")
             - An improved version (`reduction=mincut`) includes the
               minimal cut bits of the bit graph from the return to the
               parameter bits, assuming that the return bits have
-              infinite weights
+              infinite weights, this is the default
         - properties
             - `maxiter`: maximum number of iterations for the
               coinduction, as every intermediate state is also valid
@@ -196,12 +191,12 @@ All configurations and inputs are stored continously in the
             - `dot`: folder to output dot files for the bit graphs of
               the methods in different iterations and the call-graph
                 - default: empty string, produces no dot files
-            - `csmaxrec`: if > 0, each sub analysis uses a call-string
+            - `csmaxrec`: if > 0, each sub-analysis uses a call-string
               based handler for evaluation method invocations, using
               the computed summary edges as `bot` and the passed value
               as `maxrec`. Likely improves precision but also increases
-              the size of the summary edges.
-- the combobox labeled *Min-Cut* allows to choose between several
+              the size of the summary edges. Default is `0`
+- the combobox labeled *Min-Cut* allows choosing between several
   minimum-cut algorithms for the analysis
 - the tabs below
     - *Leakage*: contains the leakage of information from higher or
@@ -222,4 +217,4 @@ All configurations and inputs are stored continously in the
 
 License
 -------
-It's licensed under the GPLv3 and MIT license.
+It's licensed under the MIT license.
