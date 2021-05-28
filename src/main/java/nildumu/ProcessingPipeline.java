@@ -5,7 +5,6 @@ import nildumu.typing.TypeTransformer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import static nildumu.ProcessingPipeline.Stage.wrap;
 
@@ -42,27 +41,40 @@ public class ProcessingPipeline {
     }
 
     public static ProcessingPipeline create() {
-        return create(false, true);
+        return create(false);
     }
 
-    public static ProcessingPipeline create(boolean transformPlus, boolean transformLoops) {
-        return new ProcessingPipeline(wrap(LoopTransformer::process), p -> {
-                    new NameResolution(p).resolve();
-                    return TypeTransformer.process(p);
-                },
+    public static ProcessingPipeline create(boolean transformPlus) {
+        return new ProcessingPipeline(createTillBeforeSSAResolution().stage(),
                 wrap(SSAResolution2::process),
                 program -> new MetaOperatorTransformator(program.context.maxBitWidth, transformPlus).process(program));
     }
 
     public static ProcessingPipeline createTillBeforeTypeTransformation() {
-        return new ProcessingPipeline(wrap(LoopTransformer::process));
+        return new ProcessingPipeline(wrap(LoopTransformer::process), wrap(ReturnTransformer::process));
     }
 
     public static ProcessingPipeline createTillBeforeSSAResolution() {
-        return new ProcessingPipeline(wrap(LoopTransformer::process), p -> {
-            new NameResolution(p).resolve();
-            return TypeTransformer.process(p);
+        return new ProcessingPipeline(
+                createTillBeforeTypeTransformation().stage(),
+                p -> {
+                    new NameResolution(p).resolve();
+                    return TypeTransformer.process(p);
         });
+    }
+
+    public Stage stage() {
+        return new Stage() {
+            @Override
+            public Parser.ProgramNode process(Parser.ProgramNode program) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public String process(String program) {
+                return justProcess(program);
+            }
+        };
     }
 
     public Parser.ProgramNode process(String program) {
@@ -70,6 +82,16 @@ public class ProcessingPipeline {
     }
 
     public Parser.ProgramNode process(String program, boolean resetCounters) {
+        Parser.ProgramNode programNode = Parser.parse(justProcess(program, resetCounters));
+        new NameResolution(programNode).resolve();
+        return programNode;
+    }
+
+    String justProcess(String program) {
+        return justProcess(program, true);
+    }
+
+    String justProcess(String program, boolean resetCounters) {
         for (Stage stage : stages) {
             if (resetCounters) {
                 Parser.MJNode.resetIdCounter();
@@ -85,9 +107,7 @@ public class ProcessingPipeline {
                 throw new NildumuError(err);
             }
         }
-        Parser.ProgramNode programNode = Parser.parse(program);
-        new NameResolution(programNode).resolve();
-        return programNode;
+        return program;
     }
 
 }

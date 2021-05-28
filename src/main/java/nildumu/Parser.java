@@ -660,7 +660,7 @@ public class Parser implements Serializable {
      * Currently does a name resolution and converts the result into SSA form
      */
     public static ProgramNode process(String input, boolean transformPlus, boolean transformLoops) {
-        return ProcessingPipeline.create(transformPlus, transformLoops).process(input);
+        return ProcessingPipeline.create(transformPlus).process(input);
     }
 
     /**
@@ -1329,7 +1329,7 @@ public class Parser implements Serializable {
         public String toPrettyString(String indent, String incr) {
             return String.format("use_sec %s;\nbit_width %d;", context.sl.latticeName(), context.maxBitWidth) + "\n" +
                     methods().stream().map(m -> m.toPrettyString(indent, incr)).collect(Collectors.joining("\n")) +
-                    globalBlock.toPrettyString(indent, incr, false);
+                    (globalBlock.isEmpty() ? "" : globalBlock.toPrettyString(indent, incr, false));
         }
 
         public Collection<MethodNode> methods() {
@@ -1977,7 +1977,7 @@ public class Parser implements Serializable {
 
         public String toPrettyString(String indent, String incr, boolean showCurleyBrackets) {
             if (isEmpty()) {
-                return "";
+                return "{}";
             }
             Pair<List<VariableDeclarationNode>, List<StatementNode>> partition = splitIntoDeclsAndRest();
             String res = showCurleyBrackets ? (indent + "{\n") : "";
@@ -2034,7 +2034,11 @@ public class Parser implements Serializable {
         }
 
         public boolean isEmpty() {
-            return statementNodes.isEmpty() || statementNodes.stream().allMatch(s -> s instanceof BlockNode && ((BlockNode) s).isEmpty());
+            return statementNodes.isEmpty() || statementNodes.stream().allMatch(s -> (s instanceof BlockNode && ((BlockNode) s).isEmpty()) || s instanceof IfStatementEndNode);
+        }
+
+        public BlockNode getSubBlock(int start) {
+            return new BlockNode(Location.ZERO, new ArrayList<>(statementNodes.subList(start, statementNodes.size())));
         }
     }
 
