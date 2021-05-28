@@ -6,6 +6,11 @@ Be aware:
 - the language is its own intermediate language (SSA is directly supported)
 */
 
+@parser::members {
+  private int loopDepth = 0;
+  private boolean inMethod = false;
+}
+
 file: SEMI*
     use_sec?   // default security lattice is the high-low lattice
     bit_width? // default bit width for integers is 32
@@ -18,12 +23,14 @@ use_sec: USE_SEC IDENT SEMI;   // "use_sec [SEC_LATTICE]", specifies the used se
 bit_width: BIT_WIDTH INTEGER_LITERAL SEMI;  // specifies the width of integers, default is 32
 
 normal_statement: // a statement that ends with a semi colon
-     IDENT? mod=(INPUT|TMP_INPUT) type ident ((EQUAL_SIGN|COLON_EQUAL) INPUT_LITERAL)? #inputdecl
+      {loopDepth > 0}? BREAK     #break
+    | {loopDepth > 0}? CONTINUE  #continue
+    | IDENT? mod=(INPUT|TMP_INPUT) type ident ((EQUAL_SIGN|COLON_EQUAL) INPUT_LITERAL)? #inputdecl
      // declaration of the input, only allowed at global scope, the input literal specifies the bits that
      // are known and unknown of the input, but can omitted. "=" and ":=" can be used both for assignments.
      // the first IDENT is the optional security level, default is `h`
      // example: input int a;
-    |  (IDENT? OUTPUT)? type ident ((EQUAL_SIGN|COLON_EQUAL) (phi|expression))? #vardecl
+    | (IDENT? OUTPUT)? type ident ((EQUAL_SIGN|COLON_EQUAL) (phi|expression))? #vardecl
      // Declaration of a variable. Output variables (with optional security level, default is `l`) can only
      // be defined at global scope. Their first assignment leaks the output.
      // Variables can be assigned either a normal expression or a phi-expression (SSA)
@@ -32,7 +39,7 @@ normal_statement: // a statement that ends with a semi colon
      // currently not really supported, used for implemented streams
     | assignment #IGNORE
      // an assignment is also a statement
-    | RETURN (expression (COMMA expression)*)? #return_statement
+    | {inMethod}? RETURN (expression (COMMA expression)*)? #return_statement
      // a return statement with possibly multiple return values
      // currently only allowed at the outer most scope of a function
      // example: return 1
@@ -44,7 +51,7 @@ normal_statement: // a statement that ends with a semi colon
      // example: func(1, 2)
 
 control_statement: // statements that do not need to be followed by a semi colon
-      WHILE (LBBRACKET assignments RBBRACKET)? LPAREN expression RPAREN statement_w_semi #while_statement
+      {loopDepth++;} WHILE (LBBRACKET assignments RBBRACKET)? LPAREN expression RPAREN statement_w_semi {loopDepth--;} #while_statement
      // a typical while loop
      // example: while (i != 0) { i = i + 1; }
     | IF LPAREN expression RPAREN SEMI? block SEMI? (ELSE SEMI? block)? #if_statement
@@ -69,7 +76,7 @@ method:  // definition of a method, with multiple return types, void return type
          // example: int func(int a) { return a + 1; }
          //          int int func(int a) { return a, a + 1 }
          //          (int, int) func(int a, int b) { return (a - b, a + b); }  // returning a tuple
-    type+ ident globals? LPAREN parameters? RPAREN block
+    type+ ident globals? LPAREN parameters? RPAREN {inMethod = true;} block {inMethod = false;}
     ;
 parameters: parameter (COMMA parameter)*; // a list of comma separated paremeters
 parameter: type ident;
@@ -199,6 +206,8 @@ USE_SEC: 'use_sec';
 BIT_WIDTH: 'bit_width';
 PHI: 'phi';
 TILDE: '~';
+BREAK: 'break';
+CONTINUE: 'continue';
 
 LOWER_EQUALS: '<=';
 GREATER_EQUALS: '>=';
@@ -234,7 +243,6 @@ SEMI: (WS? ';'|WS?'\n')+;
 INTEGER_LITERAL: (([1-9][0-9]*)|'0') | ('0b'([01e](('{'([0-9]+)'}')?))*);
 INPUT_LITERAL: '0b' ([01ux](('{'([0-9]+)'}')?))+;
 IDENT: [A-Za-z_][A-Za-z0-9_]*;
-
 LCURLY: '{';
 RCURLY: '}';
 COLON: ':';

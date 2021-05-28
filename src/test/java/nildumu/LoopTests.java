@@ -410,4 +410,22 @@ public class LoopTests {
                 "while (i < 1){ i = i + 1; }\n" +
                 "int x = i;").val("x", "1").run();
     }
+
+    @Test
+    public void testLoopWithBreak() {
+        parse("use_sec basic;\n" +
+                "bit_width 4;\n" +
+                "int i = 0;\n" +
+                "while (true){ i = i + 1; if (i > 2) { break; } }\n" +
+                "int x = i;").val("x", "3").run();
+    }
+
+    @Test
+    public void testLoopWithContinue() {
+        parse("use_sec basic;\n" +
+                "bit_width 4;\n" +
+                "int i = 0;\n" +
+                "while (true){ i = i + 1;  if (i < 2) { continue; } break}\n" +
+                "int x = i;").val("x", "2").run();
+    }
 }

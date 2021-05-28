@@ -349,6 +349,16 @@ class Translator extends LangBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitBreak(LangParser.BreakContext ctx) {
+        return new Parser.LoopInterruptionNode(location(ctx), Parser.LoopInterruptionNode.Interruption.BREAK);
+    }
+
+    @Override
+    public Object visitContinue(LangParser.ContinueContext ctx) {
+        return new Parser.LoopInterruptionNode(location(ctx), Parser.LoopInterruptionNode.Interruption.CONTINUE);
+    }
+
+    @Override
     public List<Parser.VariableAssignmentNode> visitAssignments(LangParser.AssignmentsContext ctx) {
         return listOf(ctx.assignment());
     }

@@ -19,6 +19,8 @@ public class LoopTransformerTests {
     @CsvSource({
             "'int i = 0; while (i < 10){i = i + 1;} ', 1",
             "'int i = 0; int h = 1; int j = 0; while (i < 10 && j < 3){i = i + h; j = j + 1; }', 1",
+            "'int i = 0; while (1){ if (i > 10) {break;} i = i + 1 }', 1",
+            "'int i = 0; while (1){ if (i > 10) {continue;} i = i + 1 }', 1",
     })
     public void testBasicLoopTransform(String code, int numberOfFunctions) {
         assertEquals(numberOfFunctions, transform(code, true, true).getMethodNames().size());

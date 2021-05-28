@@ -1,6 +1,5 @@
 package nildumu;
 
-import jdk.nashorn.internal.ir.visitor.NodeVisitor;
 import nildumu.typing.Type;
 import nildumu.typing.Types;
 import nildumu.util.Util;
@@ -774,6 +773,10 @@ public class Parser implements Serializable {
             return visit((StatementNode) whileEndStatement);
         }
 
+        default R visit(LoopInterruptionNode loopInterruptionNode) {
+            return visit((StatementNode) loopInterruptionNode);
+        }
+
         default R visit(VariableAccessNode variableAccess) {
             return visit((PrimaryExpressionNode) variableAccess);
         }
@@ -909,6 +912,10 @@ public class Parser implements Serializable {
 
         default R visit(WhileStatementEndNode whileEndStatement) {
             return visit((StatementNode) whileEndStatement);
+        }
+
+        default R visit(LoopInterruptionNode loopInterruptionNode) {
+            return visit((StatementNode) loopInterruptionNode);
         }
 
         default R visit(ExpressionStatementNode expressionStatement) {
@@ -2873,6 +2880,56 @@ public class Parser implements Serializable {
         @Override
         public String toPrettyString(String indent, String incr) {
             return indent;
+        }
+    }
+
+    public static class LoopInterruptionNode extends StatementNode {
+
+        public enum Interruption {
+            BREAK,
+            CONTINUE
+        }
+
+        public final Interruption interruption;
+
+        public LoopInterruptionNode(Location location, Interruption interruption) {
+            super(location);
+            this.interruption = interruption;
+        }
+
+        @Override
+        public String shortType() {
+            return "li";
+        }
+
+        @Override
+        public BlockPartNode[] getBlockParts() {
+            return new BlockPartNode[0];
+        }
+
+        @Override
+        public String toPrettyString(String indent, String incr) {
+            switch (interruption) {
+                case BREAK:
+                    return indent + "break";
+                case CONTINUE:
+                    return indent + "continue";
+            }
+            return "";
+        }
+
+        public boolean isContinue() { return interruption.equals(Interruption.CONTINUE); }
+
+        public boolean isBreak() { return interruption.equals(Interruption.BREAK); }
+
+        @Override
+        public <R> R accept(NodeVisitor<R> visitor) {
+            return visitor.visit(this);
+        }
+
+        @Override
+        public <R> R accept(StatementVisitor<R> visitor) {
+            return visitor.visit(this);
         }
     }
 

@@ -15,8 +15,10 @@ import static nildumu.util.Util.concatAsArrayList;
  * Idea transform from non-SSA with loops to non-SSA without loops.
  * <p>
  * Assumption: it gets passed the raw program without any transforms (or NameResolution for that matter)
+ * <p>
+ * break and continue statements are also transformed
  */
-public class LoopTransformer implements StatementVisitor<Optional<StatementNode>> {
+public class LoopTransformer implements StatementVisitor<List<StatementNode>> {
 
     /**
      * Collect the read and written variables of a node
@@ -83,22 +85,35 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
     }
 
     @Override
-    public Optional<StatementNode> visit(StatementNode statement) {
+    public List<StatementNode> visit(StatementNode statement) {
         visitChildrenDiscardReturn(statement);
-        return Optional.empty();
+        return Collections.singletonList(statement);
     }
 
     @Override
-    public Optional<StatementNode> visit(BlockNode block) {
-        List<StatementNode> inner = block.statementNodes.stream().map(s -> s.accept(this).orElse(s)).collect(Collectors.toList());
+    public List<StatementNode> visit(BlockNode block) {
+        List<StatementNode> inner = block.statementNodes.stream().flatMap(s -> s.accept(this).stream())
+                .collect(Collectors.toList());
         block.statementNodes.clear();
         block.statementNodes.addAll(inner);
-        return Optional.empty();
+        return Collections.emptyList();
     }
 
+    private static class WhileContext {
+        private final ReturnStatementNode returnStatement;
+        private final StatementNode functionCall;
+
+        private WhileContext(ReturnStatementNode returnStatement, StatementNode functionCall) {
+            this.returnStatement = returnStatement;
+            this.functionCall = functionCall;
+        }
+    }
+
+    private Stack<WhileContext> whileContexts = new Stack<>();
+
     @Override
-    public Optional<StatementNode> visit(WhileStatementNode whileNode) {
-        visit(whileNode.body);
+    public List<StatementNode> visit(WhileStatementNode whileNode) {
+
         VariableAccessVisitor visitor = new VariableAccessVisitor();
         visitor.visit(whileNode);
         SymbolTable.Scope scope = scopePerNode.get(whileNode);
@@ -120,13 +135,18 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
         } else {
             invocationAssignment = new ExpressionStatementNode(invocation);
         }
+        ReturnStatementNode returnStatement = new ReturnStatementNode(location, writtenVariables.stream().map(v -> new VariableAccessNode(location, v)).collect(Collectors.toList()));
+        whileContexts.push(new WhileContext(returnStatement, invocationAssignment));
+
+        visit(whileNode.body);
+        whileContexts.pop();
 
         // if (condition) { body; written_vars = f(accessed_vars)} return written_vars
         BlockNode body = new BlockNode(location, asArrayList(
                 new IfStatementNode(location, whileNode.conditionalExpression, new BlockNode(location, concatAsArrayList(whileNode.body.statementNodes,
                         Collections.singletonList(invocationAssignment))
                 ), new BlockNode(location, Collections.emptyList())),
-                new ReturnStatementNode(location, writtenVariables.stream().map(v -> new VariableAccessNode(location, v)).collect(Collectors.toList())))
+                returnStatement)
         );
         Type returnType = types.INT;
         if (writtenVariables.size() > 0) {
@@ -135,6 +155,18 @@ public class LoopTransformer implements StatementVisitor<Optional<StatementNode>
         newMethods.add(new Parser.MethodNode(location, methodName, returnType, parametersNode, body,
                 new Parser.GlobalVariablesNode(location, Collections.emptyMap())));
         visitChildrenDiscardReturn(whileNode);
-        return Optional.of(invocationAssignment);
+        return Collections.singletonList(invocationAssignment);
+    }
+
+    @Override
+    public List<StatementNode> visit(LoopInterruptionNode loopInterruptionNode) {
+        WhileContext context = whileContexts.peek();
+        switch (loopInterruptionNode.interruption) {
+            case BREAK:
+                return Collections.singletonList(context.returnStatement);
+            case CONTINUE:
+                return Arrays.asList(context.functionCall, context.returnStatement);
+        }
+        return Collections.emptyList();
     }
 }
