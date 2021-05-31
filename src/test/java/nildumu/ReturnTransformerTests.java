@@ -15,7 +15,7 @@ public class ReturnTransformerTests {
             "'int func(){ if (1){ return 1 } return 2; }', 'int func(){ int ___return_taken = 0; int ___return_val; if (1) { ___return_taken = 1; ___return_val = 1; } if (!___return_taken) { ___return_taken = 1; ___return_val = 2; } return ___return_val; }'"
     })
     public void testBasicTransformation(String in, String out) {
-        assertEquals("use_sec basic; bit_width 32; " + out, process(in).trim());
+        assertEquals("use_sec basic; bit_width 32; " + out, process("bit_width 32; " + in).trim());
     }
 
     @Test

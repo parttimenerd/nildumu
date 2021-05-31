@@ -22,6 +22,8 @@ docker run -i parttimenerd/nildumu ./run --handler 'handler=inlining;maxrec=INLI
 EOF
 ```
 
+![Tests](https://github.com/parttimenerd/nildumu/actions/workflows/test.yml/badge.svg)
+
 Usage
 -----
 
