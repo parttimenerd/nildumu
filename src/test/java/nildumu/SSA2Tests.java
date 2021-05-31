@@ -1,6 +1,7 @@
 package nildumu;
 
 import nildumu.mih.MethodInvocationHandler;
+import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -9,6 +10,7 @@ import java.util.logging.Level;
 
 import static nildumu.Checks.checkAndThrow;
 import static nildumu.FunctionTests.parse;
+import static org.junit.Assert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -213,6 +215,18 @@ public class SSA2Tests {
                 "  return a11;\n" +
                 "}\n" +
                 "var x = set(0, 1);").val("x", 1).run();
+    }
+
+    /**
+     * Wrapping an assignment in a code block alters and using a declaration + assignment instead of a direct
+     * declaration alters the SSA form when it should not
+     * @see IssueTests#testIssue3()
+     */
+    @Test
+    public void testCodeBlock() {
+        assertThat(toSSA("int a;\n" +
+                "{ a = 1; } \n" +
+                "int l; l = a;").toPrettyString(), CoreMatchers.containsString("l = a1"));
     }
 
     public static Parser.ProgramNode toSSA(String program) {

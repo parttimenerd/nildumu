@@ -62,6 +62,10 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
                     .filter(e -> !definedVariables.contains(e.getKey()))
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         }
+
+        boolean isDefined(String variable) {
+            return definedVariables.contains(variable);
+        }
     }
 
     /**
@@ -287,7 +291,7 @@ public class SSAResolution2 implements NodeVisitor<SSAResolution2.VisRet> {
             if (child instanceof BlockNode){
                 Scope scope = scopes.pop();
                 scope.newVariables.forEach((o, n) -> {
-                    if (appendOnlyVariables.contains(o)){
+                    if (appendOnlyVariables.contains(o) || !scope.isDefined(o)){
                         scopes.peek().newVariables.put(o, n);
                     }
                 });

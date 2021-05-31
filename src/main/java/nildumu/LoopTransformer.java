@@ -96,7 +96,7 @@ public class LoopTransformer implements StatementVisitor<List<StatementNode>> {
                 .collect(Collectors.toList());
         block.statementNodes.clear();
         block.statementNodes.addAll(inner);
-        return Collections.emptyList();
+        return Collections.singletonList(block);
     }
 
     private static class WhileContext {

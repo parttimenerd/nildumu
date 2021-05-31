@@ -470,6 +470,10 @@ l output int o = fib(h);
         return parse(program, MethodInvocationHandler.createDefault());
     }
 
+    static ContextMatcher printAndParse(String program){
+        return parse(program, MethodInvocationHandler.createDefault());
+    }
+
     static ContextMatcher parse(String program, String handler){
         return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(handler), 0));
     }
