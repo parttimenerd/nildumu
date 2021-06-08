@@ -19,6 +19,7 @@ import static nildumu.util.Lazy.l;
 @SuppressWarnings("ALL")
 public class PrintHistory {
 
+    /** State of the global variables at a specific point in time (after a specific number of executions) */
     public static class HistoryEntry {
         public final Optional<HistoryEntry> prev;
         public final Map<Variable, HistoryPerGlobalEntry> map;
@@ -46,6 +47,7 @@ public class PrintHistory {
 
     }
 
+    /** State of a single global variable */
     public static class HistoryPerGlobalEntry {
 
         final Optional<HistoryPerGlobalEntry> prev;

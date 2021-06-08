@@ -5,6 +5,7 @@ import java.io.OutputStreamWriter;
 import java.util.List;
 import java.util.Optional;
 
+/** Abstract solver interface */
 public abstract class Solver<V> {
 
 

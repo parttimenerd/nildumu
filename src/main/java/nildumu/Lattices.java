@@ -1748,6 +1748,10 @@ public class Lattices {
             }
             return IntStream.range(Math.max(1, smallest + app), bits.size());
         }
+
+        public Value copy() {
+            return map(Bit::copy);
+        }
     }
 
     /**
@@ -1771,7 +1775,34 @@ public class Lattices {
         public AppendOnlyValue append(Value value, int bitWidth){
             AppendOnlyValue newValue = new AppendOnlyValue();
             stream().filter(b -> !b.val.isE() && b.val != X).forEach(newValue::add);
-            value.stream().forEach(newValue::add);
+
+            if (isNotEmpty() && endsWithStar()) {
+                DependencySet starBitDeps = get(newValue.size()).deps();
+                // discard bits that are either in the starBitDeps set or that only depend on them
+
+                value.stream().filter(b -> {
+                    if (b.val == E) {
+                        return false;
+                    }
+                    try {
+                        bl.walkBits(b, b_ -> {
+                        }, b_ -> {
+                            if (starBitDeps.contains(b_)) {
+                                return true;
+                            }
+                            if (b_.isAtLeastUnknown() && !b_.hasDependencies()) {
+                                throw new RuntimeException();
+                            }
+                            return false;
+                        });
+                    } catch (RuntimeException ex) {
+                        return true;
+                    }
+                    return false;
+                }).collect(Collectors.toList()).forEach(newValue::add);
+            } else {
+                value.stream().filter(b -> b.val != E).forEach(newValue::add);
+            }
             return newValue;
         }
 

@@ -3,8 +3,10 @@ package nildumu;
 import org.junit.jupiter.api.function.Executable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -30,19 +32,19 @@ public class ContextMatcher {
 
     private final Context context;
     private final TestBuilder builder = new TestBuilder();
-    private MinCut.Algo[] algos = MinCut.Algo.values();
+    private LeakageAlgorithm.Algo[] algos = LeakageAlgorithm.Algo.values();
 
     public ContextMatcher(Context context) {
         this.context = context;
     }
 
-    public ContextMatcher use(MinCut.Algo algo) {
-        algos = new MinCut.Algo[]{algo};
+    public ContextMatcher use(LeakageAlgorithm.Algo algo) {
+        algos = new LeakageAlgorithm.Algo[]{algo};
         return this;
     }
 
     public ContextMatcher useSingleMCAlgo() {
-        return use(MinCut.usedAlgo);
+        return use(LeakageAlgorithm.usedAlgo);
     }
 
     public ContextMatcher val(String variable, long value){
@@ -108,27 +110,36 @@ public class ContextMatcher {
 
     public class LeakageMatcher {
 
-        private final MinCut.Algo[] algos;
+        private final LeakageAlgorithm.Algo[] algos;
 
         public LeakageMatcher() {
             this(ContextMatcher.this.algos);
         }
 
-        public LeakageMatcher(MinCut.Algo[] algos) {
+        public LeakageMatcher(LeakageAlgorithm.Algo[] algos) {
             this.algos = algos;
         }
 
+        private List<LeakageAlgorithm.Algo> usedAlgos() {
+            List<LeakageAlgorithm.Algo> ret = Arrays.stream(algos).filter(a -> a.hasRequiredCapabilities(context))
+                    .collect(Collectors.toList());
+            if (ret.isEmpty()) {
+                fail("No algorithms to test with");
+            }
+            return ret;
+        }
+
         public LeakageMatcher leaks(Lattices.Sec<?> attackerSec, double leakage){
-            for (MinCut.Algo algo : algos) {
+            for (LeakageAlgorithm.Algo algo : usedAlgos()) {
                 Executable inner = () -> {
-                    MinCut.ComputationResult comp = MinCut.compute(context, attackerSec, algo);
+                    LeakageAlgorithm.ComputationResult comp = algo.compute(context, attackerSec);
                     assertEquals(leakage, comp.maxFlow, () -> {
                         return String.format("The calculated leakage for an attacker of level %s should be %f, leaking %s, using %s",
                                 attackerSec, leakage, comp.minCut.stream().map(Lattices.Bit::toString).collect(Collectors.joining(", ")),
                                 algo);
                     });
                 };
-                if (!algo.supportsAlternatives && context.recordsAlternatives()) {
+                if (!algo.capability(LeakageAlgorithm.Algo.SUPPORTS_ALTERNATIVES) && context.recordsAlternatives()) {
                     builder.add(() -> {
                         boolean prev = context.recordsAlternatives();
                         try {
@@ -149,12 +160,9 @@ public class ContextMatcher {
          * Only uses leakage computation algorithms that support intervals.
          */
         public LeakageMatcher numberOfOutputs(Lattices.Sec<?> attackerSec, int outputs){
-            for (MinCut.Algo algo : algos) {
-                if (!algo.supportsIntervals()){
-                    continue;
-                }
+            for (LeakageAlgorithm.Algo algo : usedAlgos()) {
                 builder.add(() -> {
-                    MinCut.ComputationResult comp = MinCut.compute(context, attackerSec, algo);
+                    LeakageAlgorithm.ComputationResult comp = algo.compute(context, attackerSec);
                     int actualOutputs = (int)Math.round(Math.pow(2, comp.maxFlow));
                     assertEquals(outputs, actualOutputs, () -> {
                         return String.format("The calculated number of outputs to an attacker of level %s should be %d, but is %d, using %s",
@@ -170,9 +178,9 @@ public class ContextMatcher {
         }
 
         public LeakageMatcher leaksAtLeast(Lattices.Sec sec, double leakage) {
-            for (MinCut.Algo algo : algos) {
+            for (LeakageAlgorithm.Algo algo : usedAlgos()) {
                 builder.add(() -> {
-                    MinCut.ComputationResult comp = MinCut.compute(context, sec, algo);
+                    LeakageAlgorithm.ComputationResult comp = algo.compute(context, sec);
                     assertTrue(comp.maxFlow >= leakage,
                             String.format("The calculated leakage for an attacker of level %s should be at least %f, " +
                                     "leaking %f, using %s", sec, leakage, comp.maxFlow, algo));
@@ -215,14 +223,11 @@ public class ContextMatcher {
     }
 
     public ContextMatcher benchLeakageComputationAlgorithms(int executionTimes) {
-        for (MinCut.Algo algo : MinCut.Algo.values()) {
-            if (!algo.supportsAlternatives) {
-                continue;
-            }
+        for (LeakageAlgorithm.Algo algo : LeakageAlgorithm.Algo.supported(context)) {
             builder.add(() -> {
                 List<Integer> times = IntStream.range(0, executionTimes).mapToObj(i -> {
                     long start = System.currentTimeMillis();
-                    MinCut.compute(context, context.sl.bot(), algo);
+                    algo.compute(context, context.sl.bot());
                     return (int) (System.currentTimeMillis() - start);
                 }).collect(Collectors.toList());
                 double mean = times.stream().mapToInt(i -> i).sum() * 1.0 / times.size();
@@ -294,6 +299,11 @@ public class ContextMatcher {
 
         public ValueMatcher size(int expected){
             builder.add(() -> assertEquals(expected, value.size(), String.format("%s has size %s", value, expected)));
+            return this;
+        }
+
+        public ValueMatcher numberOfDependenciesOfLastBit(int expected) {
+            builder.add(() -> assertEquals(expected, value.get(value.size()).deps().size(), "Number of dependencies"));
             return this;
         }
     }

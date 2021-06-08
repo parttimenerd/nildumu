@@ -149,7 +149,7 @@ public abstract class MethodInvocationHandler {
         Map<Variable, AppendOnlyValue> newGlobals = globals.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, m -> m.getValue().append(new Value(bl.create(S, set)))));
         List<Value> ret = analyze(c, callSite, arguments);
-        return new MethodReturnValue(ret, newGlobals, new InputBits());
+        return new MethodReturnValue(ret, newGlobals, new InputBits(c));
     }
 
     public List<Value> analyze(Context c, MethodInvocationNode callSite, List<Value> arguments) {

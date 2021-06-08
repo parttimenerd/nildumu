@@ -108,7 +108,6 @@ class Translator extends LangBaseVisitor<Object> {
 
             @Override
             public Object visit(Parser.InputVariableDeclarationNode inputDecl) {
-                node.context.addInputValue(secLattice.parse(inputDecl.secLevel), ((Parser.IntegerLiteralNode) inputDecl.expression).value);
                 visit((Parser.StatementNode) inputDecl);
                 return null;
             }

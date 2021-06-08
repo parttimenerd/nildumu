@@ -16,8 +16,7 @@ import static nildumu.Context.log;
 import static nildumu.Lattices.B.U;
 import static nildumu.Lattices.bl;
 import static nildumu.Lattices.ds;
-import static nildumu.util.Util.zip;
-import static nildumu.util.Util.zipAnyMatch;
+import static nildumu.util.Util.*;
 
 /**
  * A summary-edge based handler. It creates for each function beforehand summary edges:
@@ -125,7 +124,7 @@ public class SummaryHandler extends MethodInvocationHandler {
                     }
                     , node -> node.getCallers().stream().filter(n -> !n.isMainNode).collect(Collectors.toSet()),
                     state, (f, s) -> {
-                        return !areSummaryGraphsEqual(f.value, s.value); // print history is ignored here
+                        return !s.addedAStarBit && !areSummaryGraphsEqual(f.value, s.value); // print history is ignored here
                     }).entrySet().stream().collect(Collectors.toMap(e -> e.getKey().method, e -> e.getValue().value));
         });
         Context.log(() -> "Finish setup");
@@ -181,11 +180,11 @@ public class SummaryHandler extends MethodInvocationHandler {
         List<Lattices.Value> parameters = generateParameters(program, method);
         if (usedMode == Mode.COINDUCTION) {
             MethodReturnValue returnValue = botHandler.analyze(program.context, callSites.get(method), parameters, new HashMap<>());
-            return new BitGraph(program.context, parameters, returnValue, method, new InputBits());
+            return new BitGraph(program.context, parameters, returnValue, method, new InputBits(program.context));
         }
         // TODO: problem with input bits?
         return new BitGraph(program.context, parameters, new MethodReturnValue(createUnknownValue(program, method.getNumberOfReturnValues()),
-                new HashMap<>(), new InputBits()), method, new InputBits());
+                new HashMap<>(), new InputBits(program.context)), method, new InputBits(program.context));
     }
 
     List<Lattices.Value> generateParameters(Parser.ProgramNode program, Parser.MethodNode method) {
@@ -204,21 +203,25 @@ public class SummaryHandler extends MethodInvocationHandler {
     }
 
     BitGraph methodIteration(Context c, Parser.MethodInvocationNode callSite, MethodInvocationHandler handler, List<Lattices.Value> parameters) {
-        c.resetFrames();
-        c.pushNewFrame(callSite, parameters.stream().flatMap(Lattices.Value::stream).collect(Collectors.toSet()));
-        for (int i = 0; i < parameters.size(); i++) {
-            c.setVariableValue(callSite.definition.parameters.get(i).definition, parameters.get(i));
-        }
-        c.forceMethodInvocationHandler(handler);
-        Processor.process(c, callSite.definition.body);
-        List<Lattices.Value> ret = c.getReturnValue().split(callSite.definition.getNumberOfReturnValues());
-        Map<Variable, Lattices.AppendOnlyValue> globalVals = callSite.definition.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
-        InputBits inputBits = c.getNewlyIntroducedInputs();
-        c.popFrame();
-        c.forceMethodInvocationHandler(this);
-        MethodReturnValue retValue = new MethodReturnValue(ret, globalVals, inputBits);
-        return new BitGraph(c, parameters, retValue, callSite.definition, inputBits);
+        // System.out.println(String.format("Method iteration of %s with parameters %s", callSite.method, parameters));
+        return withIndentedStream(() -> {
+            c.resetFrames();
+            c.pushNewFrame(callSite, parameters.stream().flatMap(Lattices.Value::stream).collect(Collectors.toSet()));
+            for (int i = 0; i < parameters.size(); i++) {
+                c.setVariableValue(callSite.definition.parameters.get(i).definition, parameters.get(i));
+            }
+            c.forceMethodInvocationHandler(handler);
+            Processor.process(c, callSite.definition.body);
+            List<Lattices.Value> ret = c.getReturnValue().split(callSite.definition.getNumberOfReturnValues());
+            Map<Variable, Lattices.AppendOnlyValue> globalVals = callSite.definition.globalDefs.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                    e -> c.getVariableValue(e.getValue().second).asAppendOnly()));
+            InputBits inputBits = c.getNewlyIntroducedInputs();
+            c.popFrame();
+            c.forceMethodInvocationHandler(this);
+            MethodReturnValue retValue = new MethodReturnValue(ret, globalVals, inputBits);
+            //System.out.println(String.format("Resulting bit dep graph has parameters %s, retValue %s, inputBits %s", parameters, retValue, inputBits));
+            return new BitGraph(c, parameters, retValue, callSite.definition, inputBits);
+        });
     }
 
     MethodInvocationHandler createHandler(Function<Parser.MethodNode, BitGraph> curVersion) {

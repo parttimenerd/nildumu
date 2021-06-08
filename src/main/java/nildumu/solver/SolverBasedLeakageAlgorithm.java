@@ -2,7 +2,7 @@ package nildumu.solver;
 
 import nildumu.Context;
 import nildumu.Lattices;
-import nildumu.MinCut;
+import nildumu.LeakageAlgorithm;
 import nildumu.intervals.Interval;
 
 import java.util.*;
@@ -14,7 +14,7 @@ import static nildumu.Lattices.bl;
 /**
  * Solver based leakage calculation, uses a minimizing solver
  */
-public class LeakageAlgorithm extends MinCut.Algorithm {
+public class SolverBasedLeakageAlgorithm extends LeakageAlgorithm {
 
     private static enum Type {
         IS_INTERVAL("inter"),
@@ -68,17 +68,16 @@ public class LeakageAlgorithm extends MinCut.Algorithm {
 
     private final boolean inIntervalMode;
 
-    public LeakageAlgorithm(Context.SourcesAndSinks sourcesAndSinks,
-                            Function<Lattices.Bit, Double> weights,
-                            Supplier<Solver<Variable>> solverSupplier,
-                            boolean inIntervalMode) {
+    public SolverBasedLeakageAlgorithm(SourcesAndSinks sourcesAndSinks,
+                                       Function<Lattices.Bit, Double> weights,
+                                       Supplier<Solver<Variable>> solverSupplier) {
         super(sourcesAndSinks, weights);
         this.solverSupplier = solverSupplier;
-        this.inIntervalMode = inIntervalMode;
+        this.inIntervalMode = sourcesAndSinks.context.inIntervalMode();
     }
 
     @Override
-    public MinCut.ComputationResult compute() {
+    public ComputationResult compute() {
         Solver<Variable> solver = solverSupplier.get();
         assert !solver.maximize;
         Set<Lattices.Bit> alreadyVisited = new HashSet<>();
@@ -161,7 +160,7 @@ public class LeakageAlgorithm extends MinCut.Algorithm {
                     consideredBits.add(trueVariable.bit);
             }
         }
-        return new MinCut.ComputationResult(consideredBits, weight);
+        return new ComputationResult(consideredBits, weight);
     }
 
     private static Variable v(Lattices.Bit bit, Type type){

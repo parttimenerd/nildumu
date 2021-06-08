@@ -183,7 +183,8 @@ public class Parser implements Serializable {
 
                                 @Override
                                 public Object visit(InputVariableDeclarationNode inputDecl) {
-                                    node.context.addInputValue(secLattice.parse(inputDecl.secLevel), ((IntegerLiteralNode) inputDecl.expression).value);
+                                    node.context.addInputValue(secLattice.parse(inputDecl.secLevel),
+                                            inputDecl.expression, ((IntegerLiteralNode) inputDecl.expression).value);
                                     visit((StatementNode) inputDecl);
                                     return null;
                                 }

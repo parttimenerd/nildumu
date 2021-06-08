@@ -3,7 +3,7 @@ package nildumu.eval.tools;
 import java.nio.file.*;
 import java.time.Duration;
 
-import nildumu.MinCut;
+import nildumu.LeakageAlgorithm;
 import nildumu.eval.*;
 
 /**
@@ -15,13 +15,13 @@ public class Nildumu extends AbstractTool {
 
     private final String mih;
 
-    private final MinCut.Algo algo;
+    private final LeakageAlgorithm.Algo algo;
 
-    public Nildumu(int unwind, MinCut.Algo algo) {
+    public Nildumu(int unwind, LeakageAlgorithm.Algo algo) {
         this(unwind, 0, algo);
     }
 
-    public Nildumu(int unwind, boolean summaryUnwind, MinCut.Algo algo) {
+    public Nildumu(int unwind, boolean summaryUnwind, LeakageAlgorithm.Algo algo) {
         this(unwind, summaryUnwind ? unwind : 0, algo);
     }
 
@@ -29,7 +29,7 @@ public class Nildumu extends AbstractTool {
      *  @param csrec maximum recursion depth for the call string handler
      * @param scsrec maximum recusion depth for the call string handler used by the summary handler
      */
-    public Nildumu(int csrec, int scsrec, MinCut.Algo algo){
+    public Nildumu(int csrec, int scsrec, LeakageAlgorithm.Algo algo){
         super(String.format("nildumu%02d_%02d_%s", csrec, scsrec, algo.shortName), csrec, "nd");
         this.mih = String.format("handler=inlining;maxrec=%d;bot={handler=summary;csmaxrec=%d;bot=basic}",
                 csrec, scsrec);

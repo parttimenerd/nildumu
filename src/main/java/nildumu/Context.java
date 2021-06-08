@@ -176,7 +176,7 @@ public class Context {
 
         @Override
         public String toString() {
-            return path.stream().map(m -> m.method).collect(Collectors.joining(" → "));
+            return path.stream().map(m -> m.method).collect(Collectors.joining("·"));
         }
 
         public boolean isEmpty() {
@@ -197,7 +197,8 @@ public class Context {
             @Override
             public void handleValueUpdate(DefaultMap<MJNode, Value> map, MJNode key, Value value) {
                 assert value.isNotEmpty();
-                if (vl.mapBits(map.get(key), value, (a, b) -> a != b).stream().anyMatch(p -> p)){
+                if (map.get(key).size() != value.size() ||
+                        vl.mapBits(map.get(key), value, (a, b) -> a != b).stream().anyMatch(p -> p)){
                     nodeValueUpdateCount++;
                 }
             }
@@ -285,7 +286,7 @@ public class Context {
             this.state = state;
             this.methodParameterBits = methodParameterBits;
             this.nodeValueState = new NodeValueState(callPath);
-            this.inputBits = new InputBits();
+            this.inputBits = new InputBits(Context.this);
         }
 
         Frame(CallPath callPath, Set<Bit> methodParameterBits) {
@@ -407,7 +408,7 @@ public class Context {
         return secMap.put(bit, level);
     }
 
-    public Value addInputValue(Sec<?> sec, Value value){
+    public Value addInputValue(Sec<?> sec, ExpressionNode node, Value value){
         input.add(sec, value);
         for (Bit bit : value){
             if (bit.val() == B.U){
@@ -417,7 +418,7 @@ public class Context {
                 sec(bit, sec);
             }
         }
-        getNewlyIntroducedInputs().put(sec, value);
+        getNewlyIntroducedInputs().put(sec, new InputBits.InputIntegerPath(callPath(), node), value);
         return value;
     }
 
@@ -427,6 +428,10 @@ public class Context {
 
     public State.OutputState getOutputState(){
         return frame.state.outputState;
+    }
+
+    public boolean hasAppendOnlyVariables() {
+        return !frame.state.outputState.isEmpty();
     }
 
     public Value addOutputValue(Sec<?> sec, Value value){
@@ -472,7 +477,16 @@ public class Context {
             }
             //return getVariableValue(((VariableAccessNode) node).definition);
         } else if (node instanceof WrapperNode){
-            return ((WrapperNode<Value>) node).wrapped;
+            // we have to use a copy here for all non constant values
+            // non constrant values here are related to input
+            Value value = ((WrapperNode<Value>) node).wrapped;
+            if (value.isConstant()) {
+                return value;
+            }
+            if (!frame.nodeValueState.nodeValueMap.containsKey(node)) {
+                frame.nodeValueState.nodeValueMap.put(node, value.copy());
+            }
+            return replace(frame.nodeValueState.nodeValueMap.get(node));
         }
         return replace(frame.nodeValueState.nodeValueMap.get(node));
     }
@@ -489,6 +503,9 @@ public class Context {
     public Value op(MJNode node, List<Value> arguments){
         if (node instanceof ParameterAccessNode){
             return getVariableValue(((ParameterAccessNode) node).definition);
+        }
+        if (node instanceof IntegerLiteralNode) {
+            return arguments.get(0);
         }
         if (node instanceof VariableAccessNode){
             VariableAccessNode access = (VariableAccessNode)node;
@@ -552,7 +569,7 @@ public class Context {
             nodeValue(node, newVal);
             return somethingChanged;
         }
-        boolean paramsChanged = compareAndStoreParamVersion(node);
+        boolean paramsChanged = compareAndStoreParamVersion(node);  // TODO: needed for loop free programs?
         if (!paramsChanged){
             return false;
         }
@@ -712,12 +729,12 @@ public class Context {
         }
     }
 
-    private Map<Sec<?>, MinCut.ComputationResult> leaks = null;
+    private Map<Sec<?>, LeakageAlgorithm.ComputationResult> leaks = null;
 
 
-    public Map<Sec<?>, MinCut.ComputationResult> computeLeakage(MinCut.Algo algo){
+    public Map<Sec<?>, LeakageAlgorithm.ComputationResult> computeLeakage(LeakageAlgorithm.Algo algo){
         if (leaks == null){
-            leaks = MinCut.compute(this, algo);
+            leaks = algo.compute(this);
         }
         return leaks;
     }
@@ -961,12 +978,13 @@ public class Context {
         return weight;
     }
 
-    public void weight(Bit bit, double weight){
+    public Bit weight(Bit bit, double weight){
         if (weight == 1){
             weightMap.remove(bit, weight);
-            return;
+            return bit;
         }
         weightMap.put(bit, weight);
+        return bit;
     }
 
     public boolean hasInfiniteWeight(Bit bit){
@@ -1125,25 +1143,9 @@ public class Context {
                 .collect(Collectors.toSet());
     }
 
-    public SourcesAndSinks sourcesAndSinks(Sec<?> sec){
-        return new SourcesAndSinks(entropyBounds.getMaxOutputs(sec),
+    public LeakageAlgorithm.SourcesAndSinks sourcesAndSinks(Sec<?> sec){
+        return new LeakageAlgorithm.SourcesAndSinks(entropyBounds.getMaxOutputs(sec),
                 sources(sec), entropyBounds.getMaxInputEntropy(sec), sinks(sec), this);
     }
 
-    public static class SourcesAndSinks {
-
-        final double sourceWeight;
-        public final Set<Bit> sources;
-        final double sinkWeight;
-        public final Set<Bit> sinks;
-        public final Context context;
-
-        public SourcesAndSinks(double sourceWeight, Set<Bit> sources, double sinkWeight, Set<Bit> sinks, Context context){
-            this.sourceWeight = sourceWeight;
-            this.sources = sources;
-            this.sinkWeight = sinkWeight;
-            this.sinks = sinks;
-            this.context = context;
-        }
-    }
 }

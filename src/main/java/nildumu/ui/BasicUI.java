@@ -17,11 +17,13 @@ import swp.lexer.Location;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.plaf.FontUIResource;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.StyleContext;
 import java.awt.*;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -232,7 +234,10 @@ public class BasicUI {
                 resultName = currentFont.getName();
             }
         }
-        return new Font(resultName, style >= 0 ? style : currentFont.getStyle(), size >= 0 ? size : currentFont.getSize());
+        Font font = new Font(resultName, style >= 0 ? style : currentFont.getStyle(), size >= 0 ? size : currentFont.getSize());
+        boolean isMac = System.getProperty("os.name", "").toLowerCase(Locale.ENGLISH).startsWith("mac");
+        Font fontWithFallback = isMac ? new Font(font.getFamily(), font.getStyle(), font.getSize()) : new StyleContext().getFont(font.getFamily(), font.getStyle(), font.getSize());
+        return fontWithFallback instanceof FontUIResource ? fontWithFallback : new FontUIResource(fontWithFallback);
     }
 
     /**
@@ -354,14 +359,14 @@ public class BasicUI {
             setOutputMode((OutputMode) outputModeComboxBox.getSelectedItem());
             processRefreshTimer.request();
         });
-        for (MinCut.Algo algo : MinCut.Algo.values()) {
+        for (LeakageAlgorithm.Algo algo : LeakageAlgorithm.Algo.values()) {
             minCutAlgoComboBox.addItem(algo);
         }
-        minCutAlgoComboBox.setSelectedItem(MinCut.Algo.valueOf(getVarContent("lastMinCutAlgo", MinCut.usedAlgo.name())));
+        minCutAlgoComboBox.setSelectedItem(LeakageAlgorithm.Algo.valueOf(getVarContent("lastMinCutAlgo", LeakageAlgorithm.usedAlgo.name())));
         minCutAlgoComboBox.addActionListener(a -> {
-            MinCut.Algo algo = (MinCut.Algo) minCutAlgoComboBox.getSelectedItem();
+            LeakageAlgorithm.Algo algo = (LeakageAlgorithm.Algo) minCutAlgoComboBox.getSelectedItem();
             setVarContent("lastMinCutAlgo", algo.name());
-            MinCut.usedAlgo = algo;
+            LeakageAlgorithm.usedAlgo = algo;
         });
         processRefreshTimer = new ResponsiveTimer(() -> {
             parseRefreshTimer.abort();
@@ -486,7 +491,7 @@ public class BasicUI {
                 opts |= Processor.TRANSFORM_PLUS;
             }
             opts |= Processor.TRANSFORM_LOOPS;
-            if (MinCut.usedAlgo.supportsAlternatives) {
+            if (LeakageAlgorithm.usedAlgo.capability(LeakageAlgorithm.Algo.SUPPORTS_ALTERNATIVES)) {
                 opts |= Processor.RECORD_ALTERNATIVES;
             }
             Context c = Processor.process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(methodHandlerSelectionComboxBox.getSelectedItem().toString()), opts);
@@ -646,7 +651,7 @@ public class BasicUI {
 
     private void updateLeakageTable(Context context) {
         List<Sec<?>> secLevels = new ArrayList<>((Set<Sec<?>>) context.sl.elements());
-        Map<Sec<?>, MinCut.ComputationResult> compRes = context.computeLeakage((MinCut.Algo) minCutAlgoComboBox.getSelectedItem());
+        Map<Sec<?>, LeakageAlgorithm.ComputationResult> compRes = context.computeLeakage((LeakageAlgorithm.Algo) minCutAlgoComboBox.getSelectedItem());
         leakageTable.setTableHeader(new JTableHeader());
         leakageTable.setModel(new AbstractTableModel() {
 

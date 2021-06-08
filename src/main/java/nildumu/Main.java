@@ -29,7 +29,7 @@ public class Main implements Runnable {
     private String handler = "handler=inlining;maxrec=32;bot=summary";
 
     @Option(names = "--algo", description = "Used leakage computation algorithm, default is OpenWBO PMSAT based")
-    private MinCut.Algo algo = MinCut.usedAlgo;
+    private LeakageAlgorithm.Algo algo = LeakageAlgorithm.usedAlgo;
 
     @Option(names = {"-tp", "--transformPlus"},
             description = "Transform plus into bit wise operators in the preprocessing step", defaultValue = "false")
@@ -39,7 +39,7 @@ public class Main implements Runnable {
     public void run() {
         try {
             int opts = (transformPlus ? TRANSFORM_PLUS : 0) | TRANSFORM_LOOPS |
-                    (algo.supportsAlternatives ? RECORD_ALTERNATIVES : 0);
+                    (algo.capability(LeakageAlgorithm.Algo.SUPPORTS_ALTERNATIVES) ? RECORD_ALTERNATIVES : 0);
             Context context =
                     Processor.process(String.join("\n", programPath.equals("-") ?
                                     new BufferedReader(new InputStreamReader(System.in)).lines().collect(Collectors.toList()) :
@@ -53,7 +53,7 @@ public class Main implements Runnable {
 
     public static void main(String[] args) {
         CommandLine commandLine = new CommandLine(new Main());
-        commandLine.registerConverter(MinCut.Algo.class, MinCut.Algo::from);
+        commandLine.registerConverter(LeakageAlgorithm.Algo.class, LeakageAlgorithm.Algo::from);
         commandLine.execute(args);
     }
 }

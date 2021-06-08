@@ -146,7 +146,14 @@ public class Processor {
             @Override
             public Boolean visit(TmpInputVariableDeclarationNode inputDecl) {
                 visit((VariableAssignmentNode)inputDecl);
-                context.addInputValue(context.sl.parse(inputDecl.secLevel), ((IntegerLiteralNode)inputDecl.expression).value);
+                context.addInputValue(context.sl.parse(inputDecl.secLevel), inputDecl.expression, context.nodeValue(inputDecl.expression));
+                return false;
+            }
+
+            @Override
+            public Boolean visit(InputVariableDeclarationNode inputDecl) {
+                visit((VariableAssignmentNode) inputDecl);
+                context.addInputValue(context.sl.parse(inputDecl.secLevel), inputDecl.expression, context.nodeValue(inputDecl.expression));
                 return false;
             }
 

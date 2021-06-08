@@ -49,4 +49,8 @@ public class GenericState {
         return map.containsKey(variable);
     }
 
+    public boolean isEmpty() {
+        return map.isEmpty();
+    }
+
 }

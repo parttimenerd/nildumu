@@ -13,6 +13,7 @@ import static nildumu.Lattices.bl;
 import static nildumu.Lattices.vl;
 import static nildumu.mih.MethodInvocationHandler.cloneBit;
 import static nildumu.util.Util.p;
+import static nildumu.util.Util.withIndentedStream;
 
 public class BitGraph {
 
@@ -74,52 +75,61 @@ public class BitGraph {
         });
     }
 
-
+    /**
+     * @param globals old global values
+     */
     public MethodInvocationHandler.MethodReturnValue applyToArgs(Context context, List<Lattices.Value> arguments, Map<Variable, Lattices.AppendOnlyValue> globals) {
-        List<Lattices.Value> extendedArguments = arguments;
-        Map<Lattices.Bit, Lattices.Bit> newBits = new HashMap<>();
-        // populate
-        vl.walkBits(Stream.concat(inputBits.getBits().stream(), methodReturnValue.getCombinedValue().stream()).collect(Collectors.toSet()), bit -> {
-            if (newBits.containsKey(bit)) {
-                return;
-            }
-            if (parameterBits.contains(bit)) {
-                Pair<Integer, Integer> loc = bitInfo.get(bit);
-                Lattices.Bit argBit = extendedArguments.get(loc.first).get(loc.second);
-                newBits.put(bit, argBit);
-            } else {
-                Lattices.Bit clone = cloneBit(context, bit, d(bit));
-                clone.value(bit.value());
-                newBits.put(bit, clone);
-            }
-        });
-        DefaultMap<Lattices.Value, Lattices.Value> newValues = new DefaultMap<>((map, value) -> {
-            if (parameters.contains(value)) {
-                return arguments.get(parameters.indexOf(value));
-            }
-            Lattices.Value clone = value.map(b -> {
-                if (!parameterBits.contains(b)) {
-                    return newBits.get(b);
+          MethodInvocationHandler.MethodReturnValue res = withIndentedStream(() -> {
+            List<Lattices.Value> extendedArguments = arguments;
+            Map<Lattices.Bit, Lattices.Bit> newBits = new HashMap<>();
+            // populate
+            vl.walkBits(Stream.concat(inputBits.getBits().stream(), this.methodReturnValue.getCombinedValue().stream()).collect(Collectors.toSet()), bit -> {
+                if (newBits.containsKey(bit)) {
+                    return;
                 }
-                return b;
+                if (parameterBits.contains(bit)) {
+                    Pair<Integer, Integer> loc = bitInfo.get(bit);
+                    Lattices.Bit argBit = extendedArguments.get(loc.first).get(loc.second);
+                    newBits.put(bit, argBit);
+                } else {
+                    Lattices.Bit clone = cloneBit(context, bit, d(bit));
+                    clone.value(bit.value());
+                    newBits.put(bit, clone);
+                }
             });
-            clone.node(value.node());
-            return value;
+            DefaultMap<Lattices.Value, Lattices.Value> newValues = new DefaultMap<>((map, value) -> {
+                if (parameters.contains(value)) {
+                    return arguments.get(parameters.indexOf(value));
+                }
+                Lattices.Value clone = value.map(b -> {
+                    if (!parameterBits.contains(b)) {
+                        return newBits.get(b);
+                    }
+                    return b;
+                });
+                clone.node(value.node());
+                return value;
+            });
+            // update dependencies
+            newBits.forEach((old, b) -> {
+                if (!parameterBits.contains(old)) {
+                    b.alterDependencies(newBits::get);
+                }
+                //b.value(old.value());
+            });
+            // set of new global variables
+            Map<Variable, Lattices.AppendOnlyValue> globs = new HashMap<>(globals);
+            globs.putAll(this.methodReturnValue.globals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                    e -> {
+                        Lattices.AppendOnlyValue oldValue = globals.getOrDefault(e.getKey(), Lattices.AppendOnlyValue.createEmpty()); // new value??
+                        Lattices.Value additionWithThisCall = this.methodReturnValue.globals.get(e.getKey()).map(newBits::get); // old stream content??
+                        return oldValue.append(additionWithThisCall); // append to the globals
+                    })));
+            return new MethodInvocationHandler.MethodReturnValue(returnValues.stream()
+                    .map(v -> v.map(newBits::get)).collect(Collectors.toList()),
+                    globs, inputBits.map(newBits::get));
         });
-        // update dependencies
-        newBits.forEach((old, b) -> {
-            if (!parameterBits.contains(old)) {
-                b.alterDependencies(newBits::get);
-            }
-            //b.value(old.value());
-        });
-        Map<Variable, Lattices.AppendOnlyValue> globs = new HashMap<>(globals);
-        globs.putAll(methodReturnValue.globals.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                e -> globals.getOrDefault(e.getKey(), Lattices.AppendOnlyValue.createEmpty())
-                        .append(methodReturnValue.globals.get(e.getKey()).map(newBits::get)))));
-        return new MethodInvocationHandler.MethodReturnValue(returnValues.stream()
-                .map(v -> v.map(newBits::get)).collect(Collectors.toList()),
-                globs, inputBits.map(newBits::get));
+        return res;
     }
 
     public Set<Lattices.Bit> calcReachableParamBits(Lattices.Bit bit) {
@@ -137,18 +147,15 @@ public class BitGraph {
     }
 
     public Set<Lattices.Bit> minCutBits(Set<Lattices.Bit> outputBits, Set<Lattices.Bit> inputBits) {
-        return MinCut.compute(new SourcesAndSinks(INFTY, outputBits, INFTY, inputBits, context), context::weight, MinCut.usedAlgo).minCut;
+        return LeakageAlgorithm.usedAlgo.compute(new LeakageAlgorithm.SourcesAndSinks(INFTY, outputBits, INFTY, inputBits, context), context::weight).minCut;
     }
 
     public Set<Lattices.Bit> minCutBits(Set<Lattices.Bit> outputBits, Set<Lattices.Bit> inputBits, double outputWeight) {
-        return MinCut.compute(new SourcesAndSinks(INFTY, outputBits, INFTY, inputBits, context), b -> outputBits.contains(b) ? outputWeight : context.weight(b), MinCut.usedAlgo).minCut;
+        return LeakageAlgorithm.usedAlgo.compute(new LeakageAlgorithm.SourcesAndSinks(INFTY, outputBits, INFTY, inputBits, context), b -> outputBits.contains(b) ? outputWeight : context.weight(b)).minCut;
     }
 
     /**
      * Used only for the fix point iteration
-     *
-     * @param obj
-     * @return
      */
     @Override
     public boolean equals(Object obj) {

@@ -1,17 +1,15 @@
 package nildumu;
 
-import nildumu.solver.LeakageAlgorithm;
+import nildumu.solver.SolverBasedLeakageAlgorithm;
 import nildumu.solver.PMSATSolverImpl;
 import nildumu.util.DefaultMap;
 import org.jgrapht.alg.flow.PushRelabelMFImpl;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
-import picocli.CommandLine;
 import swp.util.Pair;
 
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static nildumu.Context.INFTY;
@@ -25,103 +23,7 @@ import static nildumu.Lattices.*;
  */
 public class MinCut {
 
-    public static Algo usedAlgo = Algo.OPENWBO_GLUCOSE;
-
-    public enum Algo {
-        GRAPHT_PP("JGraphT Preflow-Push", "JGT", false, false, null, ""),
-        OPENWBO_GLUCOSE("Open-WBO GL PMSAT", "OWG", "Open-WBO/bin/open-wbo-g", ""),
-        OPENWBO_MERGESAT("Open-WBO MS PMSAT", "OWM", "Open-WBO/bin/open-wbo-ms", ""),
-        UWRMAXSAT("UWrMaxSat PMSAT", "UWr", "UWrMaxSat-1.1w/bin/uwrmaxsat", "-m");
-
-        public final String description;
-        public final String shortName;
-        public final boolean supportsIntervals;
-        public final boolean supportsAlternatives;
-        public final String binaryPath;
-        public final String options;
-
-        Algo(String description, String shortName, boolean supportsIntervals, boolean supportsAlternatives, String binaryPath, String options) {
-            this.description = description;
-            this.shortName = shortName;
-            this.supportsIntervals = supportsIntervals;
-            this.supportsAlternatives = supportsAlternatives;
-            this.binaryPath = binaryPath;
-            this.options = options;
-        }
-
-        Algo(String description, String shortName, String binaryPath, String options) {
-            this(description, shortName, true, true, binaryPath, options);
-        }
-
-        @Override
-        public String toString() {
-            return description;
-        }
-
-        public boolean supportsIntervals() {
-            return supportsIntervals;
-        }
-
-        public <T> T use(Supplier<T> func) {
-            Algo prev = usedAlgo;
-            usedAlgo = this;
-            T t;
-            try {
-                t = func.get();
-            } finally {
-                usedAlgo = prev;
-            }
-            return t;
-        }
-
-        public void use(Runnable func) {
-            use(() -> {
-                func.run();
-                return null;
-            });
-        }
-
-        public static MinCut.Algo from(String s) {
-            try {
-                return MinCut.Algo.valueOf(s.toUpperCase());
-            } catch (IllegalArgumentException ex){
-                throw new IllegalArgumentException(String.format("%s is not a valid algorithm, use one of %s",
-                        s, Arrays.stream(MinCut.Algo.values()).map(MinCut.Algo::name).collect(Collectors.joining(", "))));
-            }
-        }
-    }
-
     public static boolean DEBUG = false;
-
-    public static class ComputationResult {
-        public final Set<Bit> minCut;
-        public final double maxFlow;
-
-        public ComputationResult(Set<Bit> minCut, double maxFlow) {
-            this.minCut = minCut;
-            if (maxFlow > INFTY){
-                this.maxFlow = INFTY;
-            } else {
-                this.maxFlow = maxFlow;
-            }
-            if (minCut.size() > maxFlow) {
-                System.err.println("#min cut > max flow");
-            }
-        }
-    }
-
-    public static abstract class Algorithm {
-
-        protected final Context.SourcesAndSinks sourcesAndSinks;
-        protected final Function<Bit, Double> weights;
-
-        protected Algorithm(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights) {
-            this.sourcesAndSinks = sourcesAndSinks;
-            this.weights = weights;
-        }
-
-        public abstract ComputationResult compute();
-    }
 
 
     private static class Vertex {
@@ -150,9 +52,9 @@ public class MinCut {
     }
 
 
-    public static class GraphTPP extends Algorithm {
+    public static class GraphTPP extends LeakageAlgorithm {
 
-        protected GraphTPP(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights) {
+        protected GraphTPP(SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights) {
             super(sourcesAndSinks, weights);
             assert !sourcesAndSinks.context.recordsAlternatives();
         }
@@ -228,32 +130,4 @@ public class MinCut {
         }
     }
 
-    public static ComputationResult compute(Context.SourcesAndSinks sourcesAndSinks, Function<Bit, Double> weights, Algo algo){
-        switch (algo) {
-            case GRAPHT_PP:
-                if (sourcesAndSinks.context.recordsAlternatives()) {
-                    throw new NildumuError(String.format("Algo %s cannot be used when recording alternatives", algo));
-                }
-                return new GraphTPP(sourcesAndSinks, weights).compute();
-            default:
-                return new LeakageAlgorithm(sourcesAndSinks, weights, () -> new PMSATSolverImpl<>(algo.binaryPath, algo.options, false), sourcesAndSinks.context.inIntervalMode()).compute();
-        }
-    }
-
-    public static ComputationResult compute(Context context, Sec<?> sec, Algo algo){
-        con = context;
-        if (sec == context.sl.top()){
-            return new ComputationResult(Collections.emptySet(), 0);
-        }
-        return compute(context.sourcesAndSinks(sec), context::weight, algo);
-    }
-
-    private static Context con;
-
-    public static Map<Sec<?>, ComputationResult> compute(Context context, Algo algo){
-        return context.sl.elements().stream()
-                .collect(Collectors.toMap(s -> s, s -> s == context.sl.top() ?
-                        new ComputationResult(Collections.emptySet(), 0) :
-                        compute(context, s, algo)));
-    }
 }

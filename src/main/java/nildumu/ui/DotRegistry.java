@@ -329,7 +329,7 @@ public class DotRegistry {
     }
 
     public static Graph visuLeakageDotGraph(Context context, String name, Sec<?> sec){
-        Set<Bit> minCut = context.computeLeakage(MinCut.usedAlgo).get(sec).minCut;
+        Set<Bit> minCut = context.computeLeakage(LeakageAlgorithm.usedAlgo).get(sec).minCut;
         return createDotGraph(context, name,
                 Collections.singletonList(new Anchor("input", context.sinks(sec).stream().collect(Value.collector()))),
                 new Anchor("output", context.sources(sec).stream().collect(Value.collector())), minCut);

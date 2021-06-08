@@ -8,9 +8,7 @@ import java.io.PrintStream;
 import java.io.Serializable;
 import java.time.temporal.ValueRange;
 import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.BiPredicate;
-import java.util.function.Predicate;
+import java.util.function.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -142,5 +140,27 @@ public class Util {
 
     public static <S, R> List<R> enumerate(List<S> a, BiFunction<Integer, S, R> consumer) {
         return IntStream.range(0, a.size()).mapToObj(i -> consumer.apply(i, a.get(i))).collect(Collectors.toList());
+    }
+
+    public static <S> void enumerate(Iterator<S> a, BiConsumer<Integer, S> consumer) {
+        int i = 0;
+        while (a.hasNext()) {
+            consumer.accept(i, a.next());
+            i++;
+        }
+    }
+
+    public static <R> R withIndentedStream(Supplier<R> func) {
+        PrintStream out = System.out;
+        System.setOut(new PrintStream(System.out){
+
+            @Override
+            public void println(String x) {
+                super.println("\t" + x);
+            }
+        });
+        R res = func.get();
+        System.setOut(out);
+        return res;
     }
 }
