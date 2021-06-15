@@ -260,9 +260,12 @@ public class DotPanel extends JPanel {
         dotCanvas.getInteractors().add(new AbstractZoomInteractor() {
             @Override
             public boolean startInteraction(InputEvent ie) {
-                return ie.getID() == MouseEvent.MOUSE_MOVED && ie.isShiftDown();
+                return ie.getID() == MouseEvent.MOUSE_PRESSED;
             }
         });
+        dotCanvas.setEnableImageZoomInteractor(true);
+        dotCanvas.setEnablePanInteractor(true);
+        dotCanvas.setEnableZoomInteractor(true);
         dotScrollPane = new JSVGScrollPane(dotCanvas);
     }
 
@@ -278,7 +281,7 @@ public class DotPanel extends JPanel {
         rootPanel = new JPanel();
         rootPanel.setLayout(new GridLayoutManager(2, 2, new Insets(0, 0, 0, 0), -1, -1));
         controlPanel = new JPanel();
-        controlPanel.setLayout(new GridLayoutManager(1, 4, new Insets(0, 0, 0, 0), -1, -1));
+        controlPanel.setLayout(new GridLayoutManager(1, 5, new Insets(0, 0, 0, 0), -1, -1));
         controlPanel.setRequestFocusEnabled(false);
         rootPanel.add(controlPanel, new GridConstraints(0, 0, 1, 2, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         topicSelector = new JComboBox();
@@ -287,10 +290,14 @@ public class DotPanel extends JPanel {
         controlPanel.add(fileSelector, new GridConstraints(0, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
         launchNewButton = new JButton();
         launchNewButton.setText("Launch new");
-        controlPanel.add(launchNewButton, new GridConstraints(0, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        controlPanel.add(launchNewButton, new GridConstraints(0, 4, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         autoRedrawCheckBox = new JCheckBox();
         autoRedrawCheckBox.setText("Auto redraw");
         controlPanel.add(autoRedrawCheckBox, new GridConstraints(0, 2, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        final JLabel label1 = new JLabel();
+        label1.setText("Shift+R.click+Pan for zoom");
+        label1.setToolTipText("Shift+Right click+Mouse movement lets you zoom, the same with CTRL key lets you rotate");
+        controlPanel.add(label1, new GridConstraints(0, 3, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final JPanel panel1 = new JPanel();
         panel1.setLayout(new BorderLayout(0, 0));
         rootPanel.add(panel1, new GridConstraints(1, 0, 1, 2, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, null, null, 0, false));
@@ -303,4 +310,5 @@ public class DotPanel extends JPanel {
     public JComponent $$$getRootComponent$$$() {
         return rootPanel;
     }
+
 }
