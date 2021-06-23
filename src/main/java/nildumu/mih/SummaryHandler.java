@@ -44,10 +44,10 @@ import static nildumu.util.Util.*;
 public class SummaryHandler extends MethodInvocationHandler {
 
     public enum Mode {
-        COINDUCTION,
         /**
-         * The induction mode doesn't work with recursion and has spurious errors
+         * The co induction mode doesn't work with recursion and has spurious errors
          */
+        COINDUCTION,
         INDUCTION,
         AUTO
     }

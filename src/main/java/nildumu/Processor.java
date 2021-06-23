@@ -21,6 +21,7 @@ public class Processor {
     public static final int TRANSFORM_PLUS = 0b01;
     public static final int TRANSFORM_LOOPS = 0b010;
     public static final int RECORD_ALTERNATIVES = 0b0100;
+    public static final int USE_SIMPLIFIED_HEURISTIC = 0b01000;
 
     public static boolean containsOpt(int opts, int opt) {
         return (opts & opt) != 0;
@@ -36,7 +37,7 @@ public class Processor {
 
     public static Context process(String program, Context.Mode mode, MethodInvocationHandler handler, int opts) {
         return process(Parser.process(program, containsOpt(opts, TRANSFORM_PLUS)),
-                mode, handler, containsOpt(opts, RECORD_ALTERNATIVES));
+                mode, handler, containsOpt(opts, RECORD_ALTERNATIVES), containsOpt(opts, USE_SIMPLIFIED_HEURISTIC));
     }
 
     public static Context process(ProgramNode node, MethodInvocationHandler handler) {
@@ -45,12 +46,12 @@ public class Processor {
     }
 
     public static Context process(ProgramNode node, Context.Mode mode, MethodInvocationHandler handler) {
-        return process(node, mode, handler, false);
+        return process(node, mode, handler, false, true);
     }
 
     public static Context process(ProgramNode node, Context.Mode mode, MethodInvocationHandler handler,
-                                  boolean recordAlternatives) {
-        node.context.mode(mode).setRecordAlternatives(recordAlternatives);
+                                  boolean recordAlternatives, boolean useSimplifiedHeuristic) {
+        node.context.mode(mode).setRecordAlternatives(recordAlternatives).setUseSimplifiedHeuristic(useSimplifiedHeuristic);
         handler.setup(node);
         return process(node.context.forceMethodInvocationHandler(handler), node);
     }

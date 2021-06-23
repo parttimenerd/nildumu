@@ -358,18 +358,25 @@ public class Context {
 
     private final EntropyBounds entropyBounds;
 
+    private boolean useSimplifiedHeuristic;
+
+    public static final int RECORD_ALTERNATIVES      = 0b0001;
+    /** only consider the bit itself */
+    public static final int USE_SIMPLIFIED_HEURISTIC = 0b0010;
+
     public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds, State.OutputState outputState,
-                   boolean recordAlternatives) {
+                   int alternativesConfig) {
         this.sl = sl;
         this.maxBitWidth = maxBitWidth;
         this.entropyBounds = entropyBounds;
         resetFrames(outputState);
         ValueLattice.get().bitWidth = maxBitWidth;
-        this.recordAlternatives = recordAlternatives;
+        this.recordAlternatives = (alternativesConfig & RECORD_ALTERNATIVES) != 0;
+        this.useSimplifiedHeuristic = (alternativesConfig & USE_SIMPLIFIED_HEURISTIC) != 0;
     }
 
     public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds, State.OutputState outputState) {
-        this(sl, maxBitWidth, entropyBounds, outputState, true);
+        this(sl, maxBitWidth, entropyBounds, outputState, RECORD_ALTERNATIVES | USE_SIMPLIFIED_HEURISTIC);
     }
 
     public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds) {
@@ -904,16 +911,31 @@ public class Context {
         return replMap.get(bit);
     }
 
+    private Map<Bit, Integer> c1Cache = new HashMap<>();
+
     private int c1(Bit bit){
+        if (useSimplifiedHeuristic) {
+            return bit.isConstant() ? 0 : 1;
+        }
         if (!frame.callPath.isEmpty() && frame.methodParameterBits.contains(bit)){
             return 1;
         }
         if (isInputBit(bit) && sec(bit) != sl.bot()){
             return 1;
         }
-        if (isInputBit(bit) && sec(bit) != sl.bot()){
-            return 1;
+        if (bit.deps().size() == 0) {
+            return 0;
         }
+        if (bit.deps().size() == 1) {
+            return c1(bit.deps().getSingleBit());
+        }
+        if (!c1Cache.containsKey(bit)) {
+            c1Cache.put(bit, c1_(bit));
+        }
+        return c1Cache.get(bit);
+    }
+
+    private int c1_(Bit bit){
         Queue<Bit> q = new ArrayDeque<>();
         Set<Bit> alreadyVisitedBits = new HashSet<>();
         q.add(bit);
@@ -944,13 +966,19 @@ public class Context {
     }
 
     public Bit choose(Bit a, Bit b) {
-        int ac = c1(a);
-        int bc = c1(b);
-        if (a.isConstant() || ac <= bc) {
-            if (recordAlternatives && !a.isConstant() && ac != 0) {
-                return createChooseWrapBit(a, b);
+        if (a.isConstant() || !b.isConstant()) {
+            if (a.isConstant()) {
+                return a;
+            } else {
+                if (recordAlternatives) {
+                    return createChooseWrapBit(a, b);
+                }
+                int ac = c1(a);
+                int bc = c1(b);
+                if (ac < bc) {
+                    return a;
+                }
             }
-            return a;
         }
         if (recordAlternatives && !b.isConstant()) {
             return createChooseWrapBit(b, a);
@@ -959,7 +987,7 @@ public class Context {
     }
 
     public Bit notChosen(Bit a, Bit b) {
-        if (b.isConstant() || c1(a) >= c1(b)) {
+        if (b.isConstant() || (!a.isConstant() && c1(a) >= c1(b))) {
             return a;
         }
         return b;
@@ -1100,6 +1128,11 @@ public class Context {
 
     public Context setRecordAlternatives(boolean recordAlternatives) {
         this.recordAlternatives = recordAlternatives;
+        return this;
+    }
+
+    public Context setUseSimplifiedHeuristic(boolean useSimplifiedHeuristic) {
+        this.useSimplifiedHeuristic = useSimplifiedHeuristic;
         return this;
     }
 

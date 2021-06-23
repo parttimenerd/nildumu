@@ -123,7 +123,7 @@ public class Evaluation {
         //@Option(names="--dont_split_temci")
         private boolean dontSplitTemciFiles = false;
 
-        @Option(names="--tools", description = "all (paper), full (+ other MAXSAT and GraphTT), exact (unwind 5, 10, 64, eps=0.1, delta=0.05), short (all tools in one config)")
+        @Option(names="--tools", description = "all (paper), nildumu (all with ApproxFlow), full (+ other MAXSAT and GraphTT), exact (unwind 5, 10, 64, eps=0.1, delta=0.05)")
         private List<String> tools = Collections.singletonList("all");
 
         //@Option(names="--parallelism", description = "cores to use")
@@ -151,17 +151,27 @@ public class Evaluation {
         commandLine.parseArgs(args);
         Evaluation evaluation = new Evaluation(IntegerType.INT);
         try {
-
-            List<AbstractTool> tools_ = AbstractTool.getDefaultTools(cmd.summaryUnwind, cmd.unwinds.isEmpty() ?
+            List<AbstractTool> tools_ = new ArrayList<>();
+            List<AbstractTool> allTools = AbstractTool.getDefaultTools(cmd.summaryUnwind, cmd.unwinds.isEmpty() ?
                     new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray());
-            if (!cmd.tools.get(0).equals("all")) {
-                if (cmd.tools.get(0).equals("full")) {
-                    tools_ = AbstractTool.getAllTools(cmd.summaryUnwind, cmd.unwinds.isEmpty() ?
-                            new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray());
-                } else if (cmd.tools.get(0).equals("exact")) {
-                    tools_ = Arrays.asList(new ApproxFlow(5, 0.1, 0.05), new ApproxFlow(10, 0.1, 0.05), new ApproxFlow(64, 0.1, 0.05));
-                } else {
-                    tools_ = tools_.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList());
+            for (String tool : cmd.tools) {
+                switch (tool) {
+                    case "all":
+                        tools_.addAll(allTools);
+                        break;
+                    case "nildumu":
+                        tools_.addAll(allTools
+                                .stream().filter(t -> t.name.contains("nildumu")).collect(Collectors.toList()));
+                        break;
+                    case "full":
+                        tools_.addAll(AbstractTool.getAllTools(cmd.summaryUnwind, cmd.unwinds.isEmpty() ?
+                                new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray()));
+                    case "exact":
+                        tools_.addAll(Arrays.asList(new ApproxFlow(5, 0.1, 0.05),
+                                new ApproxFlow(10, 0.1, 0.05),
+                                new ApproxFlow(64, 0.1, 0.05)));
+                    default:
+                        tools_.addAll(allTools.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList()));
                 }
             }
             List<AbstractTool> tools = tools_;

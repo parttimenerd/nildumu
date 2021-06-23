@@ -389,7 +389,7 @@ public class LoopTests {
     static ContextMatcher parse(String program, String mih) {
         Context.LOG.setLevel(Level.WARNING);
         //System.out.println(" ##SSA " + Parser.process(program, false, transformLoops).toPrettyString());
-        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih), RECORD_ALTERNATIVES));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih), 0));
     }
 
 

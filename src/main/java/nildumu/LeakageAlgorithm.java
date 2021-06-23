@@ -13,7 +13,7 @@ import static nildumu.Context.INFTY;
 
 public abstract class LeakageAlgorithm {
 
-    public static Algo usedAlgo = Algo.OPENWBO_GLUCOSE;
+    public static Algo usedAlgo = Algo.GRAPHT_PP;
     protected final SourcesAndSinks sourcesAndSinks;
     protected final Function<Lattices.Bit, Double> weights;
 

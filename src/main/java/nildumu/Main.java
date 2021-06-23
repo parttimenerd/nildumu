@@ -28,8 +28,12 @@ public class Main implements Runnable {
             "for paper: 'handler=inlining;maxrec=INLINING;bot=summary'")
     private String handler = "handler=inlining;maxrec=32;bot=summary";
 
-    @Option(names = "--algo", description = "Used leakage computation algorithm, default is OpenWBO PMSAT based")
+    @Option(names = "--algo", description = "Used leakage computation algorithm, default is GraphT_PP based")
     private LeakageAlgorithm.Algo algo = LeakageAlgorithm.usedAlgo;
+
+    @Option(names = "--useSimplifiedEdgeHeuristic", description = "Use the simplified edge selection heuristic, " +
+            "ignored if the solver is PMSAT based", negatable = true)
+    private boolean useSimplifiedEdgeHeuristic;
 
     @Option(names = {"-tp", "--transformPlus"},
             description = "Transform plus into bit wise operators in the preprocessing step", defaultValue = "false")
@@ -39,7 +43,8 @@ public class Main implements Runnable {
     public void run() {
         try {
             int opts = (transformPlus ? TRANSFORM_PLUS : 0) | TRANSFORM_LOOPS |
-                    (algo.capability(LeakageAlgorithm.Algo.SUPPORTS_ALTERNATIVES) ? RECORD_ALTERNATIVES : 0);
+                    (algo.capability(LeakageAlgorithm.Algo.SUPPORTS_ALTERNATIVES) ? RECORD_ALTERNATIVES : 0) |
+                    (useSimplifiedEdgeHeuristic ? USE_SIMPLIFIED_HEURISTIC : 0);
             Context context =
                     Processor.process(String.join("\n", programPath.equals("-") ?
                                     new BufferedReader(new InputStreamReader(System.in)).lines().collect(Collectors.toList()) :

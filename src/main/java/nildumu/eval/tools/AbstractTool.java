@@ -57,14 +57,19 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
     }
 
     public static List<AbstractTool> getDefaultTools(boolean summaryUnwind, int... unwindLimits){
-        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.of(new ApproxFlow(unwind), new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE)))
+        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.of(new ApproxFlow(unwind),
+                new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE),
+                new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, false),
+                new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, true)))
                 .flatMap(identity()).collect(Collectors.toList());
     }
 
     public static List<AbstractTool> getAllTools(boolean summaryUnwind, int... unwindLimits){
         return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.concat(
                 Stream.of(new ApproxFlow(unwind)), Stream.of(new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE),
-                        new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.UWRMAXSAT), new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP))))
+                        new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.UWRMAXSAT),
+                        new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP),
+                        new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, false))))
                 .flatMap(identity()).collect(Collectors.toList());
     }
 
