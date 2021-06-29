@@ -13,7 +13,7 @@ esac
 PROJECT_DIR=$(dirname "$SCRIPT_PATH")
 
 
-totalMemKB=$(free --kilo |awk '/^Mem:/{print $7}')
+totalMemKB=$(free --kilo | head -n 2 | tail -n 1 | awk '/:/{print $7}')
 
 # Percentage of free memory to use for Java
 usageFactor=80
