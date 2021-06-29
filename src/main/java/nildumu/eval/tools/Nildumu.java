@@ -62,11 +62,11 @@ public class Nildumu extends AbstractTool {
         return new AnalysisPacket(this, program) {
             @Override
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
-                int freeMB = (int) (Runtime.getRuntime().maxMemory() / 1024L / 1024L * 0.9);
+                int freeMB = (int) (Runtime.getRuntime().maxMemory() / 1024L / 1024L * 0.95);
                 String javaConf = String.format("-Xmx%dm", freeMB);
-                return String.format("taskset -c 0,1 %s %s --handler \"%s\" --algo \"%s\"",
+                return String.format("taskset -c 0,1 %s %s --handler \"%s\" --algo \"%s\" --%suseSimplifiedEdgeHeuristic",
                         String.format("java %s -jar %s", javaConf, formatter.format(JAR_PATH)),
-                        formatter.format(testFile), mih, algo.name());
+                        formatter.format(testFile), mih, algo.name(), useSimplifiedEdgeHeuristic ? "" : "no-");
             }
 
             @Override

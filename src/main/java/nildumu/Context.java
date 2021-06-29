@@ -973,10 +973,12 @@ public class Context {
                 if (recordAlternatives) {
                     return createChooseWrapBit(a, b);
                 }
-                int ac = c1(a);
-                int bc = c1(b);
-                if (ac < bc) {
-                    return a;
+                if (!useSimplifiedHeuristic) {
+                    int ac = c1(a);
+                    int bc = c1(b);
+                    if (ac < bc) {
+                        return a;
+                    }
                 }
             }
         }

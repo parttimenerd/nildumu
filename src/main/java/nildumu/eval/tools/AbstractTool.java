@@ -56,11 +56,11 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
         return name;
     }
 
-    public static List<AbstractTool> getDefaultTools(boolean summaryUnwind, int... unwindLimits){
-        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.of(new ApproxFlow(unwind),
-                new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE),
-                new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, false),
-                new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, true)))
+    public static List<AbstractTool> getDefaultTools(boolean summaryUnwind, boolean allAlgos, int... unwindLimits){
+        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.concat(Stream.of(new ApproxFlow(unwind),
+                new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, true)),
+                allAlgos ? Stream.of(new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE),
+                        new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, false)) : Stream.empty()))
                 .flatMap(identity()).collect(Collectors.toList());
     }
 
