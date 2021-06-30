@@ -59,6 +59,12 @@ public class Context {
 
     public static @FunctionalInterface interface ModsCreator {
         public Mods apply(Context context, Bit bit, Bit assumedValue);
+
+        public static final ModsCreator EMPTY = (c, b, a) -> Mods.empty();
+
+        public static ModsCreator empty() {
+            return EMPTY;
+        }
     }
 
     public static class InvariantViolationError extends NildumuError {
@@ -359,10 +365,13 @@ public class Context {
     private final EntropyBounds entropyBounds;
 
     private boolean useSimplifiedHeuristic;
+    private boolean useReplacements;
 
     public static final int RECORD_ALTERNATIVES      = 0b0001;
     /** only consider the bit itself */
     public static final int USE_SIMPLIFIED_HEURISTIC = 0b0010;
+
+    public static final int USE_REPLACEMENTS         = 0b0100;
 
     public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds, State.OutputState outputState,
                    int alternativesConfig) {
@@ -373,10 +382,11 @@ public class Context {
         ValueLattice.get().bitWidth = maxBitWidth;
         this.recordAlternatives = (alternativesConfig & RECORD_ALTERNATIVES) != 0;
         this.useSimplifiedHeuristic = (alternativesConfig & USE_SIMPLIFIED_HEURISTIC) != 0;
+        this.useReplacements = (alternativesConfig & USE_REPLACEMENTS) != 0;
     }
 
     public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds, State.OutputState outputState) {
-        this(sl, maxBitWidth, entropyBounds, outputState, RECORD_ALTERNATIVES | USE_SIMPLIFIED_HEURISTIC);
+        this(sl, maxBitWidth, entropyBounds, outputState, RECORD_ALTERNATIVES | USE_SIMPLIFIED_HEURISTIC | USE_REPLACEMENTS);
     }
 
     public Context(SecurityLattice sl, int maxBitWidth, EntropyBounds entropyBounds) {
@@ -817,7 +827,7 @@ public class Context {
 
     /* -------------------------- extended mode specific -------------------------------*/
 
-    public Bit replace(Bit bit, Branch branch){
+    private Bit replace(Bit bit, Branch branch){
         if (inExtendedMode()) {
             Bit ret = null;
             for (Mods additionalMod : additionalMods) {
@@ -840,7 +850,7 @@ public class Context {
         return bit;
     }
 
-    public Interval replace(Interval inter, Branch branch){
+    private Interval replace(Interval inter, Branch branch){
         if (inExtendedMode()) {
             Interval ret = null;
             for (Mods additionalMod : additionalMods) {
@@ -864,16 +874,19 @@ public class Context {
     }
 
     public Value replace(Value value) {
-        if (frame.nodeValueState.branchStack.isEmpty()){
-            if (!additionalMods.empty()) {
-                return replace(value, null);
+        if (useReplacements) {
+            if (frame.nodeValueState.branchStack.isEmpty()) {
+                if (!additionalMods.empty()) {
+                    return replace(value, null);
+                }
+                return value;
             }
-            return value;
+            return replace(value, frame.nodeValueState.branchStack.peek());
         }
-        return replace(value, frame.nodeValueState.branchStack.peek());
+        return value;
     }
 
-    public Value replace(Value value, Branch branch) {
+    private Value replace(Value value, Branch branch) {
         Util.Box<Boolean> replacedABit = new Util.Box<>(false);
         Value newValue = value.stream().map(b -> {
             Bit r = replace(b, branch);
@@ -895,7 +908,9 @@ public class Context {
     }
 
     public void repl(Bit bit, ModsCreator modsCreator){
-        replMap.put(bit, modsCreator);
+        if (useReplacements) {
+            replMap.put(bit, modsCreator);
+        }
     }
 
     /**
@@ -908,7 +923,7 @@ public class Context {
     }
 
     public ModsCreator repl(Bit bit){
-        return replMap.get(bit);
+        return useReplacements ? replMap.get(bit) : ModsCreator.empty();
     }
 
     private Map<Bit, Integer> c1Cache = new HashMap<>();
@@ -1135,6 +1150,11 @@ public class Context {
 
     public Context setUseSimplifiedHeuristic(boolean useSimplifiedHeuristic) {
         this.useSimplifiedHeuristic = useSimplifiedHeuristic;
+        return this;
+    }
+
+    public Context setUseReplacements(boolean useReplacements) {
+        this.useReplacements = useReplacements;
         return this;
     }
 

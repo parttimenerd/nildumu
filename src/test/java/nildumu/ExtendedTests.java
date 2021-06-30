@@ -4,8 +4,7 @@ import nildumu.mih.MethodInvocationHandler;
 import org.junit.jupiter.api.Test;
 
 import static nildumu.LoopTests.parse;
-import static nildumu.Processor.RECORD_ALTERNATIVES;
-import static nildumu.Processor.process;
+import static nildumu.Processor.*;
 
 /**
  * SSA bug:
@@ -284,6 +283,7 @@ public class ExtendedTests {
     }
 
     public ContextMatcher parse(String program){
-        return new ContextMatcher(process(program, Context.Mode.EXTENDED, MethodInvocationHandler.createDefault(), RECORD_ALTERNATIVES));
+        return new ContextMatcher(process(program, Context.Mode.EXTENDED, MethodInvocationHandler.createDefault(),
+                RECORD_ALTERNATIVES | USE_REPLACEMENTS));
     }
 }

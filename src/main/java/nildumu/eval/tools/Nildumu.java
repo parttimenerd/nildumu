@@ -18,33 +18,38 @@ public class Nildumu extends AbstractTool {
     private final LeakageAlgorithm.Algo algo;
 
     private final boolean useSimplifiedEdgeHeuristic;
+    private final boolean useReplacements;
 
     public Nildumu(int unwind, LeakageAlgorithm.Algo algo) {
-        this(unwind, algo, true);
+        this(unwind, algo, true, true);
     }
 
-    public Nildumu(int unwind, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic) {
-        this(unwind, 0, algo, useSimplifiedEdgeHeuristic);
+    public Nildumu(int unwind, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic, boolean useReplacements) {
+        this(unwind, 0, algo, useSimplifiedEdgeHeuristic, useReplacements);
     }
 
     public Nildumu(int unwind, boolean summaryUnwind, LeakageAlgorithm.Algo algo) {
-        this(unwind, summaryUnwind ? unwind : 0, algo, true);
+        this(unwind, summaryUnwind ? unwind : 0, algo, true, true);
     }
 
-    public Nildumu(int unwind, boolean summaryUnwind, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic) {
-        this(unwind, summaryUnwind ? unwind : 0, algo, useSimplifiedEdgeHeuristic);
+    public Nildumu(int unwind, boolean summaryUnwind, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic,
+                   boolean useReplacements) {
+        this(unwind, summaryUnwind ? unwind : 0, algo, useSimplifiedEdgeHeuristic, useReplacements);
     }
 
     /**
      *  @param csrec maximum recursion depth for the call string handler
      * @param scsrec maximum recusion depth for the call string handler used by the summary handler
      */
-    public Nildumu(int csrec, int scsrec, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic){
-        super(String.format("nildumu%02d_%02d_%s_%s", csrec, scsrec, algo.shortName, useSimplifiedEdgeHeuristic ? "s" : "c"), csrec, "nd");
+    public Nildumu(int csrec, int scsrec, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic,
+                   boolean useReplacements){
+        super(String.format("nildumu%02d_%02d_%s_%s_%s", csrec, scsrec, algo.shortName, useSimplifiedEdgeHeuristic ? "s" : "c",
+                useReplacements ? "r" : "wor"), csrec, "nd");
         this.mih = String.format("handler=inlining;maxrec=%d;bot={handler=summary;csmaxrec=%d;bot=basic}",
                 csrec, scsrec);
         this.algo = algo;
         this.useSimplifiedEdgeHeuristic = useSimplifiedEdgeHeuristic;
+        this.useReplacements = useReplacements;
     }
 
     @Override
@@ -64,9 +69,12 @@ public class Nildumu extends AbstractTool {
             public String getShellCommand(PathFormatter formatter, Duration timeLimit) {
                 int freeMB = (int) (Runtime.getRuntime().maxMemory() / 1024L / 1024L * 0.95);
                 String javaConf = String.format("-Xmx%dm", freeMB);
-                return String.format("taskset -c 0,1 %s %s --handler \"%s\" --algo \"%s\" --%suseSimplifiedEdgeHeuristic",
+                return String.format("taskset -c 0,1 %s %s --handler \"%s\" --algo \"%s\" --%suseSimplifiedEdgeHeuristic" +
+                                " --%suseReplacements",
                         String.format("java %s -jar %s", javaConf, formatter.format(JAR_PATH)),
-                        formatter.format(testFile), mih, algo.name(), useSimplifiedEdgeHeuristic ? "" : "no-");
+                        formatter.format(testFile), mih, algo.name(),
+                        useSimplifiedEdgeHeuristic ? "" : "no-",
+                        useReplacements ? "" : "no-");
             }
 
             @Override

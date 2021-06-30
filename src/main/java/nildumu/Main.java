@@ -33,7 +33,11 @@ public class Main implements Runnable {
 
     @Option(names = "--useSimplifiedEdgeHeuristic", description = "Use the simplified edge selection heuristic, " +
             "ignored if the solver is PMSAT based", negatable = true)
-    private boolean useSimplifiedEdgeHeuristic;
+    private boolean useSimplifiedEdgeHeuristic = true;
+
+    @Option(names = "--useReplacements", description = "Use the knowledge from path conditions",
+            negatable = true)
+    private boolean useReplacements = true;
 
     @Option(names = {"-tp", "--transformPlus"},
             description = "Transform plus into bit wise operators in the preprocessing step", defaultValue = "false")

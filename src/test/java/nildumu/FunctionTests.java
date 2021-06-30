@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 import static java.time.Duration.ofSeconds;
 import static nildumu.Parser.MethodNode;
 import static nildumu.Parser.ProgramNode;
+import static nildumu.Processor.USE_REPLACEMENTS;
 import static nildumu.Processor.process;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -475,11 +476,15 @@ l output int o = fib(h);
     }
 
     static ContextMatcher parse(String program, String handler){
-        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(handler), 0));
+        return parse(program, MethodInvocationHandler.parse(handler));
+    }
+
+    static ContextMatcher parse(String program, int inlining) {
+        return parse(program, String.format("handler=inlining;maxrec=%d;bot=summary", inlining));
     }
 
     static ContextMatcher parse(String program, MethodInvocationHandler handler) {
-        return new ContextMatcher(process(program, Context.Mode.LOOP, handler, 0));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, handler, USE_REPLACEMENTS));
     }
 
     static ContextMatcher parse(String program, String handler, int bitWidth) {

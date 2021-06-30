@@ -277,6 +277,6 @@ public class SSA2Tests {
 
     public static ContextMatcher process(String program){
         return new ContextMatcher(Processor.process(toSSA(program, false), Context.Mode.LOOP,
-                MethodInvocationHandler.parse("inlining"), false, true));
+                MethodInvocationHandler.parse("inlining"), false, true, true));
     }
 }

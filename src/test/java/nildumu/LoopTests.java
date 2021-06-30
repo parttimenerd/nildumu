@@ -10,8 +10,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.logging.Level;
 
 import static java.time.Duration.ofMillis;
-import static nildumu.Processor.RECORD_ALTERNATIVES;
-import static nildumu.Processor.process;
+import static nildumu.Processor.*;
 import static nildumu.util.Util.iter;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
@@ -389,7 +388,7 @@ public class LoopTests {
     static ContextMatcher parse(String program, String mih) {
         Context.LOG.setLevel(Level.WARNING);
         //System.out.println(" ##SSA " + Parser.process(program, false, transformLoops).toPrettyString());
-        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih), 0));
+        return new ContextMatcher(process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(mih), USE_REPLACEMENTS));
     }
 
 

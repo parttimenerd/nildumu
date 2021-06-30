@@ -2,12 +2,15 @@ package nildumu.intervals;
 
 import nildumu.Context;
 import nildumu.ContextMatcher;
+import nildumu.Parser;
 import nildumu.Processor;
+import nildumu.mih.MethodInvocationHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static nildumu.Lattices.vl;
+import static nildumu.Processor.USE_REPLACEMENTS;
 import static org.junit.Assert.assertEquals;
 
 public class IntervalTests {
@@ -33,11 +36,11 @@ public class IntervalTests {
 
     @Test
     public void testBasicIf(){
-        new ContextMatcher(Processor.process("bit_width 2; h input int h = 0buu;\n" +
+        new ContextMatcher(Processor.process(Parser.process("bit_width 2; h input int h = 0buu;\n" +
                 "int x = 0;\n" +
                 "if (h < 1){\n" +
                 "    x = h;\n" +
                 "}" +
-                "l output int o = x;", Context.Mode.INTERVAL)).numberOfOutputs(3).run();
+                "l output int o = x;"), Context.Mode.INTERVAL, MethodInvocationHandler.createDefault(), true, true, true)).numberOfOutputs(3).run();
     }
 }

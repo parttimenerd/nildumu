@@ -4,7 +4,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import static nildumu.LoopTests.parse;
+import static nildumu.FunctionTests.parse;
 
 /** these tests are exactly the tests used during evaluation (but with less inlinings) */
 public class EvaluationTests {
