@@ -33,11 +33,11 @@ public class Main implements Runnable {
 
     @Option(names = "--useSimplifiedEdgeHeuristic", description = "Use the simplified edge selection heuristic, " +
             "ignored if the solver is PMSAT based", negatable = true)
-    private boolean useSimplifiedEdgeHeuristic = true;
+    private boolean useSimplifiedEdgeHeuristic;
 
     @Option(names = "--useReplacements", description = "Use the knowledge from path conditions",
             negatable = true)
-    private boolean useReplacements = true;
+    private boolean useReplacements;
 
     @Option(names = {"-tp", "--transformPlus"},
             description = "Transform plus into bit wise operators in the preprocessing step", defaultValue = "false")
@@ -48,7 +48,7 @@ public class Main implements Runnable {
         try {
             int opts = (transformPlus ? TRANSFORM_PLUS : 0) | TRANSFORM_LOOPS |
                     (algo.capability(LeakageAlgorithm.Algo.SUPPORTS_ALTERNATIVES) ? RECORD_ALTERNATIVES : 0) |
-                    (useSimplifiedEdgeHeuristic ? USE_SIMPLIFIED_HEURISTIC : 0);
+                    (useSimplifiedEdgeHeuristic ? USE_SIMPLIFIED_HEURISTIC : 0) | (useReplacements ? USE_REPLACEMENTS : 0);
             Context context =
                     Processor.process(String.join("\n", programPath.equals("-") ?
                                     new BufferedReader(new InputStreamReader(System.in)).lines().collect(Collectors.toList()) :
