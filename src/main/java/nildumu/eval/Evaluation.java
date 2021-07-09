@@ -123,7 +123,7 @@ public class Evaluation {
         //@Option(names="--dont_split_temci")
         private boolean dontSplitTemciFiles = false;
 
-        @Option(names="--tools", description = "all (paper), nildumu (all without ApproxFlow), full (+ other MAXSAT and GraphTT), exact (unwind 5, 10, 64, eps=0.1, delta=0.05)")
+        @Option(names="--tools", description = "all (paper), alll (two more), nildumu (all without ApproxFlow), nildumu (alll without ApproxFlow), full (+ other MAXSAT and GraphTT), exact (unwind 5, 10, 64, eps=0.1, delta=0.05)")
         private List<String> tools = Collections.singletonList("all");
 
         //@Option(names="--parallelism", description = "cores to use")
@@ -160,8 +160,15 @@ public class Evaluation {
                     case "all":
                         tools_.addAll(AbstractTool.getDefaultTools(cmd.summaryUnwind, false, unwinds));
                         break;
+                    case "alll":
+                        tools_.addAll(AbstractTool.getDefaultTools(cmd.summaryUnwind, true, unwinds));
+                        break;
                     case "nildumu":
                         tools_.addAll(allTools
+                                .stream().filter(t -> t.name.contains("nildumu")).collect(Collectors.toList()));
+                        break;
+                    case "nildumu_alll":
+                        tools_.addAll(AbstractTool.getDefaultTools(cmd.summaryUnwind, true, unwinds)
                                 .stream().filter(t -> t.name.contains("nildumu")).collect(Collectors.toList()));
                         break;
                     case "full":
