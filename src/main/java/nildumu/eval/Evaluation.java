@@ -167,6 +167,12 @@ public class Evaluation {
                         tools_.addAll(allTools
                                 .stream().filter(t -> t.name.contains("nildumu")).collect(Collectors.toList()));
                         break;
+                    case "nildumu_32p":
+                        tools_.add(new Nildumu(32, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE, true, true));
+                        break;
+                    case "nildumu_32w":
+                        tools_.add(new Nildumu(32, LeakageAlgorithm.Algo.GRAPHT_PP, true, false));
+                        break;
                     case "nildumu_alll":
                         tools_.addAll(AbstractTool.getDefaultTools(cmd.summaryUnwind, true, unwinds)
                                 .stream().filter(t -> t.name.contains("nildumu")).collect(Collectors.toList()));
