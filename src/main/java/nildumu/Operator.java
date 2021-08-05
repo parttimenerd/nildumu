@@ -1233,12 +1233,12 @@ public interface Operator {
                 if (shift < 0){
                     return RIGHT_SHIFT.compute(c, first, vl.parse(-shift));
                 }
-                Value ret = Stream.concat(IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
+                Value ret = IntStream.range(1, c.maxBitWidth + 1).mapToObj(i -> {
                     if (i - shift < 1) {
                         return bl.create(ZERO);
                     }
                     return first.get(i - shift);
-                }), Stream.of(bl.create(ZERO))).collect(Value.collector());
+                }).collect(Value.collector());
                 return ret;
             }
             return createUnknownValue(first, second);
@@ -1254,12 +1254,12 @@ public interface Operator {
                 if (shift < 0){
                     return LEFT_SHIFT.compute(c, first, vl.parse(-shift));
                 }
-                return Stream.concat(IntStream.range(1, c.maxBitWidth).mapToObj(i -> {
+                return IntStream.range(1, c.maxBitWidth + 1).mapToObj(i -> {
                     if (i + shift > c.maxBitWidth){
                         return bl.create(ZERO);
                     }
                     return first.get(i + shift);
-                }), Stream.of(bl.create(ZERO))).collect(Value.collector());
+                }).collect(Value.collector());
             }
             return createUnknownValue(first, second);
         }

@@ -51,7 +51,7 @@ public class ExtendedTests {
                 "int x = h * 2;\n" +
                 "if (h == x){\n" +
                 "    x = h;\n" +
-                "} else {x = 0; } l output int o = x").leaks(3).run();
+                "} else {x = 0; } l output int o = x").leaks(4).run();
     }
 
     /**
@@ -280,6 +280,16 @@ public class ExtendedTests {
                 "    O = O + 1; z = O;\n" +
                 "}\n" +
                 "l output int o = O; int z_ = z;").val("z_", "0b0u1").val("o", "0b0u1").run();
+    }
+
+    @Test
+    public void testBitShift() {
+        parse("bit_width 32; int mask = -1 << 2").val("mask", "0b1{30}00").run();
+    }
+
+    @Test
+    public void testMaskedCopy() {
+        parse("bit_width 32; h input int h := 0bu{32}; l output int o := h & (-1 << 16)").leaks(16).run();
     }
 
     public ContextMatcher parse(String program){
