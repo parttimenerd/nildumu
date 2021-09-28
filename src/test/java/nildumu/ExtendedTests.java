@@ -292,6 +292,11 @@ public class ExtendedTests {
         parse("bit_width 32; h input int h := 0bu{32}; l output int o := h & (-1 << 16)").leaks(16).run();
     }
 
+    @Test
+    public void testPhi() {
+        parse("bit_width 2; input int x; int w = 0; if (x == 0){ w = x; } output int r = w").leaks(0).run();
+    }
+
     public ContextMatcher parse(String program){
         return new ContextMatcher(process(program, Context.Mode.EXTENDED, MethodInvocationHandler.createDefault(),
                 RECORD_ALTERNATIVES | USE_REPLACEMENTS));

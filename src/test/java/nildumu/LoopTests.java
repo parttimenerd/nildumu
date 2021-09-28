@@ -427,4 +427,9 @@ public class LoopTests {
                 "while (true){ i = i + 1;  if (i < 2) { continue; } break}\n" +
                 "int x = i;").val("x", "2").run();
     }
+
+    @Test
+    public void testMaskedLaundering() {
+        parse("input int h; int l = 0; while (l != h) { l = l + 1; } if ((h & 1) != 0) { l = 1; } output int l2 = l").leaks(31).run();
+    }
 }
