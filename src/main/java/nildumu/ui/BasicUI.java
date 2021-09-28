@@ -494,7 +494,9 @@ public class BasicUI {
             if (LeakageAlgorithm.usedAlgo.capability(LeakageAlgorithm.Algo.SUPPORTS_ALTERNATIVES)) {
                 opts |= Processor.RECORD_ALTERNATIVES;
             }
-            Context c = Processor.process(program, Context.Mode.LOOP, MethodInvocationHandler.parse(methodHandlerSelectionComboxBox.getSelectedItem().toString()), opts);
+            opts |= Processor.USE_REPLACEMENTS;
+            Context c = Processor.process(program, Context.Mode.LOOP,
+                    MethodInvocationHandler.parse(methodHandlerSelectionComboxBox.getSelectedItem().toString()), opts);
             if (context == null || c.sl != context.sl) {
                 context = c;
             }
