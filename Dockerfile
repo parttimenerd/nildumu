@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
 RUN apt-get install --no-install-recommends -y libboost-program-options-dev python gcc git g++ make cmake \
  zlib1g-dev wget make libgmp-dev unzip maven libc6-dev gcc-multilib g++-multilib vim emacs nano \
- curl
+ curl ninja-build flex bison libxml2-utils patch
 
 # Install OpenJDK-8     # see: https://stackoverflow.com/a/44058196
 RUN apt-get update && \

@@ -28,7 +28,8 @@ Usage
 -----
 
 Nildumu can be used either via its command line application `./run`, 
-via an editor `./gui` or via the evaluation script `./evaluation`.
+via an editor `./gui` or via the evaluation script `./evaluation` (be sure to
+run `./update_eval` before).
 
 ### Command Line Application
 A command line that can be used to run programs 
