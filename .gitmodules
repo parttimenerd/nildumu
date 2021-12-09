@@ -3,5 +3,5 @@
 	url = https://github.com/parttimenerd/approxflow
 [submodule "bin/modified_cbmc"]
 	path = bin/modified_cbmc
-  url = https://github.com/parttimenerd/cbmc.git
+	url = https://github.com/parttimenerd/cbmc.git
   branch = information_flow
