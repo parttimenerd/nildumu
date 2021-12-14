@@ -1,5 +1,5 @@
 /* Toy program from paper of R. Chadha et. al "Computing information flow using symbolic model-checking"*/
-/* Should leak 3 bit */
+/* Should leak 2 bit */
 h input int H = 0bu{32};
 int O = 0;
 while (H >= 5 && H < 20){

@@ -29,5 +29,5 @@ git submodule update --recursive --remote
 #(cd eval-programs/approxflow; git checkout master; git pull)
 
 echo "build modified cbmc"
-(cd bin; ./build > /dev/null)
+(cd bin; rm -fr modified_cbmc/build; ./build > /dev/null)
 

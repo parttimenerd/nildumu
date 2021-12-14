@@ -1,5 +1,5 @@
 /* Toy program from paper of R. Chadha et. al "Computing information flow using symbolic model-checking"*/
-/* Should leak 3 bit */
+/* Should leak 2 bit */
 
 int nondet();
 

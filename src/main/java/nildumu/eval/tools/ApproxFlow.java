@@ -4,12 +4,17 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import nildumu.eval.*;
+import swp.util.Pair;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+import static nildumu.util.Util.p;
 
 /**
  * Uses the ApproxFlow tool (of "Scalable Approximation of Quantitative Information Flow in Programs")
@@ -24,19 +29,30 @@ public class ApproxFlow extends AbstractTool {
     private final double epsilon;
     private final double delta;
 
+    ApproxFlow(String name) {
+        this(name, 32);
+    }
+
+    ApproxFlow(String name, int unwindLimit) {
+        this(name, unwindLimit, 0.8, 0.2);
+    }
+
+    public ApproxFlow(String name, int unwindLimit, double epsilon, double delta) {
+        super(String.format(name + "%02d", unwindLimit), unwindLimit, "c");
+        this.epsilon = epsilon;
+        this.delta = delta;
+    }
+
     ApproxFlow() {
-        this(32);
+        this("ApproxFlow");
     }
 
     ApproxFlow(int unwindLimit) {
-        this(unwindLimit, 0.8, 0.2);
+        this("ApproxFlow", unwindLimit);
     }
 
-
     public ApproxFlow(int unwindLimit, double epsilon, double delta) {
-        super(String.format("ApproxFlow%02d", unwindLimit), unwindLimit, "c");
-        this.epsilon = epsilon;
-        this.delta = delta;
+        this("ApproxFlow", unwindLimit, epsilon, delta);
     }
 
     static String toCCode(TestProgram program){
@@ -96,10 +112,11 @@ public class ApproxFlow extends AbstractTool {
                         e.printStackTrace();
                     }
                 }
-                return String.format("cd %s; %s UNWIND=%d EPSILON=%f DELTA=%f PARTIAL_LOOPS=true taskset -c 0,1 python ApproxFlow.py %s %s; rm %s* || true",
+                return String.format("cd \"%s\"; %s EPSILON=%f DELTA=%f PARTIAL_LOOPS=true %s taskset -c 0,1 python ApproxFlow.py \"%s\" \"%s\"; rm \"%s\"* || true",
                         formatter.format(approxFlowFolder),
                         envString,
-                        unwind, epsilon, delta,
+                        epsilon, delta,
+                        formatEnvVariables(getEnvVariables()),
                         file.getAbsolutePath(),
                         function, file.getAbsolutePath());
             }
@@ -109,6 +126,16 @@ public class ApproxFlow extends AbstractTool {
                 return LeakageParser.forLine(ApproxFlow.this, function + " : ", "");
             }
         };
+    }
+
+    private String formatEnvVariables(List<Pair<String, Object>> variables) {
+        return variables.stream().map(v -> String.format("%s=\"%s\"", v.first, v.second)).collect(Collectors.joining(" "));
+    }
+
+    /** List of key value pair for environment variables to set, at least UNWIND should be set,
+     * EPSILON, DELTA and PARTIAL_LOOPS are set by other code */
+    public List<Pair<String, Object>> getEnvVariables(){
+        return Collections.singletonList(p("UNWIND", unwind));
     }
 
     @Override

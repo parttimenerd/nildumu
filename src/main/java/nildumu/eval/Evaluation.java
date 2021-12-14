@@ -123,7 +123,7 @@ public class Evaluation {
         //@Option(names="--dont_split_temci")
         private boolean dontSplitTemciFiles = false;
 
-        @Option(names="--tools", description = "all (paper), alll (two more), nildumu (all without ApproxFlow), nildumu (alll without ApproxFlow), full (+ other MAXSAT and GraphTT), exact (unwind 5, 10, 64, eps=0.1, delta=0.05)")
+        @Option(names="--tools", description = "all (paper), alll (two more), nildumu (all without ApproxFlow), nildumu (alll without ApproxFlow), full (+ other MAXSAT and GraphTT), exact (unwind 5, 10, 64, eps=0.1, delta=0.05), mapproxflow (ApproxFlow with modified CBMC)")
         private List<String> tools = Collections.singletonList("all");
 
         //@Option(names="--parallelism", description = "cores to use")
@@ -172,6 +172,12 @@ public class Evaluation {
                         break;
                     case "nildumu_32w":
                         tools_.add(new Nildumu(32, LeakageAlgorithm.Algo.GRAPHT_PP, true, false));
+                        break;
+                    case "mapproxflow":
+                        tools_.addAll(allTools.stream().filter(t -> t.name.contains("MApproxFlow")).collect(Collectors.toList()));
+                        break;
+                    case "approxflow":
+                        tools_.addAll(allTools.stream().filter(t -> t.name.startsWith("ApproxFlow")).collect(Collectors.toList()));
                         break;
                     case "nildumu_alll":
                         tools_.addAll(AbstractTool.getDefaultTools(cmd.summaryUnwind, true, unwinds)

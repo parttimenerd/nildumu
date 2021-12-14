@@ -57,7 +57,8 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
     }
 
     public static List<AbstractTool> getDefaultTools(boolean summaryUnwind, boolean allAlgos, int... unwindLimits){
-        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.concat(Stream.of(new ApproxFlow(unwind),
+        return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.concat(Stream.of(new ModifiedApproxFlow(unwind),
+                new ApproxFlow(unwind),
                 new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, true, true),
                 new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, true, false)),
                 allAlgos ? Stream.of(new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE),
@@ -67,7 +68,7 @@ public abstract class AbstractTool implements Comparable<AbstractTool> {
 
     public static List<AbstractTool> getAllTools(boolean summaryUnwind, int... unwindLimits){
         return Arrays.stream(unwindLimits).mapToObj(unwind -> Stream.concat(
-                Stream.of(new ApproxFlow(unwind)), Stream.of(new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE),
+                Stream.of(new ApproxFlow(unwind), new ModifiedApproxFlow(unwind)), Stream.of(new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE),
                         new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.UWRMAXSAT),
                         new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP),
                         new Nildumu(unwind, summaryUnwind, LeakageAlgorithm.Algo.GRAPHT_PP, false, false),
