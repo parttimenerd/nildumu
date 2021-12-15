@@ -154,7 +154,7 @@ public class Evaluation {
             List<AbstractTool> tools_ = new ArrayList<>();
             int[] unwinds = cmd.unwinds.isEmpty() ?
                     new int[]{AbstractTool.DEFAULT_UNWIND} : cmd.unwinds.stream().mapToInt(i -> i).toArray();
-            List<AbstractTool> allTools = AbstractTool.getDefaultTools(cmd.summaryUnwind, true, unwinds);
+            List<AbstractTool> allTools = AbstractTool.getDefaultTools(cmd.summaryUnwind, false, unwinds);
             for (String tool : cmd.tools) {
                 switch (tool) {
                     case "all":
@@ -169,6 +169,9 @@ public class Evaluation {
                         break;
                     case "nildumu_32p":
                         tools_.add(new Nildumu(32, LeakageAlgorithm.Algo.OPENWBO_GLUCOSE, true, true));
+                        break;
+                    case "nildumu_wo_summary":
+                        Arrays.stream(unwinds).forEach(i -> tools_.add(Nildumu.withoutSummary(i, LeakageAlgorithm.Algo.GRAPHT_PP)));
                         break;
                     case "nildumu_32w":
                         tools_.add(new Nildumu(32, LeakageAlgorithm.Algo.GRAPHT_PP, true, false));

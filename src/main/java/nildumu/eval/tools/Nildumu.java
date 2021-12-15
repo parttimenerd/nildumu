@@ -25,16 +25,25 @@ public class Nildumu extends AbstractTool {
     }
 
     public Nildumu(int unwind, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic, boolean useReplacements) {
-        this(unwind, 0, algo, useSimplifiedEdgeHeuristic, useReplacements);
+        this(unwind, 0, algo, useSimplifiedEdgeHeuristic, useReplacements, true);
     }
 
     public Nildumu(int unwind, boolean summaryUnwind, LeakageAlgorithm.Algo algo) {
-        this(unwind, summaryUnwind ? unwind : 0, algo, true, true);
+        this(unwind, summaryUnwind ? unwind : 0, algo, true, true, true);
+    }
+
+    public static Nildumu withoutSummary(int unwind, LeakageAlgorithm.Algo algo) {
+        return withoutSummary(unwind, algo, true, true);
     }
 
     public Nildumu(int unwind, boolean summaryUnwind, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic,
                    boolean useReplacements) {
-        this(unwind, summaryUnwind ? unwind : 0, algo, useSimplifiedEdgeHeuristic, useReplacements);
+        this(unwind, summaryUnwind ? unwind : 0, algo, useSimplifiedEdgeHeuristic, useReplacements, true);
+    }
+
+    public static Nildumu withoutSummary(int unwind, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic,
+                   boolean useReplacements) {
+        return new Nildumu(unwind, 0, algo, useSimplifiedEdgeHeuristic, useReplacements, false);
     }
 
     /**
@@ -42,11 +51,13 @@ public class Nildumu extends AbstractTool {
      * @param scsrec maximum recusion depth for the call string handler used by the summary handler
      */
     public Nildumu(int csrec, int scsrec, LeakageAlgorithm.Algo algo, boolean useSimplifiedEdgeHeuristic,
-                   boolean useReplacements){
-        super(String.format("nildumu%02d_%02d_%s_%s_%s", csrec, scsrec, algo.shortName, useSimplifiedEdgeHeuristic ? "s" : "c",
+                   boolean useReplacements, boolean useSummaryHandler){
+        super(String.format("nildumu%s%02d_%02d_%s_%s_%s", useSummaryHandler ? "" : "WOS",
+                csrec, scsrec, algo.shortName, useSimplifiedEdgeHeuristic ? "s" : "c",
                 useReplacements ? "r" : "wor"), csrec, "nd");
-        this.mih = String.format("handler=inlining;maxrec=%d;bot={handler=summary;csmaxrec=%d;bot=basic}",
-                csrec, scsrec);
+        this.mih = useSummaryHandler ? String.format("handler=inlining;maxrec=%d;bot={handler=summary;csmaxrec=%d;bot=basic}",
+                csrec, scsrec) : String.format("handler=inlining;maxrec=%d;bot=basic",
+                csrec);
         this.algo = algo;
         this.useSimplifiedEdgeHeuristic = useSimplifiedEdgeHeuristic;
         this.useReplacements = useReplacements;
