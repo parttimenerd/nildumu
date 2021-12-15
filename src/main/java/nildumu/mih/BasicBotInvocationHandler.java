@@ -41,7 +41,8 @@ class BasicBotInvocationHandler extends MethodInvocationHandler {
         if (!callSite.definition.hasReturnValue()) {
             return new MethodReturnValue(bot(callSite), newGlobals, new InputBits(c));
         }
-        return new MethodReturnValue(Collections.nCopies(callSite.definition.getNumberOfReturnValues(),
-                new Lattices.Value(bl.create(U, set)).withBitCount(c.maxBitWidth)), newGlobals, new InputBits(c));
+        return new MethodReturnValue(IntStream.range(0, callSite.definition.getNumberOfReturnValues())
+                .mapToObj(i -> IntStream.range(0, c.maxBitWidth).mapToObj(i2 -> bl.create(U, set.copy()))
+                        .collect(Lattices.Value.collector())).collect(Collectors.toList()), newGlobals, new InputBits(c));
     }
 }
