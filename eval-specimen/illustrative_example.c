@@ -2,15 +2,13 @@
 /* Should leak log 17 = 4.087 bits */
 /* adapted from ApproxFlow source code */
 
-int nondet();
-
 int main() {
   int O;
-  int S = nondet();
+  int S = INPUT(int);
   S = S & 0x77777777;
   if (S <= 64) O = S;
     else O = 0;
   if (O % 2 == 0)
     O++;
-  return O;
+  LEAK(O);
 }

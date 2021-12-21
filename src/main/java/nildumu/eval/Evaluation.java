@@ -189,9 +189,9 @@ public class Evaluation {
                     case "full":
                         tools_.addAll(AbstractTool.getAllTools(cmd.summaryUnwind, unwinds));
                     case "exact":
-                        tools_.addAll(Arrays.asList(new ApproxFlow(5, 0.1, 0.05),
-                                new ApproxFlow(10, 0.1, 0.05),
-                                new ApproxFlow(64, 0.1, 0.05)));
+                        tools_.addAll(Arrays.asList(DSharpy.createApproxFlow(5, 0.1, 0.05),
+                                DSharpy.createApproxFlow(10, 0.1, 0.05),
+                                DSharpy.createApproxFlow(64, 0.1, 0.05)));
                     default:
                         tools_.addAll(allTools.stream().filter(t -> cmd.tools.contains(t.name)).collect(Collectors.toList()));
                 }

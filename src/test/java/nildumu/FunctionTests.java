@@ -12,6 +12,7 @@ import java.util.logging.Level;
 import java.util.stream.Stream;
 
 import static java.time.Duration.ofSeconds;
+import static nildumu.LoopTransformerTests.transform;
 import static nildumu.Parser.MethodNode;
 import static nildumu.Parser.ProgramNode;
 import static nildumu.Processor.USE_REPLACEMENTS;

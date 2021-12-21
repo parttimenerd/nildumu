@@ -1,9 +1,6 @@
 /* adopted from the ApproxFlow repo, which in turn is based on */
 /* F. Biondi, A. Legay, and J. Quilbeuf, "Comparative analysis of leakage tools on scalable case studies," */
 
-#include <time.h>
-#include <stdlib.h>
-#include <stdio.h>
 //#include <string.h>
 
 // N is the total number of houses 
@@ -46,10 +43,6 @@ int main() {
   
   // the observable is the global consumption of the system
   global_consumption = 0;
-
-
-  srand(time(NULL));
-
   
   
   // Initialize the public values
@@ -104,6 +97,5 @@ int main() {
       i= i + 1;
     }
     // global_consumption is the public value (output)
-    int result = global_consumption;    // we do this by hand, as ApproxFlow has a bug in its C parsing routing
-    __CPROVER_assert(0, "ret-val assertion");
+    LEAK(global_consumption);
 }

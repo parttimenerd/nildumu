@@ -1,9 +1,6 @@
 /* copied from the ApproxFlow repo, which in turn is based on */
 /* F. Biondi, A. Legay, and J. Quilbeuf, “Comparative analysis of leakage tools on scalable case studies,” in Lecture Notes in Computer Science (including subseries Lecture Notes in Artificial Intelligence and Lecture Notes in Bioinformatics), 2015, vol. 9232, pp. 263–281. */
 
-#include <stdlib.h>
-#include <time.h>
-
 #define CONST_N 10
 #define CONST_C 10
 
@@ -23,8 +20,6 @@ int fact(int n){
 
 int main(int argc, char ** args){
   // global declarations
-  
-  srand(time(NULL));
 
   // initialize public values
   N=10;
@@ -40,9 +35,17 @@ int main(int argc, char ** args){
   // The secret is the preference of each voter
   int vote[N]; // these are our secrets
   int CFACT= fact(C);
-  for(int i =0; i<N ; i++){
-    vote[i]=rand()%CFACT;
-  }
+    vote[0] = INPUT() % CFACT;
+    vote[1] = INPUT() % CFACT;
+    vote[2] = INPUT() % CFACT;
+    vote[3] = INPUT() % CFACT;
+    vote[4] = INPUT() % CFACT;
+    vote[5] = INPUT() % CFACT;
+    vote[6] = INPUT() % CFACT;
+    vote[7] = INPUT() % CFACT;
+    vote[8] = INPUT() % CFACT;
+    vote[9] = INPUT() % CFACT;
+
 
     int i = 0;
     int j  = 0;
@@ -57,8 +60,14 @@ int main(int argc, char ** args){
       i= i + 1;
     }
 
-    int results[10] = {result[0], result[1], result[2], result[3], result[4], result[5], result[6], result[7], result[8], result[9]};
-
-  __CPROVER_assert(0, "ret-val assertion");
-  // result is our public value (C ints)
+    LEAK(result[0]);
+    LEAK(result[1]);
+    LEAK(result[2]);
+    LEAK(result[3]);
+    LEAK(result[4]);
+    LEAK(result[5]);
+    LEAK(result[6]);
+    LEAK(result[7]);
+    LEAK(result[8]);
+    LEAK(result[9]);
 }

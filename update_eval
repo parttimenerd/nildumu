@@ -25,9 +25,10 @@ echo "build evaluated jar"
 mvn package -f pom2.xml -DskipTests=true > /dev/null
 cp target/nildumu-minimal-jar-with-dependencies.jar eval-programs/nildumu.jar
 
-git submodule update --recursive --remote
+git submodule update 
+
 #(cd eval-programs/approxflow; git checkout master; git pull)
 
-echo "build modified cbmc"
-(cd bin; rm -fr modified_cbmc/build; ./build > /dev/null)
+echo "build dsharpy"
+(cd eval-programs/dsharpy; git pull origin information_flow --recurse-submodules; ./update.sh > /dev/null)
 

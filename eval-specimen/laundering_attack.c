@@ -1,10 +1,8 @@
-int nondet();
-
 int main(){
-    int h = nondet();
+    int h = INPUT(int);
     int z = 0;
     while (z != h) {
         z = z + 1;
     }
-    return z;
+    LEAK(z);
 }

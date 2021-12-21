@@ -1,9 +1,6 @@
 /* copied from the ApproxFlow repo, which in turn is based on */
 /* F. Biondi, A. Legay, and J. Quilbeuf, “Comparative analysis of leakage tools on scalable case studies,” in Lecture Notes in Computer Science (including subseries Lecture Notes in Artificial Intelligence and Lecture Notes in Bioinformatics), 2015, vol. 9232, pp. 263–281. */
 
-#include <stdlib.h>
-#include <time.h>
-
 #define CONST_N 5
 #define CONST_C 5
 
@@ -24,8 +21,6 @@ int fact(int n){
 int main(int argc, char ** args){
   // global declarations
 
-  srand(time(NULL));
-
   // initialize public values
   N=5;
   C=5;
@@ -40,9 +35,11 @@ int main(int argc, char ** args){
   // The secret is the preference of each voter
   int vote[N]; // these are our secrets
   int CFACT= fact(C);
-  for(int i =0; i<N ; i++){
-    vote[i]=rand()%CFACT;
-  }
+  vote[0] = INPUT() % CFACT;
+  vote[1] = INPUT() % CFACT;
+  vote[2] = INPUT() % CFACT;
+  vote[3] = INPUT() % CFACT;
+  vote[4] = INPUT() % CFACT;
 
   int voter = 0;
   int vote_val = 0;
@@ -94,7 +91,9 @@ k=k-1;
     }
     voter=voter+1;
   }
-    int results[5] = {result[0], result[1], result[2], result[3], result[4]};
-  __CPROVER_assert(0, "ret-val assertion");
-  // result is our public value (C ints)
+  LEAK(result[0]);
+  LEAK(result[1]);
+  LEAK(result[2]);
+  LEAK(result[3]);
+  LEAK(result[4]);
 }

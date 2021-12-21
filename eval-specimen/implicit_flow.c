@@ -2,9 +2,8 @@
 /* https://github.com/qif/jpf-qif/blob/master/src/examples/plas/ImplicitFlow.java */
 /* Should leak log 7 = 2.8074 */
 
-int nondet();
 int main() {
-    int S = nondet();
+    int S = INPUT(int);
     int O;
     if (S == 0) {
         O = 0;
@@ -35,5 +34,5 @@ int main() {
             }
         }
     }
-    return O;
+    LEAK(O);
 }
