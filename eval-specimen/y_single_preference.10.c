@@ -35,16 +35,16 @@ int main(int argc, char ** args){
   // The secret is the preference of each voter
   int vote[N]; // these are our secrets
   int CFACT= fact(C);
-    vote[0] = INPUT() % CFACT;
-    vote[1] = INPUT() % CFACT;
-    vote[2] = INPUT() % CFACT;
-    vote[3] = INPUT() % CFACT;
-    vote[4] = INPUT() % CFACT;
-    vote[5] = INPUT() % CFACT;
-    vote[6] = INPUT() % CFACT;
-    vote[7] = INPUT() % CFACT;
-    vote[8] = INPUT() % CFACT;
-    vote[9] = INPUT() % CFACT;
+    vote[0] = INPUT(int) % CFACT;
+    vote[1] = INPUT(int) % CFACT;
+    vote[2] = INPUT(int) % CFACT;
+    vote[3] = INPUT(int) % CFACT;
+    vote[4] = INPUT(int) % CFACT;
+    vote[5] = INPUT(int) % CFACT;
+    vote[6] = INPUT(int) % CFACT;
+    vote[7] = INPUT(int) % CFACT;
+    vote[8] = INPUT(int) % CFACT;
+    vote[9] = INPUT(int) % CFACT;
 
 
     int i = 0;
