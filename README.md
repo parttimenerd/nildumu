@@ -84,8 +84,12 @@ docker run -i parttimenerd/nildumu ./evaluation --runs 1 --programs all --tools 
 The evaluation commands print the evaluation results.
 
 Running the evaluation without docker is also possible, refer to the Dockerfile for required packages.
-The evaluation of nildumu alone runs without installing additional software, only the usage of ApproxFlow 
-(with which we compare nildumu) requires additional software.
+The evaluation of nildumu alone runs without installing additional software, only the usage of
+[dsharpy](https://github.com/parttimenerd/dsharpy)
+(which includes an implementation of [ApproxFlow](https://github.com/approxflow/approxflow) and
+[relationscutter](https://github.com/parttimenerd/relationscutter)), which we compare with nildumu,
+requires additional software (the version of the SEFM21 paper has is the commit
+[2fcf12994d](https://github.com/parttimenerd/nildumu/tree/2fcf12994d76cf15a3c5fc28acd72496f1dded25)).
 
 
 ### Nildumu Editor UI
