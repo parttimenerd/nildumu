@@ -30,5 +30,8 @@ git submodule update
 #(cd eval-programs/approxflow; git checkout master; git pull)
 
 echo "build dsharpy"
-(cd eval-programs/dsharpy; git pull origin information_flow --recurse-submodules; ./update.sh > /dev/null)
+(cd eval-programs/dsharpy;
+git pull origin information_flow --recurse-submodules;
+pip3 install poetry;
+poetry install; ./update.sh > /dev/null)
 
