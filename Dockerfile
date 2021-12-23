@@ -16,9 +16,9 @@ ENV DEBCONF_NONINTERACTIVE_SEEN true
 RUN echo 'tzdata tzdata/Areas select Etc' | debconf-set-selections; \
     echo 'tzdata tzdata/Zones/Etc select UTC' | debconf-set-selections; \
     apt-get update && apt-get upgrade -y && apt-get install --no-install-recommends -y ca-certificates \
-           make cmake ninja-build gcc g++ flex bison libxml2-utils patch ccache make \
-           zlib1g-dev wget libgmp-dev unzip libc6-dev gcc-multilib g++-multilib vim emacs nano jq git \
-           openjdk-8-jdk ant ca-certificates-java python3 python3-pip maven; \
+           bison ccache cmake curl flex g++ g++-multilib gcc gcc-multilib git jq \
+           libboost-program-options-dev libc6-dev libgmp-dev libxml2-utils make ninja-build patch unzip wget zlib1g-dev \
+            python3 python3-pip ant maven nano vim emacs; \
     update-ca-certificates -f;
 
 # Setup JAVA_HOME -- useful for docker commandline
@@ -29,12 +29,7 @@ COPY . /nildumu
 WORKDIR /nildumu
 WORKDIR /nildumu/eval-programs/dsharpy
 
-RUN rm -fr tools/*/build
-RUN ./update.sh
-
-# install dsharpy
-RUN pip3 install poetry
-RUN poetry install
+RUN ./update_eval
 
 WORKDIR /nildumu
 

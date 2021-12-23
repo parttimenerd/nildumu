@@ -112,7 +112,7 @@ public class Evaluation {
     static class Cmd {
 
         @Option(names="--duration")
-        private String maxDuration = "PT2H";
+        private String maxDuration = "PT1H";
 
         @Option(names="--programs", description = "example programs to evaluate: all (all from paper), small (… except E-Voting)")
         private List<String> normalBench = Collections.singletonList("all");

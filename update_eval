@@ -14,6 +14,8 @@ PROJECT_DIR=$(dirname "$SCRIPT_PATH")
 
 cd "$PROJECT_DIR"
 
+rm -fr .ran_update_eval
+
 echo "check for solvers"
 ./download_solvers > /dev/null
 
@@ -34,4 +36,6 @@ echo "build dsharpy"
 git pull origin information_flow --recurse-submodules;
 pip3 install poetry;
 poetry install; ./update.sh > /dev/null)
+
+touch .ran_update_eval
 

@@ -1,0 +1,1 @@
+sudo sh -c "docker build -t y .; docker tag y parttimenerd/nildumu:latest; docker push parttimenerd/nildumu:latest; docker image rm y"

@@ -1,4 +1,6 @@
 #!/usr/bin/env sh
+# runs the evaluation and builds the evaluation if necessary
+
 set -e
 case "$(uname -s)" in
    Darwin)
@@ -10,25 +12,6 @@ case "$(uname -s)" in
      ;;
 esac
 
-PROJECT_DIR=$(dirname "$SCRIPT_PATH")
-
-
-totalMemKB=$(free --kilo | head -n 2 | tail -n 1 | awk '/:/{print $7}')
-
-# Percentage of free memory to use for Java
-usageFactor=80
-
-# Percentage to use for the heap
-heapFactor=80
-
-# heap size in KB
-avKB=$(($totalMemKB*$usageFactor/100))
-
-# heap size in MB
-heapMB=$(($avKB*$heapFactor/1024/100))
-
-stackMB=$((($avKB / 1024 - $heapMB)))
-
-cd "$PROJECT_DIR"
-./update_eval
-MAVEN_OPTS="-Xmx$((avKB))k" mvn exec:java -Deval -Dexec.args="$*"
+cd "$(dirname "$SCRIPT_PATH")"
+test -f .ran_update_eval || ./update_eval
+mvn exec:java -Deval -Dexec.args="$*"
