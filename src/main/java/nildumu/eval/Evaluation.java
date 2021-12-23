@@ -182,6 +182,9 @@ public class Evaluation {
                     case "approxflow":
                         tools_.addAll(allTools.stream().filter(t -> t.name.startsWith("ApproxFlow")).collect(Collectors.toList()));
                         break;
+                    case "relationscutter":
+                        tools_.addAll(allTools.stream().filter(t -> t.name.startsWith("RelationsCutter")).collect(Collectors.toList()));
+                        break;
                     case "nildumu_alll":
                         tools_.addAll(AbstractTool.getDefaultTools(cmd.summaryUnwind, true, unwinds)
                                 .stream().filter(t -> t.name.contains("nildumu")).collect(Collectors.toList()));
