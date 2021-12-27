@@ -27,7 +27,6 @@ RUN export JAVA_HOME
 
 COPY . /nildumu
 WORKDIR /nildumu
-WORKDIR /nildumu/eval-programs/dsharpy
 
 RUN ./update_eval
 

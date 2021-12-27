@@ -31,7 +31,7 @@ public class DSharpy extends AbstractTool {
     private final double delta;
 
     private DSharpy(String name, String modelChecker, String leakageComputer, int unwindLimit, double epsilon, double delta) {
-        super(name, unwindLimit, "c");
+        super(String.format("%s%02d", name, unwindLimit), unwindLimit, "c");
         this.modelChecker = modelChecker;
         this.leakageComputer = leakageComputer;
         this.epsilon = epsilon;
