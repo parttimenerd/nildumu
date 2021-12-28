@@ -1,0 +1,12 @@
+binary_search.16.nd, 16, 32
+binary_search.32.nd, 32, 32
+electronic_purse.nd, 2, 32
+illustrative_example.nd, 4.087, 32
+implicit_flow.nd, 2.8074, 32
+laundering_attack.nd, 32, 32
+masked_copy.nd, 16, 32
+mixdup.nd, 16, 32
+population_count.nd, 5.0444, 32
+sanity_check.nd, 4, 32
+sum.nd, 32, 32
+y_smart_grid.nd, 7, 32

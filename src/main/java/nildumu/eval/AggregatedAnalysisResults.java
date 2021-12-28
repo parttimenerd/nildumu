@@ -1,15 +1,21 @@
 package nildumu.eval;
 
+import com.kitfox.svg.A;
 import de.vandermeer.asciitable.AsciiTable;
 import de.vandermeer.asciithemes.TA_GridThemes;
 import de.vandermeer.skb.interfaces.transformers.textformat.TextAlignment;
 import org.apache.commons.lang3.StringEscapeUtils;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.*;
 import java.util.stream.*;
 
 import nildumu.eval.tools.AbstractTool;
+import org.apache.commons.lang3.StringUtils;
+import swp.util.Utils;
 
 public class AggregatedAnalysisResults {
 
@@ -65,6 +71,74 @@ public class AggregatedAnalysisResults {
 
     public String toStringPerProgram(AnalysisResultFormatter formatter, Mode... modes) {
         return toString(perProgram, formatter, modes);
+    }
+
+    static class Expected {
+        public final String program;
+        public final float expected;
+        public final float maximum;
+
+        Expected(String program, float expected, float maximum) {
+            this.program = program;
+            this.expected = expected;
+            this.maximum = maximum;
+        }
+    }
+
+    static Map<String, Expected> loadExpected(Path file) throws IOException {
+        return Files.lines(file).map(line -> {
+            String[] parts = line.split(", ?");
+            return new Utils.Triple<>(parts[0], Float.parseFloat(parts[1]), Float.parseFloat(parts[2]));
+        }).collect(Collectors.toMap(t -> t.first, t -> new Expected(t.first, t.second, t.third)));
+    }
+
+    enum LaTexMode {
+        LEAKAGE,
+        RUNTIME
+    }
+
+    public String toLaTexTable(LaTexMode mode, Map<String, Expected> expected, float allowedDeviation) {
+        Function<Float, String> f = x -> StringUtils.leftPad(String.format("%.1f", x), 5);
+        List<List<String>> lines = new ArrayList<>();
+        List<AbstractTool> tools = perProgram.values().iterator().next().keySet().stream().sorted().collect(Collectors.toList());
+        lines.addAll(perProgram.keySet().stream().sorted().map(program -> {
+            Map<AbstractTool, AnalysisResult> resultMap = perProgram.get(program);
+            if (mode == LaTexMode.LEAKAGE) {
+                Optional<Expected> exp = Optional.ofNullable(expected.getOrDefault(program.name, null));
+                List<String> line = new ArrayList<>(Arrays.asList(program.name, f.apply(exp.map(e -> e.expected).orElse(-1f)), f.apply(exp.map(e -> e.maximum).orElse(-1f))));
+                for (AbstractTool tool : tools) {
+                    float value = resultMap.get(tool).leakage;
+                    char mod = exp.map(e -> {
+                        if (e.expected + allowedDeviation >= value && e.expected - allowedDeviation <= value) {
+                            return 'n';
+                        } else if (e.expected + allowedDeviation < value) {
+                            return 'o';
+                        } else if (e.expected - allowedDeviation > value) {
+                            return 'u';
+                        }
+                        return 'n';
+                    }).orElse('n');
+                    line.add(String.format("\\%sa{%s}", mod, f.apply(value)));
+                }
+                return line;
+            } else {
+                List<String> line = new ArrayList<>(Collections.singletonList(program.name));
+                for (AbstractTool tool : tools) {
+                    float value = resultMap.get(tool).runtime.toMillis() / 1000.0f;
+                    line.add(f.apply(value));
+                }
+                return line;
+            }
+        }).collect(Collectors.toList()));
+        List<String> result = new ArrayList<>();
+        List<String> header = new ArrayList<>(mode == LaTexMode.LEAKAGE ? Arrays.asList("", "$I$ [bit]", "$I_{max}$ [bit]") : Collections.singletonList(""));
+        header.addAll(tools.stream().map(AbstractTool::toString).collect(Collectors.toList()));
+        result.add(String.join(" & ", header));
+        for (List<String> line : lines) {
+            String res = StringUtils.rightPad(line.get(0), 30) + "&" + line.subList(1, line.size()).stream().map(l -> String.format("%10s", l)).collect(Collectors.joining(" & "));
+            result.add(res);
+        }
+        return String.join("\\\\\n", result);
     }
 
     /**

@@ -247,6 +247,14 @@ public class Evaluation {
         System.out.println(results.toStringPerProgram(AggregatedAnalysisResults.LEAKAGE, AggregatedAnalysisResults.Mode.NICE) + "\n\n" +
                 results.toStringPerProgram(AggregatedAnalysisResults.RUNTIME, AggregatedAnalysisResults.Mode.NICE));
         try {
+            System.out.println();
+            System.out.println(results.toLaTexTable(AggregatedAnalysisResults.LaTexMode.LEAKAGE, AggregatedAnalysisResults.loadExpected(DEFAULT_SPECIMEN_DIR.resolve("expected_leakages.csv")), 0.8f));
+            System.out.println();
+            System.out.println(results.toLaTexTable(AggregatedAnalysisResults.LaTexMode.RUNTIME, null, 0));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
             Files.write(Paths.get(csvFile), Arrays.asList(csv.split("\n")));
         } catch (IOException e) {
             //e.printStackTrace();
