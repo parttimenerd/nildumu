@@ -10,5 +10,5 @@ int main() {
     } else {
         O = base;
     }
-    LEAK(O);
+    OBSERVE(O);
 }

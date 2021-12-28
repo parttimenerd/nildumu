@@ -97,5 +97,5 @@ int main() {
       i= i + 1;
     }
     // global_consumption is the public value (output)
-    LEAK(global_consumption);
+    OBSERVE(global_consumption);
 }

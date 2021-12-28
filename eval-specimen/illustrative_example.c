@@ -10,5 +10,5 @@ int main() {
     else O = 0;
   if (O % 2 == 0)
     O++;
-  LEAK(O);
+  OBSERVE(O);
 }

@@ -5,5 +5,5 @@ int main() {
     int x = INPUT(int);
     int y = ( ( x >> 16 ) ^ x ) & 0xffff;
     int O = y | ( y << 16 );
-    LEAK(O);
+    OBSERVE(O);
 }

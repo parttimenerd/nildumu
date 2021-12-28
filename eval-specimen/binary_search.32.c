@@ -15,5 +15,5 @@ int main() {
       m = 1<<(31-i);
       if (O + m <= I) O += m;
     }
-    LEAK(O);
+    OBSERVE(O);
 }

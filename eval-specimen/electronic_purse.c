@@ -8,5 +8,5 @@ int main() {
       H = H - 5;
       O = O + 1;
   }
-  LEAK(O);
+  OBSERVE(O);
 }

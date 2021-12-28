@@ -3,5 +3,5 @@
 /* Should leak n */
 
 int main() {
-    LEAK(INPUT(int) + INPUT(int) + INPUT(int));
+    OBSERVE(INPUT(int) + INPUT(int) + INPUT(int));
 }

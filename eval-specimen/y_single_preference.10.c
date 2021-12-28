@@ -60,14 +60,14 @@ int main(int argc, char ** args){
       i= i + 1;
     }
 
-    LEAK(result[0]);
-    LEAK(result[1]);
-    LEAK(result[2]);
-    LEAK(result[3]);
-    LEAK(result[4]);
-    LEAK(result[5]);
-    LEAK(result[6]);
-    LEAK(result[7]);
-    LEAK(result[8]);
-    LEAK(result[9]);
+    OBSERVE(result[0]);
+    OBSERVE(result[1]);
+    OBSERVE(result[2]);
+    OBSERVE(result[3]);
+    OBSERVE(result[4]);
+    OBSERVE(result[5]);
+    OBSERVE(result[6]);
+    OBSERVE(result[7]);
+    OBSERVE(result[8]);
+    OBSERVE(result[9]);
 }

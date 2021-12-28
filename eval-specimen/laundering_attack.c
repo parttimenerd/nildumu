@@ -4,5 +4,5 @@ int main(){
     while (z != h) {
         z = z + 1;
     }
-    LEAK(z);
+    OBSERVE(z);
 }

@@ -54,9 +54,9 @@ int main(int argc, char ** args){
       i= i + 1;
     }
 
-      LEAK(result[0]);
-      LEAK(result[1]);
-      LEAK(result[2]);
-      LEAK(result[3]);
-      LEAK(result[4]);
+      OBSERVE(result[0]);
+      OBSERVE(result[1]);
+      OBSERVE(result[2]);
+      OBSERVE(result[3]);
+      OBSERVE(result[4]);
 }

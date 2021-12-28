@@ -2,5 +2,5 @@
 /* Should leak 16 bits */
 
 int main() {
-    LEAK(INPUT(int) & 0xffff0000);
+    OBSERVE(INPUT(int) & 0xffff0000);
 }
